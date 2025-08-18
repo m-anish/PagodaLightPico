@@ -1,29 +1,56 @@
 """
-Configuration file for PagodaLightPico project.
+Configuration for PagodaLightPico
 
-Rename this file to `config.py` before use, and update the values with your specific settings.
-
-Attributes:
-    WIFI_SSID (str): WiFi network SSID for Pico W connection.
-    WIFI_PASSWORD (str): WiFi network password.
-    TIMEZONE_NAME (str): Abbreviation for the timezone (e.g., IST, UTC, PST).
-    TIMEZONE_OFFSET (float): Offset from UTC in hours (e.g., 5.5 for IST).
-    RTC_I2C_SDA_PIN (int): GPIO pin number for I2C SDA line connected to DS3231.
-    RTC_I2C_SCL_PIN (int): GPIO pin number for I2C SCL line connected to DS3231.
-    LOG_LEVEL (str): Logging level. Options: 'FATAL', 'ERROR', 'WARN', 'INFO', 'DEBUG'.
+Rename to config.py before use and set values as needed.
 """
 
-# WiFi credentials
 WIFI_SSID = "your_wifi_ssid_here"
 WIFI_PASSWORD = "your_wifi_password_here"
 
-# Timezone settings
 TIMEZONE_NAME = "IST"       # e.g., IST, UTC, PST
-TIMEZONE_OFFSET = 5.5       # Timezone offset from UTC in hours (e.g., 5.5 for IST)
+TIMEZONE_OFFSET = 5.5       # Offset from UTC in hours
 
-# I2C pins for DS3231 RTC (adjust as per your wiring)
-RTC_I2C_SDA_PIN = 20
+RTC_I2C_SDA_PIN = 20       # GPIO pins for I2C (DS3231)
 RTC_I2C_SCL_PIN = 21
 
-# Logging level (options: 'FATAL', 'ERROR', 'WARN', 'INFO', 'DEBUG')
-LOG_LEVEL = 'DEBUG'
+LED_PWM_PIN = 16           # GPIO pin used for PWM LED control
+
+PWM_FREQUENCY = 1000       # PWM frequency in Hz
+
+LOG_LEVEL = 'DEBUG'        # Logging levels: FATAL, ERROR, WARN, INFO, DEBUG
+
+UPDATE_INTERVAL = 60       # Update interval in seconds; controls frequency of LED updates
+
+# Time windows for LED duty cycle control; "day" window start/end replaced dynamically
+TIME_WINDOWS = {
+    "day": {
+        "start": "06:00",  # Default 6am
+        "end": "18:00",    # Default 6pm
+        "duty_cycle": 0    # Default duty cycle for day is 0
+    },
+    "window_1": {
+        "start": "18:00",
+        "end": "20:00",
+        "duty_cycle": 60
+    },
+    "window_2": {
+        "start": "20:00",
+        "end": "22:00",
+        "duty_cycle": 40
+    },
+    "window_3": {
+        "start": "22:00",
+        "end": "00:00",
+        "duty_cycle": 20
+    },
+    "window_4": {
+        "start": "00:00",
+        "end": "04:00",
+        "duty_cycle": 10
+    },
+    "window_5": {
+        "start": "04:00",
+        "end": "06:00",
+        "duty_cycle": 30
+    }
+}

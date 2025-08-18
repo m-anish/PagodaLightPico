@@ -1,33 +1,35 @@
 """
-Main control loop for PWM output based on sunrise and sunset times.
+main.py
 
-Handles WiFi and NTP sync on boot, daily update of sunrise/sunset times,
-and periodic PWM duty adjustment based on current time and schedule.
+Main application script for PagodaLightPico.
 
-Logs key events and debug info.
+Controls LED lighting PWM duty cycle based on configurable time windows
+and dynamically calculated sunrise and sunset times from sun_times_leh module.
+
+The "day" time window start and end times are set dynamically each check
+based on the current date's sunrise and sunset times.
+
+Other time windows are configured statically in config.py.
+
+The script reads real-time clock (RTC) time using rtc_module and sets PWM
+on an assigned GPIO pin accordingly.
+
+Logging is done via simple_logger with timestamps and levels.
 """
 
-import time
-from rtc_module import get_current_time
-from sun_times_leh import get_sunrise_sunset
-from pwm_control import PWMController
-from wifi_connect import connect_wifi, sync_time_ntp
+import config
+import sun_times_leh
+import rtc_module
 from simple_logger import Logger
+from machine import PWM, Pin
+from wifi_connect import connect_wifi, sync_time_ntp
+import time
 
 log = Logger()
 
-def get_seconds_since_midnight(hours, minutes):
-    """
-    Convert hours and minutes to seconds since midnight.
-
-    Args:
-        hours (int): Hour component.
-        minutes (int): Minute component.
-
-    Returns:
-        int: Seconds since midnight.
-    """
-    return hours * 3600 + minutes * 60
+led_pin = Pin(config.LED_PWM_PIN)  # PWM pin from config
+led_pwm = PWM(led_pin)
+led_pwm.freq(config.PWM_FREQUENCY)
 
 log.info("Starting system")
 
@@ -38,40 +40,114 @@ if connect_wifi():
 else:
     log.warn("Using RTC time due to WiFi connection failure")
 
-pwm = PWMController()
 
-last_date = None
-sunrise = 0
-sunset = 0
+def time_str_to_minutes(time_str):
+    """
+    Convert a time string 'HH:MM' into total minutes past midnight.
 
-while True:
-    year, month, day, hour, minute, second, weekday = get_current_time()
+    Args:
+        time_str (str): Time formatted as 'HH:MM'.
 
-    if (year, month, day) != last_date:
-        sun_rise_h, sun_rise_m, sun_set_h, sun_set_m = get_sunrise_sunset(month, day)
-        sunrise = get_seconds_since_midnight(sun_rise_h, sun_rise_m)
-        sunset = get_seconds_since_midnight(sun_set_h, sun_set_m)
-        last_date = (year, month, day)
-        log.info("Updated sunrise to {:02d}:{:02d} and sunset to {:02d}:{:02d} for {:04d}-{:02d}-{:02d}".format(
-            sun_rise_h, sun_rise_m, sun_set_h, sun_set_m, year, month, day))
+    Returns:
+        int: Total minutes past midnight.
+    """
+    hour, minute = map(int, time_str.split(":"))
+    return hour * 60 + minute
 
-    now = get_seconds_since_midnight(hour, minute)
-    t_2200 = get_seconds_since_midnight(22, 0)
-    t_midnight = 0
-    t_2hr_before_sunrise = sunrise - 7200 if sunrise - 7200 > 0 else 0
 
-    duty = 0
-    if sunrise <= now < sunset:
-        duty = 0
-    elif sunset <= now < t_2200:
-        duty = 90
-    elif t_2200 <= now or now == 0:
-        duty = 70
-    elif t_midnight <= now < t_2hr_before_sunrise:
-        duty = 40
-    elif t_2hr_before_sunrise <= now < sunrise:
-        duty = 90
+def int_to_time_str(hour, minute):
+    """
+    Format integers hour and minute as zero-padded 'HH:MM' string.
 
-    pwm.set_duty_percent(duty)
-    log.debug("Time {:02d}:{:02d}:{:02d} - PWM duty set to {}%".format(hour, minute, second, duty))
-    time.sleep(30)
+    Args:
+        hour (int): Hour component (0-23).
+        minute (int): Minute component (0-59).
+
+    Returns:
+        str: Time string formatted as 'HH:MM'.
+    """
+    return f"{hour:02d}:{minute:02d}"
+
+
+def get_current_window(time_windows, current_time_tuple):
+    """
+    Determine the currently active time window and corresponding PWM duty cycle.
+
+    The "day" window's start and end times are dynamically updated from sunrise
+    and sunset times retrieved via sun_times_leh.get_sunrise_sunset().
+
+    Args:
+        time_windows (dict): Dictionary of time windows with start/end times and duty cycles.
+        current_time_tuple (tuple): Current local time tuple (year, month, day, hour, minute, ...).
+
+    Returns:
+        tuple (str, int): The active window name and duty cycle percentage.
+                         Returns (None, 0) if no active window matches.
+    """
+    current_minutes = current_time_tuple[3] * 60 + current_time_tuple[4]
+    month = current_time_tuple[1]
+    day = current_time_tuple[2]
+
+    log.debug(f"RTC current time: {current_time_tuple}")
+    sunrise_h, sunrise_m, sunset_h, sunset_m = sun_times_leh.get_sunrise_sunset(month, day)
+    log.debug(f"Sunrise/sunset times for {month}/{day}: "
+              f"{sunrise_h:02d}:{sunrise_m:02d}, {sunset_h:02d}:{sunset_m:02d}")
+
+    sunrise_str = int_to_time_str(sunrise_h, sunrise_m)
+    sunset_str = int_to_time_str(sunset_h, sunset_m)
+    log.debug(f"Formatted sunrise/sunset times: {sunrise_str}, {sunset_str}")
+
+    windows = dict(time_windows)
+    if "day" in windows:
+        windows["day"] = windows["day"].copy()
+        windows["day"]["start"] = sunrise_str
+        windows["day"]["end"] = sunset_str
+
+    for window_name, window in windows.items():
+        start = time_str_to_minutes(window["start"])
+        end = time_str_to_minutes(window["end"])
+        duty = window["duty_cycle"]
+
+        log.debug(f"Checking window '{window_name}' start: {window['start']} ({start}), "
+                  f"end: {window['end']} ({end}), duty: {duty}")
+
+        if start <= end:
+            if start <= current_minutes < end:
+                log.debug(f"Current time {current_minutes} is within window '{window_name}'")
+                return window_name, duty
+        else:
+            # Handle overnight windows crossing midnight
+            if current_minutes >= start or current_minutes < end:
+                log.debug(f"Current time {current_minutes} is within overnight window '{window_name}'")
+                return window_name, duty
+    log.debug("No matching time window found")
+    return None, 0
+
+
+def update_led():
+    """
+    Reads the current time from RTC and updates the LED PWM duty cycle
+    based on the active time window.
+    """
+    current_time = rtc_module.get_current_time()
+    window, duty_cycle = get_current_window(config.TIME_WINDOWS, current_time)
+    if window:
+        log.info(f"Active window: {window}, setting duty cycle: {duty_cycle}%")
+        led_pwm.duty_u16(int(duty_cycle / 100 * 65535))
+    else:
+        log.warn("No active window detected, turning LED off")
+        led_pwm.duty_u16(0)
+
+
+def main_loop():
+    """
+    Main loop that repeatedly updates the LED PWM every configured interval.
+    """
+    while True:
+        update_led()
+        time.sleep(config.UPDATE_INTERVAL)
+
+
+if __name__ == "__main__":
+    main_loop()
+
