@@ -156,6 +156,10 @@ class ConfigWebServer:
             '/': self._page_status,
             '/config': self._page_config,
             '/system': self._page_system,
+            '/pins': self._page_pins,
+            '/windows': self._page_windows,
+            '/notifications': self._page_notifications,
+            '/upload': self._page_upload,
             '/api/config': self._api_config_get,
             '/api/status': self._api_status_get,
             '/api/download': self._api_download_config,
@@ -275,6 +279,8 @@ class ConfigWebServer:
             # Simple navigation
             html += "<hr><p><a href='/config'>WiFi Config</a> | "
             html += "<a href='/system'>System Settings</a> | "
+            html += "<a href='/pins'>Add/Remove Controllers</a> | "
+            html += "<a href='/windows'>Manage Controllers</a> | "
             html += "<a href='/api/download'>Download Config</a></p>"
             html += "</body></html>"
             
