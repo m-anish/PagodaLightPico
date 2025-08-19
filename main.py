@@ -48,7 +48,19 @@ if wifi_connected:
     
     # Start web server for configuration management
     if web_server.start():
-        log.info("Web configuration server started - access via http://[pico-ip]/")
+        # Get actual IP address for the log message
+        try:
+            import network
+            wlan = network.WLAN(network.STA_IF)
+            if wlan.isconnected():
+                ip_address = wlan.ifconfig()[0]
+                log.info(f"Web configuration server started - access via http://{ip_address}/")
+            else:
+                log.info("Web configuration server started - access via http://[pico-ip]/")
+        except Exception as e:
+            log.info("Web configuration server started - access via http://[pico-ip]/")
+            log.debug(f"Could not get IP address: {e}")
+        
         system_status.set_connection_status(web_server=True)
         
         # Device accessible via configured hostname or direct IP
