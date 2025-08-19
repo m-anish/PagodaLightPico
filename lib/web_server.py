@@ -297,8 +297,11 @@ class ConfigWebServer:
             try:
                 config_data = config_manager.get_config_dict()
                 ssid = config_data.get('wifi', {}).get('ssid', '')
-                html += f"<p><label>Network Name (SSID):</label><input name='ssid' value='{ssid}' required></p>"
-            except:
+                # HTML escape the SSID value to handle special characters
+                ssid_escaped = self._html_escape(ssid)
+                html += f"<p><label>Network Name (SSID):</label><input name='ssid' value='{ssid_escaped}' required></p>"
+            except Exception as e:
+                log.error(f"[WEB] Error loading SSID from config: {e}")
                 html += "<p><label>Network Name (SSID):</label><input name='ssid' required></p>"
             
             html += "<p><label>Password:</label><input type='password' name='password' required></p>"
@@ -803,7 +806,8 @@ class ConfigWebServer:
         """API endpoint to download configuration as JSON file."""
         try:
             config_data = config_manager.get_config_dict()
-            json_data = json.dumps(config_data, indent=2)
+            # Use json.dumps without indent parameter for MicroPython compatibility
+            json_data = json.dumps(config_data)
             
             # Create HTTP response with file download headers
             response = "HTTP/1.1 200 OK\r\n"
@@ -1391,6 +1395,20 @@ class ConfigWebServer:
         except Exception as e:
             log.error(f"[WEB] Error parsing multipart upload: {e}")
             return None
+
+
+    def _html_escape(self, text):
+        """Simple HTML escaping for attribute values."""
+        if not text:
+            return ""
+        # Replace common HTML special characters
+        text = str(text)
+        text = text.replace('&', '&amp;')
+        text = text.replace('<', '&lt;')
+        text = text.replace('>', '&gt;')
+        text = text.replace('"', '&quot;')
+        text = text.replace("'", '&#x27;')
+        return text
 
 
 # Global web server instance
