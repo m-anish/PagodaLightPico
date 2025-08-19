@@ -206,7 +206,7 @@ class SystemStatus:
             },
             "time_window": {
                 "current": self.current_window,
-                "current_display": (self.current_window or '').replace('_', ' ').title() if self.current_window else "None",
+                "current_display": self._safe_format_window_name(self.current_window),
                 "start_time": self.current_window_start,
                 "end_time": self.current_window_end,
                 "last_update": self.last_update_time
@@ -219,6 +219,35 @@ class SystemStatus:
             }
         }
     
+    def _safe_format_window_name(self, window_name):
+        """
+        Safely format window name for display.
+        
+        Args:
+            window_name (str): Raw window name
+            
+        Returns:
+            str: Formatted window name
+        """
+        try:
+            if not window_name:
+                return "None"
+            
+            # Convert to string safely
+            safe_name = str(window_name) if window_name is not None else ''
+            if not safe_name:
+                return "None"
+                
+            # Format the name
+            formatted = safe_name.replace('_', ' ')
+            if hasattr(formatted, 'title'):
+                return formatted.title()
+            else:
+                return formatted
+        except Exception as e:
+            log.error(f"[STATUS] Error formatting window name '{window_name}': {e}")
+            return "Unknown"
+    
     def get_status_summary(self):
         """
         Get brief status summary for logging.
@@ -227,7 +256,7 @@ class SystemStatus:
             str: Status summary string
         """
         time_info = self.get_current_time_info()
-        window_display = (self.current_window or '').replace('_', ' ').title() if self.current_window else "None"
+        window_display = self._safe_format_window_name(self.current_window)
         
         return (f"LED: {self.current_duty_cycle}%, "
                 f"Window: {window_display}, "

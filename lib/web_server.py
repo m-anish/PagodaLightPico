@@ -320,28 +320,56 @@ class ConfigWebServer:
             if window_name.startswith('_'):  # Skip comment fields
                 continue
             
-            readonly = "readonly class='readonly'" if window_name == "day" else ""
-            is_day = window_name == "day"
-            
-            html += f"""
-                    <div class="time-window">
-                        <h4>{"🌅 Day (Auto-adjusted)" if is_day else f"🌙 {str(window_name or '').replace('_', ' ').title() or 'Unknown'}"}</h4>
-                        {"<small>Start and end times are automatically set based on sunrise/sunset</small>" if is_day else ""}
-                        <div class="time-inputs">
-                            <div class="form-group">
-                                <label for="{window_name}_start">Start Time:</label>
-                                <input type="time" id="{window_name}_start" name="{window_name}_start" value="{window_config.get('start', '')}" {readonly} required>
+            try:
+                readonly = "readonly class='readonly'" if window_name == "day" else ""
+                is_day = window_name == "day"
+                
+                # Safe window name processing
+                if is_day:
+                    window_display = "🌅 Day (Auto-adjusted)"
+                else:
+                    try:
+                        # Extra safety for window name processing
+                        safe_name = str(window_name) if window_name is not None else ''
+                        if safe_name:
+                            formatted_name = safe_name.replace('_', ' ')
+                            if hasattr(formatted_name, 'title'):
+                                window_display = f"🌙 {formatted_name.title()}"
+                            else:
+                                window_display = f"🌙 {formatted_name}"
+                        else:
+                            window_display = "🌙 Unknown"
+                    except Exception as e:
+                        log.error(f"[WEB] Error formatting window name '{window_name}': {e}")
+                        window_display = "🌙 Unknown"
+                
+                html += f"""
+                        <div class="time-window">
+                            <h4>{window_display}</h4>
+                            {"<small>Start and end times are automatically set based on sunrise/sunset</small>" if is_day else ""}
+                            <div class="time-inputs">
+                                <div class="form-group">
+                                    <label for="{window_name}_start">Start Time:</label>
+                                    <input type="time" id="{window_name}_start" name="{window_name}_start" value="{window_config.get('start', '')}" {readonly} required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="{window_name}_end">End Time:</label>
+                                    <input type="time" id="{window_name}_end" name="{window_name}_end" value="{window_config.get('end', '')}" {readonly} required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="{window_name}_duty">Brightness (%):</label>
+                                    <input type="number" id="{window_name}_duty" name="{window_name}_duty" min="0" max="100" value="{window_config.get('duty_cycle', 0)}" required>
+                                </div>
                             </div>
-                            <div class="form-group">
-                                <label for="{window_name}_end">End Time:</label>
-                                <input type="time" id="{window_name}_end" name="{window_name}_end" value="{window_config.get('end', '')}" {readonly} required>
-                            </div>
-                            <div class="form-group">
-                                <label for="{window_name}_duty">Brightness (%):</label>
-                                <input type="number" id="{window_name}_duty" name="{window_name}_duty" min="0" max="100" value="{window_config.get('duty_cycle', 0)}" required>
-                            </div>
-                        </div>
-                    </div>"""
+                        </div>"""
+            except Exception as e:
+                log.error(f"[WEB] Error processing time window '{window_name}': {e}")
+                # Add a fallback window entry
+                html += f"""
+                        <div class="time-window">
+                            <h4>🌙 Error: {window_name or 'Unknown'}</h4>
+                            <p>Error processing this time window configuration.</p>
+                        </div>"""
         
         html += """
                 </div>
