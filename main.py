@@ -31,7 +31,7 @@ Async Architecture:
 
 import asyncio
 from lib import config_manager as config
-import sun_times_leh
+from lib import sun_times_leh
 import rtc_module
 from simple_logger import Logger
 from wifi_connect import connect_wifi, sync_time_ntp
@@ -99,7 +99,15 @@ def get_current_window_for_pin(pin_config):
         if 'day' in time_windows:
             day_window = time_windows['day'].copy()
             try:
-                sunrise_time, sunset_time = sun_times_leh.get_sunrise_sunset()
+                # Get current month and day for sunrise/sunset lookup
+                current_month = current_time[1]  # Month from RTC time tuple
+                current_day = current_time[2]    # Day from RTC time tuple
+                sunrise_sunset_data = sun_times_leh.get_sunrise_sunset(current_month, current_day)
+                
+                # Extract sunrise and sunset times (format: (sunrise_hour, sunrise_min, sunset_hour, sunset_min))
+                sunrise_time = (sunrise_sunset_data[0], sunrise_sunset_data[1])
+                sunset_time = (sunrise_sunset_data[2], sunrise_sunset_data[3])
+                
                 day_window['start'] = f"{sunrise_time[0]:02d}:{sunrise_time[1]:02d}"
                 day_window['end'] = f"{sunset_time[0]:02d}:{sunset_time[1]:02d}"
                 time_windows['day'] = day_window
