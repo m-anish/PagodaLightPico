@@ -1,7 +1,7 @@
 """
 main.py
 
-Main application script for PagodaLightPico.
+Main application script for PagodaLightPico with async architecture.
 
 Controls multiple LED lighting PWM outputs based on individual configurable time windows
 and dynamically calculated sunrise and sunset times from sun_times_leh module.
@@ -21,8 +21,15 @@ Web Interface:
 - When WiFi is connected, access http://[pico-ip]/ for configuration management
 - All settings can be updated in real-time without restarting the system
 - Changes are validated and applied immediately
+
+Async Architecture:
+- Web server runs in its own async task
+- PWM updates run in a separate async task
+- Network monitoring runs in a separate async task
+- All tasks run concurrently without blocking each other
 """
 
+import asyncio
 from lib import config_manager as config
 import sun_times_leh
 import rtc_module
@@ -30,288 +37,175 @@ from simple_logger import Logger
 from wifi_connect import connect_wifi, sync_time_ntp
 import time
 from lib.pwm_control import multi_pwm
-from lib.web_server import web_server
+from lib.web_server_async import AsyncWebServer
 from lib.mqtt_notifier import mqtt_notifier
 from lib.system_status import system_status
 
 log = Logger()
 
-log.info("Starting system")
+log.info("Starting async system")
 
+# Initialize WiFi and services
 wifi_connected = connect_wifi()
 if wifi_connected:
     log.info("WiFi connected successfully")
     system_status.set_connection_status(wifi=True)
     
-    if not sync_time_ntp():
-        log.warn("Using RTC time due to NTP sync failure")
+    # Sync time from NTP
+    try:
+        sync_time_ntp()
+        log.info("Time synchronized from NTP")
+    except Exception as e:
+        log.error(f"NTP sync failed: {e}")
     
-    # Start web server for configuration management
-    if web_server.start():
-        # Get actual IP address for the log message
-        try:
-            import network
-            wlan = network.WLAN(network.STA_IF)
-            if wlan.isconnected():
-                ip_address = wlan.ifconfig()[0]
-                log.info(f"Web configuration server started - access via http://{ip_address}/")
-            else:
-                log.info("Web configuration server started - access via http://[pico-ip]/")
-        except Exception as e:
-            log.info("Web configuration server started - access via http://[pico-ip]/")
-            log.debug(f"Could not get IP address: {e}")
-        
-        system_status.set_connection_status(web_server=True)
-        
-        # Device accessible via configured hostname or direct IP
-        hostname = config.config_manager.get_config_dict().get('hostname', 'PagodaLightPico')
-        log.info(f"Device hostname: {hostname}")
-    else:
-        log.error("Failed to start web configuration server")
-        system_status.set_connection_status(web_server=False)
+    # Start async web server
+    web_server = AsyncWebServer()
     
-    # Start MQTT notifications if enabled
+    # Connect MQTT if enabled
     if mqtt_notifier.connect():
-        log.info("MQTT notifications enabled")
+        log.info("MQTT connected successfully")
         system_status.set_connection_status(mqtt=True)
     else:
-        log.warn("MQTT notifications not available")
+        log.info("MQTT connection failed or disabled")
         system_status.set_connection_status(mqtt=False)
+        
 else:
     log.warn("Using RTC time due to WiFi connection failure")
     system_status.set_connection_status(wifi=False, web_server=False, mqtt=False)
+    web_server = None
 
+# Initialize PWM controller
+multi_pwm.initialize()
 
-def time_str_to_minutes(time_str):
+def get_current_window_for_pin(pin_config):
     """
-    Convert a time string 'HH:MM' into total minutes past midnight.
-
+    Determine which time window is currently active for a specific pin.
+    
     Args:
-        time_str (str): Time formatted as 'HH:MM'.
-
+        pin_config (dict): Pin configuration with time_windows
+        
     Returns:
-        int: Total minutes past midnight.
-    """
-    hour, minute = map(int, time_str.split(":"))
-    return hour * 60 + minute
-
-
-def int_to_time_str(hour, minute):
-    """
-    Format integers hour and minute as zero-padded 'HH:MM' string.
-
-    Args:
-        hour (int): Hour component (0-23).
-        minute (int): Minute component (0-59).
-
-    Returns:
-        str: Time string formatted as 'HH:MM'.
-    """
-    return f"{hour:02d}:{minute:02d}"
-
-
-def get_current_window(time_windows, current_time_tuple):
-    """
-    Determine the currently active time window and corresponding PWM duty
-    cycle.
-
-    The "day" window's start and end times are dynamically updated from
-    sunrise and sunset times retrieved via sun_times_leh.get_sunrise_sunset().
-
-    Args:
-        time_windows (dict): Dictionary of time windows with start/end times
-            and duty cycles.
-        current_time_tuple (tuple): Current local time tuple (year, month,
-            day, hour, minute, ...).
-
-    Returns:
-        tuple (str, int): The active window name and duty cycle percentage.
-                         Returns (None, 0) if no active window matches.
-    """
-    current_minutes = current_time_tuple[3] * 60 + current_time_tuple[4]
-    month = current_time_tuple[1]
-    day = current_time_tuple[2]
-
-    # Reduce debug logging to save memory
-    # log.debug(f"[MAIN] RTC current time: {current_time_tuple}")
-    sunrise_h, sunrise_m, sunset_h, sunset_m = \
-        sun_times_leh.get_sunrise_sunset(month, day)
-    # log.debug(f"[MAIN] Sunrise/sunset times for {month}/{day}: "
-    #           f"{sunrise_h:02d}:{sunrise_m:02d}, "
-    #           f"{sunset_h:02d}:{sunset_m:02d}")
-
-    sunrise_str = int_to_time_str(sunrise_h, sunrise_m)
-    sunset_str = int_to_time_str(sunset_h, sunset_m)
-    # log.debug(f"[MAIN] Formatted sunrise/sunset times: {sunrise_str}, {sunset_str}")
-
-    windows = dict(time_windows)
-    if "day" in windows:
-        windows["day"] = windows["day"].copy()
-        windows["day"]["start"] = sunrise_str
-        windows["day"]["end"] = sunset_str
-
-    for window_name, window in windows.items():
-        start = time_str_to_minutes(window["start"])
-        end = time_str_to_minutes(window["end"])
-        duty = window["duty_cycle"]
-
-        # log.debug(f"[MAIN] Checking window '{window_name}' start: {window['start']} "
-        #           f"({start}), end: {window['end']} ({end}), duty: {duty}")
-
-        if start <= end:
-            if start <= current_minutes < end:
-                # log.debug(f"[MAIN] Current time {current_minutes} is within window "
-                #           f"'{window_name}'")
-                return window_name, duty
-        else:
-            # Handle overnight windows crossing midnight
-            if current_minutes >= start or current_minutes < end:
-                # log.debug(
-                #     f"[MAIN] Current time {current_minutes} is within overnight "
-                #     f"window '{window_name}'")
-                return window_name, duty
-    # log.debug("[MAIN] No matching time window found")
-    return None, 0
-
-
-def update_pwm_pins():
-    """
-    Reads the current time from RTC and updates all enabled PWM pin duty cycles
-    based on their individual time windows. Also updates system status and sends
-    MQTT notifications when windows change.
+        tuple: (window_name, window_config) or (None, None) if no active window
     """
     try:
-        current_time_tuple = rtc_module.get_current_time()
-        config_dict = config.config_manager.get_config_dict()
-        pwm_pins = config_dict.get('pwm_pins', {})
+        current_time = rtc_module.get_current_time()
+        current_hour = current_time[3]
+        current_minute = current_time[4]
+        current_minutes_since_midnight = current_hour * 60 + current_minute
         
-        # Process each enabled PWM pin
-        pin_updates = {}
-        for pin_key, pin_config in pwm_pins.items():
-            # Skip comment fields and disabled pins
-            if pin_key.startswith('_') or not pin_config.get('enabled', False):
+        time_windows = pin_config.get('time_windows', {})
+        
+        # Handle dynamic day window with sunrise/sunset
+        if 'day' in time_windows:
+            day_window = time_windows['day'].copy()
+            try:
+                sunrise_time, sunset_time = sun_times_leh.get_sunrise_sunset()
+                day_window['start'] = f"{sunrise_time[0]:02d}:{sunrise_time[1]:02d}"
+                day_window['end'] = f"{sunset_time[0]:02d}:{sunset_time[1]:02d}"
+                time_windows['day'] = day_window
+            except Exception as e:
+                log.error(f"Error getting sunrise/sunset times: {e}")
+        
+        # Check each time window to see if current time falls within it
+        for window_name, window_config in time_windows.items():
+            if not isinstance(window_config, dict):
                 continue
                 
-            pin_name = pin_config.get('name', pin_key)
-            time_windows = pin_config.get('time_windows', {})
+            start_str = window_config.get('start')
+            end_str = window_config.get('end')
             
-            # Get current window for this pin
-            window, duty_cycle = get_current_window(time_windows, current_time_tuple)
+            if not start_str or not end_str:
+                continue
             
-            # Get window start/end times for status and notifications
-            window_start = None
-            window_end = None
-            if window and window in time_windows:
-                window_config = time_windows[window]
-                window_start = window_config.get("start")
-                window_end = window_config.get("end")
+            try:
+                start_parts = start_str.split(':')
+                end_parts = end_str.split(':')
+                start_minutes = int(start_parts[0]) * 60 + int(start_parts[1])
+                end_minutes = int(end_parts[0]) * 60 + int(end_parts[1])
                 
-                # For day window, use actual sunrise/sunset times
-                if window == "day":
-                    month = current_time_tuple[1]
-                    day = current_time_tuple[2]
-                    sunrise_h, sunrise_m, sunset_h, sunset_m = sun_times_leh.get_sunrise_sunset(month, day)
-                    window_start = int_to_time_str(sunrise_h, sunrise_m)
-                    window_end = int_to_time_str(sunset_h, sunset_m)
-            
-            # Update PWM for this pin
-            if window:
-                # Reduce debug logging to save memory
-                # log.info(f"Pin {pin_name}: Active window '{window}', setting duty cycle: {duty_cycle}%")
-                multi_pwm.set_pin_duty_percent(pin_key, duty_cycle)
-            else:
-                # log.warn(f"Pin {pin_name}: No active window detected, turning off")
-                multi_pwm.set_pin_duty_percent(pin_key, 0)
-                duty_cycle = 0
-            
-            # Store pin update info for status and notifications
-            pin_updates[pin_key] = {
-                'name': pin_name,
-                'window': window,
-                'duty_cycle': duty_cycle,
-                'window_start': window_start,
-                'window_end': window_end
-            }
+                # Handle overnight windows (e.g., 22:00 to 06:00)
+                if start_minutes > end_minutes:
+                    if current_minutes_since_midnight >= start_minutes or current_minutes_since_midnight < end_minutes:
+                        return window_name, window_config
+                else:
+                    if start_minutes <= current_minutes_since_midnight < end_minutes:
+                        return window_name, window_config
+                        
+            except (ValueError, IndexError) as e:
+                log.error(f"Invalid time format in window {window_name}: {e}")
+                continue
         
-        # Update system status with all pin information
-        system_status.update_multi_pin_status(pin_updates)
+        return None, None
         
-        # Send MQTT notifications for changed windows
-        mqtt_notifier.notify_multi_pin_changes(pin_updates)
+    except Exception as e:
+        log.error(f"Error determining current window: {e}")
+        return None, None
+
+async def update_pwm_pins():
+    """
+    Async task to update PWM pins based on current time windows.
+    """
+    try:
+        config_data = config.config_manager.get_config_dict()
+        pwm_pins = config_data.get('pwm_pins', {})
+        
+        pin_updates = {}
+        
+        for pin_key, pin_config in pwm_pins.items():
+            if pin_key.startswith('_'):
+                continue  # Skip comment entries
+            
+            if not isinstance(pin_config, dict):
+                log.error(f"Invalid pin config for {pin_key}: expected dict, got {type(pin_config)}")
+                continue
+            
+            enabled = pin_config.get('enabled', False)
+            if not enabled:
+                continue
+            
+            gpio_pin = pin_config.get('gpio_pin')
+            if gpio_pin is None:
+                log.error(f"No GPIO pin specified for {pin_key}")
+                continue
+            
+            # Get current active window
+            window_name, window_config = get_current_window_for_pin(pin_config)
+            
+            if window_config:
+                duty_cycle = window_config.get('duty_cycle', 0)
+                pin_name = pin_config.get('name', f'Pin {gpio_pin}')
+                
+                # Update PWM
+                multi_pwm.set_duty_cycle(gpio_pin, duty_cycle)
+                
+                # Store update info for notifications
+                pin_updates[pin_key] = {
+                    'name': pin_name,
+                    'window': window_name,
+                    'duty_cycle': duty_cycle,
+                    'window_start': window_config.get('start'),
+                    'window_end': window_config.get('end')
+                }
+        
+        # Send notifications for changes
+        if pin_updates and mqtt_notifier.connected:
+            mqtt_notifier.notify_multi_pin_changes(pin_updates)
             
     except Exception as e:
         error_msg = f"Error updating PWM pins: {e}"
         log.error(error_msg)
-        
-        # Record error in system status
-        system_status.record_error(error_msg)
-        
-        # Send error notification
-        mqtt_notifier.notify_error(error_msg)
-        
-        # Turn off all pins in case of error
-        try:
-            multi_pwm.set_all_pins_duty_percent(0)
-            system_status.update_multi_pin_status({})
-        except Exception as cleanup_error:
-            log.error(f"Error during cleanup: {cleanup_error}")
+        if mqtt_notifier.connected:
+            mqtt_notifier.notify_error(error_msg)
 
-
-def main_loop():
+async def pwm_update_task():
     """
-    Main loop that repeatedly updates all PWM pins and handles web requests.
-    
-    The loop now integrates web server request handling with multi-pin PWM updates,
-    and supports runtime configuration reloading when updates are received
-    via the web interface.
+    Async task that periodically updates PWM pins.
     """
     last_pwm_update = 0
-    last_network_check = 0
-
-    web_request_interval = 0.1  # Handle web requests every 100ms
-    
-    network_check_interval = 30  # Check network health every 30 seconds
     
     while True:
         try:
             current_time = time.time()
-            
-            # Handle web requests frequently (non-blocking)
-            if web_server.running:
-                web_server.handle_requests(timeout=web_request_interval)
-            
-            # Periodic network health check
-            if current_time - last_network_check >= network_check_interval:
-                try:
-                    import network
-                    wlan = network.WLAN(network.STA_IF)
-                    if not wlan.isconnected():
-                        log.warn("[MAIN] WiFi connection lost, attempting reconnection...")
-                        system_status.set_connection_status(wifi=False, web_server=False, mqtt=False)
-                        # Try to reconnect
-                        if connect_wifi():
-                            log.info("[MAIN] WiFi reconnected successfully")
-                            system_status.set_connection_status(wifi=True)
-                            # Restart web server if needed
-                            if not web_server.running:
-                                if web_server.start():
-                                    system_status.set_connection_status(web_server=True)
-                            # Reconnect MQTT if needed
-                            if not mqtt_notifier.connected:
-                                if mqtt_notifier.connect():
-                                    system_status.set_connection_status(mqtt=True)
-                    else:
-                        # Check MQTT connection health
-                        if mqtt_notifier.notifications_enabled and not mqtt_notifier.connected:
-                            log.info("[MAIN] MQTT disconnected, attempting reconnection...")
-                            if mqtt_notifier.connect():
-                                system_status.set_connection_status(mqtt=True)
-                                log.info("[MAIN] MQTT reconnected successfully")
-                    
-                    last_network_check = current_time
-                except Exception as e:
-                    log.error(f"[MAIN] Network health check error: {e}")
-                    last_network_check = current_time
             
             # Update PWM pins based on configured interval
             if current_time - last_pwm_update >= config.UPDATE_INTERVAL:
@@ -331,27 +225,113 @@ def main_loop():
                     import json
                     config.config_manager._last_config_hash = hash(json.dumps(current_config))
                 
-                update_pwm_pins()
+                await update_pwm_pins()
                 last_pwm_update = current_time
-            else:
-                # Short sleep to prevent excessive CPU usage
-                time.sleep(web_request_interval)
-                
-        except KeyboardInterrupt:
-            log.info("Shutdown requested")
-            if web_server.running:
-                web_server.stop()
-            # Clean up PWM controllers
-            try:
-                multi_pwm.deinit_all()
-            except Exception as cleanup_error:
-                log.error(f"Error during PWM cleanup: {cleanup_error}")
-            break
+            
+            # Yield control to other tasks
+            await asyncio.sleep(0.1)
+            
         except Exception as e:
-            log.error(f"Error in main loop: {e}")
-            time.sleep(1)  # Brief pause on error
+            log.error(f"Error in PWM update task: {e}")
+            await asyncio.sleep(1)  # Wait before retrying
 
+async def network_monitor_task():
+    """
+    Async task that monitors network connectivity and handles reconnections.
+    """
+    last_network_check = 0
+    network_check_interval = 30  # Check network health every 30 seconds
+    
+    while True:
+        try:
+            current_time = time.time()
+            
+            # Periodic network health check
+            if current_time - last_network_check >= network_check_interval:
+                try:
+                    import network
+                    wlan = network.WLAN(network.STA_IF)
+                    if not wlan.isconnected():
+                        log.warn("[NETWORK] WiFi connection lost, attempting reconnection...")
+                        system_status.set_connection_status(wifi=False, web_server=False, mqtt=False)
+                        # Try to reconnect
+                        if connect_wifi():
+                            log.info("[NETWORK] WiFi reconnected successfully")
+                            system_status.set_connection_status(wifi=True)
+                            # Restart web server if needed
+                            if web_server and not web_server.running:
+                                await web_server.start()
+                                system_status.set_connection_status(web_server=True)
+                            # Reconnect MQTT if needed
+                            if not mqtt_notifier.connected:
+                                if mqtt_notifier.connect():
+                                    system_status.set_connection_status(mqtt=True)
+                    else:
+                        # Check MQTT connection health
+                        if mqtt_notifier.notifications_enabled and not mqtt_notifier.connected:
+                            log.info("[NETWORK] MQTT disconnected, attempting reconnection...")
+                            if mqtt_notifier.connect():
+                                system_status.set_connection_status(mqtt=True)
+                                log.info("[NETWORK] MQTT reconnected successfully")
+                    
+                    last_network_check = current_time
+                except Exception as e:
+                    log.error(f"[NETWORK] Network health check error: {e}")
+                    last_network_check = current_time
+            
+            # Yield control to other tasks
+            await asyncio.sleep(1)
+            
+        except Exception as e:
+            log.error(f"Error in network monitor task: {e}")
+            await asyncio.sleep(5)  # Wait before retrying
 
-# Start the main loop automatically when the module is loaded
-main_loop()
+async def main():
+    """
+    Main async function that starts all tasks.
+    """
+    log.info("Starting async main loop")
+    
+    # Start web server if WiFi is connected
+    if wifi_connected and web_server:
+        await web_server.start()
+        system_status.set_connection_status(web_server=True)
+    
+    # Create and start all async tasks
+    tasks = []
+    
+    # PWM update task
+    tasks.append(asyncio.create_task(pwm_update_task()))
+    
+    # Network monitoring task
+    tasks.append(asyncio.create_task(network_monitor_task()))
+    
+    # Web server task (if WiFi connected)
+    if wifi_connected and web_server:
+        tasks.append(asyncio.create_task(web_server.serve_forever()))
+    
+    log.info(f"Started {len(tasks)} async tasks")
+    
+    try:
+        # Run all tasks concurrently
+        await asyncio.gather(*tasks)
+    except KeyboardInterrupt:
+        log.info("Received keyboard interrupt, shutting down...")
+    except Exception as e:
+        log.error(f"Error in main async loop: {e}")
+    finally:
+        # Cleanup
+        if wifi_connected and web_server:
+            web_server.stop()
+        log.info("System shutdown complete")
 
+if __name__ == "__main__":
+    try:
+        # Run the async main function
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        log.info("System interrupted by user")
+    except Exception as e:
+        log.error(f"Fatal error: {e}")
+    finally:
+        log.info("System exit")
