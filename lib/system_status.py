@@ -156,6 +156,29 @@ class SystemStatus:
         else:
             return f"{seconds}s"
     
+    def get_network_info(self):
+        """
+        Get network status information.
+        
+        Returns:
+            dict: Network status information
+        """
+        try:
+            # Import here to avoid circular imports
+            from lib.wifi_connect import get_network_status
+            return get_network_status()
+        except Exception as e:
+            log.error(f"[STATUS] Error getting network info: {e}")
+            return {
+                "active": False,
+                "connected": False,
+                "hostname": None,
+                "ip": None,
+                "gateway": None,
+                "dns": None,
+                "signal_strength": None
+            }
+    
     def get_status_dict(self):
         """
         Get complete system status as dictionary.
@@ -164,6 +187,7 @@ class SystemStatus:
             dict: Complete system status information
         """
         time_info = self.get_current_time_info()
+        network_info = self.get_network_info()
         
         return {
             "system": {
@@ -179,6 +203,7 @@ class SystemStatus:
                 "web_server": self.web_server_running,
                 "mdns": self.mdns_running
             },
+            "network": network_info,
             "led": {
                 "duty_cycle": self.current_duty_cycle,
                 "duty_cycle_display": f"{self.current_duty_cycle}%",

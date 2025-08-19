@@ -229,6 +229,13 @@ class ConfigWebServer:
                     <div class="status-value" id="systemUptime">Loading...</div>
                 </div>
                 <div class="status-card">
+                    <div class="status-label">Network Info</div>
+                    <div class="status-value" style="font-size: 0.9em;">
+                        <div id="hostname">Host: Loading...</div>
+                        <div id="ipAddress">IP: Loading...</div>
+                    </div>
+                </div>
+                <div class="status-card">
                     <div class="status-label">Connections</div>
                     <div class="status-value">
                         <span id="wifiStatus" class="connection-status">WiFi</span>
@@ -440,6 +447,12 @@ class ConfigWebServer:
                 // Update system uptime
                 document.getElementById('systemUptime').textContent = 
                     data.system.uptime_string;
+                
+                // Update network information
+                document.getElementById('hostname').textContent = 
+                    'Host: ' + (data.network.hostname || 'Unknown');
+                document.getElementById('ipAddress').textContent = 
+                    'IP: ' + (data.network.ip || 'Unknown');
                 
                 // Update connection status
                 const wifiStatus = document.getElementById('wifiStatus');

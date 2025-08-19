@@ -12,7 +12,7 @@ Handles:
 import network
 import time
 import ntptime
-from lib.config_manager import WIFI_SSID, WIFI_PASSWORD, TIMEZONE_OFFSET
+from lib.config_manager import WIFI_SSID, WIFI_PASSWORD, TIMEZONE_OFFSET, config_manager
 from machine import Pin
 import urtc
 from simple_logger import Logger
@@ -22,35 +22,119 @@ led = Pin(25, Pin.OUT)
 log = Logger()
 
 
-def connect_wifi(timeout=10):
+def connect_wifi(timeout=10, max_attempts=3):
     """
-    Connects to WiFi using credentials from config file.
+    Connects to WiFi using credentials from config file with retry logic.
 
     Args:
-        timeout (int): How many seconds to wait before giving up.
+        timeout (int): How many seconds to wait per attempt before giving up.
+        max_attempts (int): Maximum number of connection attempts.
 
     Returns:
-        bool: True if connected, False on failure.
+        bool: True if connected, False on failure after all attempts.
     """
     wlan = network.WLAN(network.STA_IF)
     wlan.active(True)
-    log.info("[WIFI] Starting connection attempt")
-
-    if not wlan.isconnected():
-        wlan.connect(WIFI_SSID, WIFI_PASSWORD)
-        start = time.time()
-        while not wlan.isconnected():
-            if time.time() - start > timeout:
-                log.error("[WIFI] Connection timed out after {} seconds"
-                          .format(timeout))
-                led.value(0)  # LED OFF when not connected
-                return False
-            time.sleep(0.1)
-        log.info("[WIFI] Connected with IP: {}".format(wlan.ifconfig()[0]))
-    else:
+    
+    # Set hostname from config
+    hostname = config_manager.get_config_dict().get('hostname', 'PagodaLightPico')
+    try:
+        network.hostname(hostname)
+        log.info(f"[WIFI] Set network hostname to: {hostname}")
+    except Exception as e:
+        log.warn(f"[WIFI] Failed to set hostname: {e}")
+    
+    # Check if already connected
+    if wlan.isconnected():
         log.info("[WIFI] Already connected")
-    led.value(1)  # LED ON when connected
-    return True
+        led.value(1)  # LED ON when connected
+        return True
+    
+    # Attempt to connect with retries
+    for attempt in range(1, max_attempts + 1):
+        log.info(f"[WIFI] Connection attempt {attempt}/{max_attempts}")
+        
+        try:
+            wlan.connect(WIFI_SSID, WIFI_PASSWORD)
+            start = time.time()
+            
+            # Wait for connection or timeout
+            while not wlan.isconnected():
+                if time.time() - start > timeout:
+                    log.warn(f"[WIFI] Attempt {attempt} timed out after {timeout} seconds")
+                    break
+                time.sleep(0.1)
+            
+            # Check if connection was successful
+            if wlan.isconnected():
+                ip_info = wlan.ifconfig()
+                log.info(f"[WIFI] Connected successfully on attempt {attempt}")
+                log.info(f"[WIFI] IP: {ip_info[0]}, Subnet: {ip_info[1]}, Gateway: {ip_info[2]}, DNS: {ip_info[3]}")
+                led.value(1)  # LED ON when connected
+                return True
+            
+        except Exception as e:
+            log.error(f"[WIFI] Connection attempt {attempt} failed with error: {e}")
+        
+        # Wait before retry (except on last attempt)
+        if attempt < max_attempts:
+            log.info(f"[WIFI] Waiting 2 seconds before retry...")
+            time.sleep(2)
+    
+    # All attempts failed
+    log.error(f"[WIFI] Failed to connect after {max_attempts} attempts")
+    led.value(0)  # LED OFF when not connected
+    return False
+
+
+def get_network_status():
+    """
+    Get current network connection status and information.
+    
+    Returns:
+        dict: Network status information including connection state, IP, etc.
+    """
+    wlan = network.WLAN(network.STA_IF)
+    
+    if not wlan.active():
+        return {
+            "active": False,
+            "connected": False,
+            "hostname": None,
+            "ip": None,
+            "gateway": None,
+            "dns": None,
+            "signal_strength": None
+        }
+    
+    connected = wlan.isconnected()
+    ip_info = wlan.ifconfig() if connected else [None, None, None, None]
+    
+    # Get hostname if available
+    hostname = None
+    try:
+        hostname = network.hostname()
+    except:
+        pass
+    
+    # Get signal strength if connected
+    signal_strength = None
+    if connected:
+        try:
+            signal_strength = wlan.status('rssi')
+        except:
+            pass
+    
+    return {
+        "active": wlan.active(),
+        "connected": connected,
+        "hostname": hostname,
+        "ip": ip_info[0],
+        "subnet": ip_info[1],
+        "gateway": ip_info[2],
+        "dns": ip_info[3],
+        "signal_strength": signal_strength
+    }
 
 
 def sync_time_ntp():
