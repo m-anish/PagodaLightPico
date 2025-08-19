@@ -54,24 +54,24 @@ class MQTTNotifier:
         self.port = notifications.get('mqtt_port', 1883)
         self.topic = notifications.get('mqtt_topic', 'pagoda_light/notifications')
         self.client_id = notifications.get('mqtt_client_id', 'pagoda_light_pico')
-        self.notify_window_change = notifications.get('notify_on_window_change', True)
-        self.notify_errors = notifications.get('notify_on_errors', True)
+        self.notify_on_window_change = notifications.get('notify_on_window_change', True)
+        self.notify_on_errors = notifications.get('notify_on_errors', True)
     
     def connect(self):
         """Connect to MQTT broker."""
         if not MQTT_AVAILABLE:
-            log.warn("MQTT library not available - notifications disabled")
+            log.warn("[MQTT] Library not available - notifications disabled")
             return False
         
         if not self.notifications_enabled:
-            log.debug("Notifications disabled in configuration")
+            log.debug("[MQTT] Notifications disabled in configuration")
             return False
         
         try:
             self.client = MQTTClient(self.client_id, self.broker, port=self.port)
             self.client.connect()
             self.connected = True
-            log.info(f"Connected to MQTT broker {self.broker}:{self.port}")
+            log.info(f"[MQTT] Connected to broker {self.broker}:{self.port}")
             
             # Send startup notification
             self._send_notification("system", {
@@ -84,7 +84,7 @@ class MQTTNotifier:
             return True
             
         except Exception as e:
-            log.error(f"Failed to connect to MQTT broker: {e}")
+            log.error(f"[MQTT] Failed to connect to broker: {e}")
             self.connected = False
             return False
     
@@ -100,9 +100,9 @@ class MQTTNotifier:
                     "device": self.client_id
                 })
                 self.client.disconnect()
-                log.info("Disconnected from MQTT broker")
+                log.info("[MQTT] Disconnected from broker")
             except Exception as e:
-                log.error(f"Error disconnecting from MQTT: {e}")
+                log.error(f"[MQTT] Error disconnecting: {e}")
             finally:
                 self.connected = False
     
@@ -116,7 +116,7 @@ class MQTTNotifier:
             start_time (str): Window start time (HH:MM)
             end_time (str): Window end time (HH:MM)
         """
-        if not self.notify_window_change or not self.connected:
+        if not self.notify_on_window_change or not self.connected:
             return
         
         # Only notify if window actually changed
@@ -150,7 +150,7 @@ class MQTTNotifier:
         }
         
         self._send_notification("window_change", notification_data)
-        log.info(f"Sent window change notification: {message}")
+        log.info(f"[MQTT] Sent window change notification: {message}")
     
     def notify_error(self, error_message):
         """
@@ -159,7 +159,7 @@ class MQTTNotifier:
         Args:
             error_message (str): Error description
         """
-        if not self.notify_errors or not self.connected:
+        if not self.notify_on_errors or not self.connected:
             return
         
         notification_data = {
@@ -171,7 +171,7 @@ class MQTTNotifier:
         }
         
         self._send_notification("error", notification_data)
-        log.info(f"Sent error notification: {error_message}")
+        log.info(f"[MQTT] Sent error notification: {error_message}")
     
     def notify_config_change(self):
         """Send notification when configuration is updated."""
@@ -186,7 +186,7 @@ class MQTTNotifier:
         }
         
         self._send_notification("config", notification_data)
-        log.info("Sent configuration change notification")
+        log.info("[MQTT] Sent configuration change notification")
     
     def _send_notification(self, category, data):
         """
@@ -208,10 +208,10 @@ class MQTTNotifier:
             
             # Publish message
             self.client.publish(topic, message)
-            log.debug(f"Published notification to {topic}")
+            log.debug(f"[MQTT] Published notification to {topic}")
             
         except Exception as e:
-            log.error(f"Failed to send MQTT notification: {e}")
+            log.error(f"[MQTT] Failed to send notification: {e}")
             # Try to reconnect on next notification
             self.connected = False
     

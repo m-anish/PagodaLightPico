@@ -34,7 +34,6 @@ from lib.pwm_control import PWMController
 from lib.web_server import web_server
 from lib.mqtt_notifier import mqtt_notifier
 from lib.system_status import system_status
-from lib.mdns_service import mdns_service
 
 log = Logger()
 
@@ -56,13 +55,10 @@ if wifi_connected:
         log.info("Web configuration server started - access via http://[pico-ip]/")
         system_status.set_connection_status(web_server=True)
         
-        # Start mDNS service for friendly hostname discovery
-        if mdns_service.start(web_server_port=80):
-            log.info(f"mDNS service enabled - access via {mdns_service.get_hostname_url()}")
-            system_status.set_connection_status(mdns=True)
-        else:
-            log.warn("mDNS service could not be started")
-            system_status.set_connection_status(mdns=False)
+        # Device accessible via hostname set in config or direct IP
+        hostname = config.config_manager.get_config_dict().get('hostname', 'pagoda-light')
+        log.info(f"Device hostname: {hostname} (use direct IP if mDNS not available)")
+        system_status.set_connection_status(mdns=False)
     else:
         log.error("Failed to start web configuration server")
         system_status.set_connection_status(web_server=False, mdns=False)
@@ -129,16 +125,16 @@ def get_current_window(time_windows, current_time_tuple):
     month = current_time_tuple[1]
     day = current_time_tuple[2]
 
-    log.debug(f"RTC current time: {current_time_tuple}")
+    log.debug(f"[MAIN] RTC current time: {current_time_tuple}")
     sunrise_h, sunrise_m, sunset_h, sunset_m = \
         sun_times_leh.get_sunrise_sunset(month, day)
-    log.debug(f"Sunrise/sunset times for {month}/{day}: "
+    log.debug(f"[MAIN] Sunrise/sunset times for {month}/{day}: "
               f"{sunrise_h:02d}:{sunrise_m:02d}, "
               f"{sunset_h:02d}:{sunset_m:02d}")
 
     sunrise_str = int_to_time_str(sunrise_h, sunrise_m)
     sunset_str = int_to_time_str(sunset_h, sunset_m)
-    log.debug(f"Formatted sunrise/sunset times: {sunrise_str}, {sunset_str}")
+    log.debug(f"[MAIN] Formatted sunrise/sunset times: {sunrise_str}, {sunset_str}")
 
     windows = dict(time_windows)
     if "day" in windows:
@@ -151,22 +147,22 @@ def get_current_window(time_windows, current_time_tuple):
         end = time_str_to_minutes(window["end"])
         duty = window["duty_cycle"]
 
-        log.debug(f"Checking window '{window_name}' start: {window['start']} "
+        log.debug(f"[MAIN] Checking window '{window_name}' start: {window['start']} "
                   f"({start}), end: {window['end']} ({end}), duty: {duty}")
 
         if start <= end:
             if start <= current_minutes < end:
-                log.debug(f"Current time {current_minutes} is within window "
+                log.debug(f"[MAIN] Current time {current_minutes} is within window "
                           f"'{window_name}'")
                 return window_name, duty
         else:
             # Handle overnight windows crossing midnight
             if current_minutes >= start or current_minutes < end:
                 log.debug(
-                    f"Current time {current_minutes} is within overnight "
+                    f"[MAIN] Current time {current_minutes} is within overnight "
                     f"window '{window_name}'")
                 return window_name, duty
-    log.debug("No matching time window found")
+    log.debug("[MAIN] No matching time window found")
     return None, 0
 
 
@@ -268,8 +264,7 @@ def main_loop():
             log.info("Shutdown requested")
             if web_server.running:
                 web_server.stop()
-            if mdns_service.running:
-                mdns_service.stop()
+            # mDNS service removed - no cleanup needed
             break
         except Exception as e:
             log.error(f"Error in main loop: {e}")

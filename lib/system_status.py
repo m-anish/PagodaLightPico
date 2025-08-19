@@ -53,7 +53,7 @@ class SystemStatus:
         self.last_update_time = time.time()
         self.total_updates += 1
         
-        log.debug(f"Status updated: {duty_cycle}% duty cycle, window: {window_name}")
+        log.debug(f"[STATUS] Updated: {duty_cycle}% duty cycle, window: {window_name}")
     
     def record_error(self, error_message):
         """
@@ -67,7 +67,7 @@ class SystemStatus:
             "message": error_message,
             "timestamp": time.time()
         }
-        log.debug(f"Error recorded: {error_message}")
+        log.debug(f"[STATUS] Error recorded: {error_message}")
     
     def set_connection_status(self, wifi=None, mqtt=None, web_server=None, mdns=None):
         """
@@ -115,7 +115,7 @@ class SystemStatus:
                 "timezone": config_manager.TIMEZONE_NAME
             }
         except Exception as e:
-            log.error(f"Error getting time info: {e}")
+            log.error(f"[STATUS] Error getting time info: {e}")
             return {
                 "current_time": "Unknown",
                 "current_date": "Unknown", 

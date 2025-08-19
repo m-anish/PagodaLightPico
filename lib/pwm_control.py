@@ -29,20 +29,20 @@ class PWMController:
         self.freq = freq
         self.pwm.freq(self.freq)
         self.set_duty_percent(0)
-        log.info("PWMController initialized at freq {} Hz on pin {}".format(
+        log.info("[PWM] Controller initialized at freq {} Hz on pin {}".format(
             self.freq, pin))
 
     def set_freq(self, freq):
         self.freq = freq
         self.pwm.freq(self.freq)
-        log.info("PWM frequency set to {} Hz".format(freq))
+        log.info("[PWM] Frequency set to {} Hz".format(freq))
 
     def set_duty_percent(self, percent):
         duty_value = int(percent * 65535 / 100)
         self.pwm.duty_u16(duty_value)
-        log.debug("PWM duty cycle set to {}% (duty_u16={})".format(
+        log.debug("[PWM] Duty cycle set to {}% (duty_u16={})".format(
             percent, duty_value))
 
     def deinit(self):
         self.pwm.deinit()
-        log.info("PWM deinitialized")
+        log.info("[PWM] Controller deinitialized")

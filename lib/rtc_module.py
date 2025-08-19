@@ -40,7 +40,7 @@ def get_current_time():
     second = dt.second
     weekday = dt.weekday
 
-    log.debug("RTC current time read (no offset): "
+    log.debug("[RTC] Current time read (no offset): "
               "{:04d}-{:02d}-{:02d} {:02d}:{:02d}:{:02d} Weekday: {}"
               .format(year, month, day, hour, minute, second, weekday))
 

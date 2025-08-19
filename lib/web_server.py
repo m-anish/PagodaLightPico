@@ -37,10 +37,10 @@ class ConfigWebServer:
             self.socket.bind(('', self.port))
             self.socket.listen(5)
             self.running = True
-            log.info(f"Web server started on port {self.port}")
+            log.info(f"[WEB] Server started on port {self.port}")
             return True
         except Exception as e:
-            log.error(f"Failed to start web server: {e}")
+            log.error(f"[WEB] Failed to start server: {e}")
             return False
     
     def stop(self):
@@ -48,7 +48,7 @@ class ConfigWebServer:
         self.running = False
         if self.socket:
             self.socket.close()
-            log.info("Web server stopped")
+            log.info("[WEB] Server stopped")
     
     def handle_requests(self, timeout=1):
         """
@@ -66,7 +66,7 @@ class ConfigWebServer:
         try:
             self.socket.settimeout(timeout)
             conn, addr = self.socket.accept()
-            log.debug(f"Connection from {addr}")
+            log.debug(f"[WEB] Connection from {addr}")
             
             try:
                 request = conn.recv(1024).decode('utf-8')
@@ -74,7 +74,7 @@ class ConfigWebServer:
                 conn.send(response.encode('utf-8'))
                 return True
             except Exception as e:
-                log.error(f"Error processing request: {e}")
+                log.error(f"[WEB] Error processing request: {e}")
                 error_response = self._create_error_response(500, str(e))
                 conn.send(error_response.encode('utf-8'))
                 return True
@@ -85,7 +85,7 @@ class ConfigWebServer:
             # Timeout occurred, this is normal
             return False
         except Exception as e:
-            log.error(f"Error handling request: {e}")
+            log.error(f"[WEB] Error handling request: {e}")
             return False
     
     def _process_request(self, request):
@@ -103,7 +103,7 @@ class ConfigWebServer:
         method = parts[0]
         path = parts[1]
         
-        log.debug(f"Processing {method} request for {path}")
+        log.debug(f"[WEB] Processing {method} request for {path}")
         
         if method == "GET":
             return self._handle_get(path)
@@ -153,13 +153,13 @@ class ConfigWebServer:
             
             # Update configuration
             if config_manager.update_config(update_data):
-                log.info("Configuration updated successfully via web interface")
+                log.info("[WEB] Configuration updated successfully")
                 return self._create_json_response({"status": "success", "message": "Configuration updated"})
             else:
                 return self._create_json_response({"status": "error", "message": "Failed to save configuration"}, 500)
                 
         except Exception as e:
-            log.error(f"Error updating configuration: {e}")
+            log.error(f"[WEB] Error updating configuration: {e}")
             return self._create_json_response({"status": "error", "message": str(e)}, 500)
     
     def _create_config_page(self):
@@ -319,7 +319,7 @@ class ConfigWebServer:
             
             html += f"""
                     <div class="time-window">
-                        <h4>{"🌅 Day (Auto-adjusted)" if is_day else f"🌙 {window_name.replace('_', ' ').title()}"}</h4>
+                        <h4>{"🌅 Day (Auto-adjusted)" if is_day else f"🌙 {str(window_name).replace('_', ' ').title()}"}</h4>
                         {"<small>Start and end times are automatically set based on sunrise/sunset</small>" if is_day else ""}
                         <div class="time-inputs">
                             <div class="form-group">

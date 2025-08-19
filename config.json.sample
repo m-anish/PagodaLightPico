@@ -5,6 +5,7 @@
     "ssid": "your_wifi_ssid_here",
     "password": "your_wifi_password_here"
   },
+  "hostname": "pagoda-light",
   "timezone": {
     "name": "IST",
     "offset": 5.5,

@@ -35,18 +35,16 @@ class ConfigManager:
     def load_config(self):
         """Load configuration from JSON file."""
         try:
-            if not os.path.exists(self.config_file):
-                log.error(f"Configuration file {self.config_file} not found")
-                raise FileNotFoundError(f"Configuration file {self.config_file} not found")
+            os.stat(self.config_file)
             
             with open(self.config_file, 'r') as f:
                 self.config = json.load(f)
             
-            log.info(f"Configuration loaded from {self.config_file}")
+            log.info(f"[CONFIG] Configuration loaded from {self.config_file}")
             self._validate_config()
             
         except Exception as e:
-            log.error(f"Failed to load configuration: {e}")
+            log.error(f"[CONFIG] Failed to load configuration: {e}")
             raise
     
     def save_config(self):
@@ -54,10 +52,10 @@ class ConfigManager:
         try:
             with open(self.config_file, 'w') as f:
                 json.dump(self.config, f, indent=2)
-            log.info(f"Configuration saved to {self.config_file}")
+            log.info(f"[CONFIG] Configuration saved to {self.config_file}")
             return True
         except Exception as e:
-            log.error(f"Failed to save configuration: {e}")
+            log.error(f"[CONFIG] Failed to save configuration: {e}")
             return False
     
     def update_config(self, updates):
@@ -84,7 +82,7 @@ class ConfigManager:
             return self.save_config()
             
         except Exception as e:
-            log.error(f"Failed to update configuration: {e}")
+            log.error(f"[CONFIG] Failed to update configuration: {e}")
             return False
     
     def _deep_merge(self, base_dict, update_dict):
@@ -193,10 +191,10 @@ class ConfigManager:
         
         if errors:
             error_msg = "Configuration validation failed: " + "; ".join(errors)
-            log.error(error_msg)
+            log.error(f"[CONFIG] {error_msg}")
             raise ValueError(error_msg)
         
-        log.debug("Configuration validation passed")
+        log.debug("[CONFIG] Validation passed")
     
     def _is_valid_time_format(self, time_str):
         """Validate time format HH:MM."""
@@ -219,7 +217,7 @@ class ConfigManager:
     
     def reload(self):
         """Reload configuration from file."""
-        log.info("Reloading configuration from file")
+        log.info("[CONFIG] Reloading configuration from file")
         self.load_config()
         self._setup_attributes()
 
