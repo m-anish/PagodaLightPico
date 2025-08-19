@@ -889,15 +889,21 @@ class ConfigWebServer:
     def _handle_pins_update(self, request):
         """Handle pin configuration update via POST."""
         try:
+            log.info(f"[WEB] Raw request: {request[:200]}...")  # Log first 200 chars of request
+            
             # Extract body from POST request
             body_start = request.find('\r\n\r\n')
             if body_start == -1:
                 body_start = request.find('\n\n')
             
+            log.info(f"[WEB] Body start position: {body_start}")
+            
             if body_start == -1:
                 return self._create_error_response(400, "No request body")
             
             body = request[body_start + 4:].strip()
+            log.info(f"[WEB] Request body: '{body}'")
+            
             if not body:
                 return self._create_error_response(400, "Empty request body")
             
@@ -908,6 +914,8 @@ class ConfigWebServer:
                     if line.lower().startswith('content-type:'):
                         content_type = line.split(':', 1)[1].strip().lower()
                         break
+            
+            log.info(f"[WEB] Content type: {content_type}")
             
             # Parse update data based on content type
             if "application/json" in content_type:
