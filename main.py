@@ -264,6 +264,6 @@ def main_loop():
             time.sleep(1)  # Brief pause on error
 
 
-if __name__ == "__main__":
-    main_loop()
+# Start the main loop automatically when the module is loaded
+main_loop()
 
