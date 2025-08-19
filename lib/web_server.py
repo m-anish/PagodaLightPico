@@ -63,23 +63,31 @@ class ConfigWebServer:
         if not self.running or not self.socket:
             return False
         
+        conn = None
         try:
             self.socket.settimeout(timeout)
             conn, addr = self.socket.accept()
             log.debug(f"[WEB] Connection from {addr}")
             
+            # Set connection timeout for send operations
+            conn.settimeout(5)  # 5 second timeout for send operations
+            
             try:
                 request = conn.recv(1024).decode('utf-8')
                 response = self._process_request(request)
-                conn.send(response.encode('utf-8'))
+                
+                # Send response in chunks to handle large responses
+                self._send_response_chunked(conn, response)
                 return True
             except Exception as e:
                 log.error(f"[WEB] Error processing request: {e}")
-                error_response = self._create_error_response(500, str(e))
-                conn.send(error_response.encode('utf-8'))
+                try:
+                    error_response = self._create_error_response(500, str(e))
+                    conn.send(error_response.encode('utf-8'))
+                except:
+                    # If we can't send error response, just log it
+                    log.error(f"[WEB] Failed to send error response")
                 return True
-            finally:
-                conn.close()
                 
         except OSError:
             # Timeout occurred, this is normal
@@ -87,6 +95,34 @@ class ConfigWebServer:
         except Exception as e:
             log.error(f"[WEB] Error handling request: {e}")
             return False
+        finally:
+            if conn:
+                try:
+                    conn.close()
+                except:
+                    pass
+    
+    def _send_response_chunked(self, conn, response):
+        """
+        Send HTTP response in chunks to handle large responses.
+        
+        Args:
+            conn: Socket connection
+            response (str): HTTP response to send
+        """
+        try:
+            response_bytes = response.encode('utf-8')
+            chunk_size = 1024  # Send in 1KB chunks
+            
+            for i in range(0, len(response_bytes), chunk_size):
+                chunk = response_bytes[i:i + chunk_size]
+                conn.send(chunk)
+                # Small delay between chunks to prevent overwhelming the Pico W
+                time.sleep(0.01)
+                
+        except Exception as e:
+            log.error(f"[WEB] Error sending chunked response: {e}")
+            raise
     
     def _process_request(self, request):
         """Process HTTP request and return response."""
