@@ -69,7 +69,12 @@ def connect_wifi(timeout=10, max_attempts=3):
             if wlan.isconnected():
                 ip_info = wlan.ifconfig()
                 log.info(f"[WIFI] Connected successfully on attempt {attempt}")
-                log.info(f"[WIFI] IP: {ip_info[0]}, Subnet: {ip_info[1]}, Gateway: {ip_info[2]}, DNS: {ip_info[3]}")
+                log.info(f"[WIFI] Network Details:")
+                log.info(f"[WIFI]   IP Address: {ip_info[0]}")
+                log.info(f"[WIFI]   Subnet Mask: {ip_info[1]}")
+                log.info(f"[WIFI]   Gateway: {ip_info[2]}")
+                log.info(f"[WIFI]   DNS Server: {ip_info[3]}")
+                log.info(f"[WIFI] Web interface will be available at: http://{ip_info[0]}/")
                 led.value(1)  # LED ON when connected
                 return True
             

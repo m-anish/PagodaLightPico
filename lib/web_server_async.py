@@ -24,16 +24,29 @@ class AsyncWebServer:
     async def start(self):
         """Start the async web server."""
         try:
+            log.info(f"[WEB] Initializing server socket on port {self.port}")
             self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            log.debug("[WEB] Socket created successfully")
+            
             self.server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            log.debug("[WEB] Socket options set")
+            
             self.server_socket.bind(('', self.port))
+            log.debug(f"[WEB] Socket bound to port {self.port}")
+            
             self.server_socket.listen(5)
+            log.debug("[WEB] Socket listening with backlog of 5")
+            
             self.server_socket.setblocking(False)  # Non-blocking socket
+            log.debug("[WEB] Socket set to non-blocking mode")
+            
             self.running = True
-            log.info(f"[WEB] Async server started on port {self.port}")
+            log.info(f"[WEB] Async server started successfully on port {self.port}")
+            log.info(f"[WEB] Server is ready to accept connections")
             return True
         except Exception as e:
             log.error(f"[WEB] Failed to start async server: {e}")
+            log.error(f"[WEB] Error type: {type(e).__name__}")
             return False
     
     def stop(self):
@@ -141,21 +154,39 @@ class AsyncWebServer:
         """
         if not self.running or not self.server_socket:
             log.error("[WEB] Server not properly initialized")
+            log.error(f"[WEB] Running: {self.running}, Socket: {self.server_socket}")
             return
         
         log.info("[WEB] Starting async server loop")
+        log.info(f"[WEB] Server listening on port {self.port}")
+        
+        connection_count = 0
+        loop_count = 0
+        last_status_time = 0
         
         while self.running:
             try:
                 # Try to accept a connection (non-blocking)
                 try:
                     client_socket, addr = self.server_socket.accept()
+                    connection_count += 1
+                    log.info(f"[WEB] Accepted connection #{connection_count} from {addr}")
                     # Handle client in a separate task
                     asyncio.create_task(self.handle_client(client_socket, addr))
                 except OSError as e:
                     if e.errno == 11:  # EAGAIN - no pending connections
                         # No connections available, yield control
                         await asyncio.sleep(0.01)
+                        
+                        # Periodic status message
+                        loop_count += 1
+                        if loop_count % 3000 == 0:  # Every ~30 seconds (3000 * 0.01s)
+                            import time
+                            current_time = time.time()
+                            if current_time - last_status_time >= 30:
+                                log.info(f"[WEB] Server loop active, {connection_count} connections handled")
+                                last_status_time = current_time
+                        
                         continue
                     else:
                         raise

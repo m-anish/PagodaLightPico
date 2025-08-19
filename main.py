@@ -34,7 +34,7 @@ from lib import config_manager as config
 from lib import sun_times_leh
 import rtc_module
 from simple_logger import Logger
-from wifi_connect import connect_wifi, sync_time_ntp
+from lib.wifi_connect import connect_wifi, sync_time_ntp
 import time
 from lib.pwm_control import multi_pwm
 from lib.web_server_async import AsyncWebServer
@@ -302,8 +302,14 @@ async def main():
     
     # Start web server if WiFi is connected
     if wifi_connected and web_server:
-        await web_server.start()
-        system_status.set_connection_status(web_server=True)
+        log.info("[MAIN] Starting web server...")
+        server_started = await web_server.start()
+        if server_started:
+            log.info("[MAIN] Web server started successfully")
+            system_status.set_connection_status(web_server=True)
+        else:
+            log.error("[MAIN] Failed to start web server")
+            system_status.set_connection_status(web_server=False)
     
     # Create and start all async tasks
     tasks = []
@@ -315,8 +321,13 @@ async def main():
     tasks.append(asyncio.create_task(network_monitor_task()))
     
     # Web server task (if WiFi connected)
-    if wifi_connected and web_server:
+    if wifi_connected and web_server and web_server.running:
+        log.info("[MAIN] Adding web server task to async loop")
         tasks.append(asyncio.create_task(web_server.serve_forever()))
+    elif wifi_connected and web_server and not web_server.running:
+        log.warn("[MAIN] Web server not running, skipping server task")
+    elif not wifi_connected:
+        log.info("[MAIN] WiFi not connected, skipping web server task")
     
     log.info(f"Started {len(tasks)} async tasks")
     
