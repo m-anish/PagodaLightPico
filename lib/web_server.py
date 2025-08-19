@@ -325,7 +325,7 @@ class ConfigWebServer:
             
             html += f"""
                     <div class="time-window">
-                        <h4>{"🌅 Day (Auto-adjusted)" if is_day else f"🌙 {str(window_name).replace('_', ' ').title()}"}</h4>
+                        <h4>{"🌅 Day (Auto-adjusted)" if is_day else f"🌙 {str(window_name or '').replace('_', ' ').title() or 'Unknown'}"}</h4>
                         {"<small>Start and end times are automatically set based on sunrise/sunset</small>" if is_day else ""}
                         <div class="time-inputs">
                             <div class="form-group">

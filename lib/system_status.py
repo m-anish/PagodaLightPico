@@ -206,7 +206,7 @@ class SystemStatus:
             },
             "time_window": {
                 "current": self.current_window,
-                "current_display": self.current_window.replace('_', ' ').title() if self.current_window else "None",
+                "current_display": (self.current_window or '').replace('_', ' ').title() if self.current_window else "None",
                 "start_time": self.current_window_start,
                 "end_time": self.current_window_end,
                 "last_update": self.last_update_time
@@ -227,7 +227,7 @@ class SystemStatus:
             str: Status summary string
         """
         time_info = self.get_current_time_info()
-        window_display = self.current_window.replace('_', ' ').title() if self.current_window else "None"
+        window_display = (self.current_window or '').replace('_', ' ').title() if self.current_window else "None"
         
         return (f"LED: {self.current_duty_cycle}%, "
                 f"Window: {window_display}, "
