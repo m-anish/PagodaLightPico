@@ -196,8 +196,14 @@ async def update_pwm_pins():
                 }
         
         # Send notifications for changes
-        if pin_updates and mqtt_notifier.connected:
-            mqtt_notifier.notify_multi_pin_changes(pin_updates)
+        if pin_updates:
+            active_pins = sum(1 for update in pin_updates.values() if update.get('duty_cycle', 0) > 0)
+            log.info(f"[PWM_UPDATE] Updated {len(pin_updates)} pins, {active_pins} active")
+            
+            if mqtt_notifier.connected:
+                mqtt_notifier.notify_multi_pin_changes(pin_updates)
+        else:
+            log.debug("[PWM_UPDATE] No pin updates needed")
             
     except Exception as e:
         error_msg = f"Error updating PWM pins: {e}"
@@ -207,23 +213,34 @@ async def update_pwm_pins():
 
 async def pwm_update_task():
     """
-    Async task that periodically updates PWM pins.
+    Async task that periodically updates PWM pins based on configured update_interval.
     """
     last_pwm_update = 0
+    last_config_check = 0
+    current_update_interval = config.UPDATE_INTERVAL
+    
+    log.info(f"[PWM_TASK] Starting PWM update task with {current_update_interval}s interval")
     
     while True:
         try:
             current_time = time.time()
             
-            # Update PWM pins based on configured interval
-            if current_time - last_pwm_update >= config.UPDATE_INTERVAL:
-                # Check if configuration was updated via web interface
+            # Check for configuration changes every 10 seconds (less frequent than PWM updates)
+            if current_time - last_config_check >= 10:
                 current_config = config.config_manager.get_config_dict()
+                new_update_interval = current_config.get('system', {}).get('update_interval', 60)
+                
+                # Check if update interval changed
+                if new_update_interval != current_update_interval:
+                    log.info(f"[PWM_TASK] Update interval changed from {current_update_interval}s to {new_update_interval}s")
+                    current_update_interval = new_update_interval
+                
+                # Check if configuration was updated via web interface
                 if hasattr(config.config_manager, '_last_config_hash'):
                     import json
                     current_hash = hash(json.dumps(current_config))
                     if current_hash != config.config_manager._last_config_hash:
-                        log.info("Configuration change detected, reloading...")
+                        log.info("[PWM_TASK] Configuration change detected, reloading...")
                         config.config_manager.reload()
                         # Re-initialize multi-PWM manager with new configuration
                         multi_pwm.reload_config()
@@ -233,14 +250,30 @@ async def pwm_update_task():
                     import json
                     config.config_manager._last_config_hash = hash(json.dumps(current_config))
                 
+                last_config_check = current_time
+            
+            # Update PWM pins based on configured interval
+            if current_time - last_pwm_update >= current_update_interval:
+                log.debug(f"[PWM_TASK] Performing PWM update (interval: {current_update_interval}s)")
                 await update_pwm_pins()
                 last_pwm_update = current_time
             
-            # Yield control to other tasks
-            await asyncio.sleep(0.1)
+            # Calculate optimal sleep time - check more frequently as we approach update time
+            time_until_next_update = current_update_interval - (current_time - last_pwm_update)
+            if time_until_next_update > 10:
+                # If more than 10 seconds until next update, sleep for 5 seconds
+                sleep_time = 5.0
+            elif time_until_next_update > 2:
+                # If 2-10 seconds until next update, sleep for 1 second
+                sleep_time = 1.0
+            else:
+                # If less than 2 seconds until next update, check every 0.5 seconds
+                sleep_time = 0.5
+            
+            await asyncio.sleep(sleep_time)
             
         except Exception as e:
-            log.error(f"Error in PWM update task: {e}")
+            log.error(f"[PWM_TASK] Error in PWM update task: {e}")
             await asyncio.sleep(1)  # Wait before retrying
 
 async def network_monitor_task():
@@ -249,6 +282,8 @@ async def network_monitor_task():
     """
     last_network_check = 0
     network_check_interval = 30  # Check network health every 30 seconds
+    
+    log.info(f"[NETWORK_TASK] Starting network monitor task with {network_check_interval}s interval")
     
     while True:
         try:
