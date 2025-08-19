@@ -12,7 +12,7 @@ Handles:
 import network
 import time
 import ntptime
-from config import WIFI_SSID, WIFI_PASSWORD, TIMEZONE_OFFSET
+from lib.config_manager import WIFI_SSID, WIFI_PASSWORD, TIMEZONE_OFFSET
 from machine import Pin
 import urtc
 from simple_logger import Logger

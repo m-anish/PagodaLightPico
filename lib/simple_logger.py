@@ -10,7 +10,7 @@ Timestamps are formatted as:
 e.g. <Mon 18 Aug 2025 - 15:55:10 IST(UTC+5:30)>
 """
 
-from config import LOG_LEVEL, TIMEZONE_NAME, TIMEZONE_OFFSET
+from lib.config_manager import LOG_LEVEL, TIMEZONE_NAME, TIMEZONE_OFFSET
 from lib.rtc_shared import rtc
 
 class Logger:

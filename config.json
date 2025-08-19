@@ -1,0 +1,54 @@
+{
+  "_comment": "Configuration for PagodaLightPico - JSON format for runtime updates",
+  "wifi": {
+    "ssid": "iPhone",
+    "password": "this is some key"
+  },
+  "timezone": {
+    "name": "IST",
+    "offset": 5.5
+  },
+  "hardware": {
+    "rtc_i2c_sda_pin": 20,
+    "rtc_i2c_scl_pin": 21,
+    "led_pwm_pin": 16,
+    "pwm_frequency": 1000
+  },
+  "system": {
+    "log_level": "DEBUG",
+    "update_interval": 60
+  },
+  "time_windows": {
+    "day": {
+      "start": "06:00",
+      "end": "18:00",
+      "duty_cycle": 0,
+      "_comment": "Day window start/end times are replaced dynamically with sunrise/sunset"
+    },
+    "window_1": {
+      "start": "18:00",
+      "end": "20:00",
+      "duty_cycle": 60
+    },
+    "window_2": {
+      "start": "20:00",
+      "end": "22:00",
+      "duty_cycle": 40
+    },
+    "window_3": {
+      "start": "22:00",
+      "end": "00:00",
+      "duty_cycle": 20
+    },
+    "window_4": {
+      "start": "00:00",
+      "end": "04:00",
+      "duty_cycle": 10
+    },
+    "window_5": {
+      "start": "04:00",
+      "end": "06:00",
+      "duty_cycle": 30
+    }
+  }
+}

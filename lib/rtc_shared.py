@@ -7,7 +7,7 @@ creating multiple instances which could cause conflicts.
 
 from machine import I2C, Pin
 import urtc
-from config import RTC_I2C_SDA_PIN, RTC_I2C_SCL_PIN
+from lib.config_manager import RTC_I2C_SDA_PIN, RTC_I2C_SCL_PIN
 
 # Initialize shared I2C bus for RTC
 i2c = I2C(0, scl=Pin(RTC_I2C_SCL_PIN), sda=Pin(RTC_I2C_SDA_PIN))

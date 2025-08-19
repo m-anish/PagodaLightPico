@@ -5,7 +5,7 @@ Controls PWM frequency and duty cycle with debug logging.
 """
 
 from machine import Pin, PWM
-from config import LED_PWM_PIN, PWM_FREQUENCY
+from lib.config_manager import LED_PWM_PIN, PWM_FREQUENCY
 from simple_logger import Logger
 
 

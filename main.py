@@ -17,24 +17,15 @@ on an assigned GPIO pin accordingly.
 Logging is done via simple_logger with timestamps and levels.
 """
 
-import config
+from lib import config_manager as config
 import sun_times_leh
 import rtc_module
 from simple_logger import Logger
 from wifi_connect import connect_wifi, sync_time_ntp
 import time
 from lib.pwm_control import PWMController
-from lib.config_validator import validate_config
 
 log = Logger()
-
-# Validate configuration
-config_errors = validate_config()
-if config_errors:
-    log.fatal("Configuration validation failed:")
-    for error in config_errors:
-        log.fatal(f"  - {error}")
-    raise SystemExit("Invalid configuration")
 
 # Initialize PWM controller
 led_pwm = PWMController(freq=config.PWM_FREQUENCY, pin=config.LED_PWM_PIN)
