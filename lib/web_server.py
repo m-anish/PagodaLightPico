@@ -581,7 +581,7 @@ class ConfigWebServer:
             html += "  newWindow.innerHTML = '<label>Window Name:</label> <input type=\"text\" name=\"' + pin + '_window_' + windowCount + '_name\" placeholder=\"e.g. morning\"> '"
             html += "    + '<label>Start:</label> <input type=\"time\" name=\"' + pin + '_window_' + windowCount + '_start\"> '"
             html += "    + '<label>End:</label> <input type=\"time\" name=\"' + pin + '_window_' + windowCount + '_end\"> '"
-            html += "    + '<label>Brightness (%):</label> <input type=\"number\" name=\"' + pin + '_window_' + windowCount + '_brightness\" min=\"0\" max=\"100\" style=\"width:60px\"> '"
+            html += "    + '<label>Duty Cycle (%):</label> <input type=\"number\" name=\"' + pin + '_window_' + windowCount + '_duty_cycle\" min=\"0\" max=\"100\" style=\"width:60px\"> '"
             html += "    + '<button type=\"button\" class=\"remove-btn\" onclick=\"removeWindow(this)\">Remove</button>';"
             html += "  container.appendChild(newWindow);"
             html += "}"
@@ -623,12 +623,12 @@ class ConfigWebServer:
                         # Show current windows for this controller
                         html += "<h4>Current Time Windows:</h4>"
                         if time_windows:
-                            html += "<table><tr><th>Window</th><th>Start</th><th>End</th><th>Brightness</th></tr>"
+                            html += "<table><tr><th>Window</th><th>Start</th><th>End</th><th>Duty Cycle</th></tr>"
                             
                             # Always show day window first (calculated from sunrise/sunset)
                             if 'day' in time_windows:
-                                day_brightness = time_windows['day'].get('brightness', 80)
-                                html += f"<tr><td>Day</td><td>{sunrise_h:02d}:{sunrise_m:02d}</td><td>{sunset_h:02d}:{sunset_m:02d}</td><td>{day_brightness}%</td></tr>"
+                                day_duty_cycle = time_windows['day'].get('duty_cycle', 80)
+                                html += f"<tr><td>Day</td><td>{sunrise_h:02d}:{sunrise_m:02d}</td><td>{sunset_h:02d}:{sunset_m:02d}</td><td>{day_duty_cycle}%</td></tr>"
                             
                             # Show other windows
                             for window_name, window_config in time_windows.items():
@@ -637,9 +637,9 @@ class ConfigWebServer:
                                 
                                 start_time = window_config.get('start', '00:00')
                                 end_time = window_config.get('end', '00:00')
-                                brightness = window_config.get('brightness', 50)
+                                duty_cycle = window_config.get('duty_cycle', 50)
                                 display_name = window_name.replace('_', ' ').title()
-                                html += f"<tr><td>{display_name}</td><td>{start_time}</td><td>{end_time}</td><td>{brightness}%</td></tr>"
+                                html += f"<tr><td>{display_name}</td><td>{start_time}</td><td>{end_time}</td><td>{duty_cycle}%</td></tr>"
                             
                             html += "</table>"
                         else:
@@ -649,10 +649,10 @@ class ConfigWebServer:
                         html += "<h4>Configure Time Windows:</h4>"
                         
                         # Day window (always present)
-                        day_brightness = time_windows.get('day', {}).get('brightness', 80)
+                        day_duty_cycle = time_windows.get('day', {}).get('duty_cycle', 80)
                         html += f"<div class='window-row'>"
                         html += f"<label><strong>Day Window (Sunrise-Sunset):</strong></label> "
-                        html += f"<label>Brightness (%):</label> <input type='number' name='{pin_num}_day_brightness' value='{day_brightness}' min='0' max='100' style='width:60px'>"
+                        html += f"<label>Duty Cycle (%):</label> <input type='number' name='{pin_num}_day_duty_cycle' value='{day_duty_cycle}' min='0' max='100' style='width:60px'>"
                         html += "</div>"
                         
                         # Dynamic windows container
@@ -666,13 +666,13 @@ class ConfigWebServer:
                             
                             start_time = window_config.get('start', '')
                             end_time = window_config.get('end', '')
-                            brightness = window_config.get('brightness', 50)
+                            duty_cycle = window_config.get('duty_cycle', 50)
                             
                             html += f"<div class='window-row'>"
                             html += f"<label>Window Name:</label> <input type='text' name='{pin_num}_window_{window_index}_name' value='{window_name}' placeholder='e.g. evening'> "
                             html += f"<label>Start:</label> <input type='time' name='{pin_num}_window_{window_index}_start' value='{start_time}'> "
                             html += f"<label>End:</label> <input type='time' name='{pin_num}_window_{window_index}_end' value='{end_time}'> "
-                            html += f"<label>Brightness (%):</label> <input type='number' name='{pin_num}_window_{window_index}_brightness' value='{brightness}' min='0' max='100' style='width:60px'> "
+                            html += f"<label>Duty Cycle (%):</label> <input type='number' name='{pin_num}_window_{window_index}_duty_cycle' value='{duty_cycle}' min='0' max='100' style='width:60px'> "
                             html += f"<button type='button' class='remove-btn' onclick='removeWindow(this)'>Remove</button>"
                             html += "</div>"
                             window_index += 1
@@ -867,19 +867,19 @@ class ConfigWebServer:
                     if pin_number not in pin_data:
                         pin_data[pin_number] = {}
             
-            # Process day window brightness for each pin
+            # Process day window duty cycle for each pin
             for pin_number in pin_data:
-                day_brightness_key = f"{pin_number}_day_brightness"
-                if day_brightness_key in form_data:
+                day_duty_cycle_key = f"{pin_number}_day_duty_cycle"
+                if day_duty_cycle_key in form_data:
                     try:
-                        brightness = int(form_data[day_brightness_key])
-                        pin_data[pin_number]['day'] = {'brightness': brightness}
+                        duty_cycle = int(form_data[day_duty_cycle_key])
+                        pin_data[pin_number]['day'] = {'duty_cycle': duty_cycle}
                     except ValueError:
-                        # Default brightness if parsing fails
-                        pin_data[pin_number]['day'] = {'brightness': 80}
+                        # Default duty_cycle if parsing fails
+                        pin_data[pin_number]['day'] = {'duty_cycle': 80}
                 else:
                     # Default day window if not in form
-                    pin_data[pin_number]['day'] = {'brightness': 80}
+                    pin_data[pin_number]['day'] = {'duty_cycle': 80}
             
             # Process custom time windows for each pin
             for pin_number in pin_data:
@@ -898,25 +898,25 @@ class ConfigWebServer:
                                 if not window_name or window_name == '':
                                     continue  # Skip windows with empty names
                                 
-                                # Get corresponding start/end/brightness for this window
+                                # Get corresponding start/end/duty_cycle for this window
                                 start_key = f"{pin_number}_window_{window_index}_start"
                                 end_key = f"{pin_number}_window_{window_index}_end"
-                                brightness_key = f"{pin_number}_window_{window_index}_brightness"
+                                duty_cycle_key = f"{pin_number}_window_{window_index}_duty_cycle"
                                 
                                 start = form_data.get(start_key, '')
                                 end = form_data.get(end_key, '')
                                 
                                 try:
-                                    brightness = int(form_data.get(brightness_key, 50))
+                                    duty_cycle = int(form_data.get(duty_cycle_key, 50))
                                 except ValueError:
-                                    brightness = 50  # Default brightness
+                                    duty_cycle = 50  # Default duty_cycle
                                 
                                 # Only add window if it has valid start/end times
                                 if start and end:
                                     window_data[window_name] = {
                                         'start': start,
                                         'end': end,
-                                        'brightness': brightness
+                                        'duty_cycle': duty_cycle
                                     }
                         except (IndexError, ValueError):
                             continue
