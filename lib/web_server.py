@@ -380,57 +380,27 @@ class ConfigWebServer:
         try:
             from lib.gpio_utils import gpio_utils
             
-            # Build HTML in chunks to reduce memory usage
-            html_parts = []
-            
-            # Header section
-            html_parts.extend([
-                "<html><head><title>PagodaLight Pin Configuration</title>",
-                "<style>body{font-family:Arial;margin:15px}table{border-collapse:collapse;width:100%}",
-                "th,td{border:1px solid #ddd;padding:8px;text-align:left}th{background:#f2f2f2}",
-                "select,input{padding:4px;border:1px solid #ccc;border-radius:3px;margin:2px}",
-                "button{background:#007acc;color:white;padding:10px 20px;border:none;cursor:pointer;border-radius:3px;margin:5px}",
+            # Minimal HTML to reduce memory usage
+            html_parts = [
+                "<html><head><title>PagodaLight Pins</title>",
+                "<style>body{font-family:sans-serif;margin:10px}table{border-collapse:collapse;width:100%;font-size:0.9em}",
+                "th,td{border:1px solid #ccc;padding:4px}th{background:#eee}",
+                "select,input{padding:2px;margin:1px;font-size:0.9em}",
+                "button{background:#007acc;color:white;padding:5px 10px;border:none;cursor:pointer;margin:2px;font-size:0.9em}",
                 ".remove-btn{background:#dc3545}",
-                "label{font-weight:bold}.note{color:#666;font-size:0.9em}</style>",
-                "<script>",
-                "function addPinRow(){var table=document.getElementById('pinTable').getElementsByTagName('tbody')[0];",
-                "var rowCount=table.rows.length;if(rowCount>=5){alert('Maximum 5 PWM pins allowed');return;}",
-                "var newRow=table.insertRow();",
-                "newRow.innerHTML='<td><select name=\"pin_'+rowCount+'_number\"><option value=\"\">Select Pin...</option>"
-            ])
-            
-            # Add pin options to JavaScript
-            try:
-                pin_options = gpio_utils.get_pin_options_for_dropdown(exclude_current_usage=False)
-                for pin_num, display_name in pin_options:
-                    html_parts.append(f"<option value=\"{pin_num}\">GP{pin_num}</option>")
-            except:
-                # Fallback to all PWM-capable pins if gpio_utils not available
-                all_pins = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 25, 26, 27, 28]
-                for pin in all_pins:
-                    html_parts.append(f"<option value=\"{pin}\">GP{pin}</option>")
-            
-            # Continue with JavaScript
-            html_parts.extend([
-                "</select></td><td><input type=\"checkbox\" name=\"pin_'+rowCount+'_enabled\"></td>",
-                "<td><button type=\"button\" class=\"remove-btn\" onclick=\"removePinRow(this)\">Remove</button></td>';",
-                "}",
-                "function removePinRow(btn){var row=btn.closest('tr');row.remove();}",
-                "</script>",
+                "label{font-weight:bold}</style>",
                 "</head><body>",
-                "<h1>PWM Pin Configuration</h1>"
-            ])
+                "<h1>PWM Pins</h1>"
+            ]
             
             try:
                 config_data = config_manager.get_config_dict()
                 pwm_pins = config_data.get('pwm_pins', {})
-                available_pins = gpio_utils.get_available_pins()
-                used_pins = set()  # We'll track used pins manually
                 
-                # Show current pin configuration
+                # Show current pin configuration - simplified
                 html_parts.extend([
-                    "<h3>Current PWM Pins</h3>",
-                    "<table id='currentPins'><tr><th>Pin Number</th><th>Enabled</th><th>Time Windows</th></tr>"
+                    "<h2>Current Pins</h2>",
+                    "<table><tr><th>Pin</th><th>Name</th><th>Enabled</th></tr>"
                 ])
                 
                 for pin_key, pin_config in pwm_pins.items():
@@ -440,17 +410,14 @@ class ConfigWebServer:
                     gpio_pin = pin_config.get('gpio_pin', 'Unknown')
                     pin_name = pin_config.get('name', f'Pin {gpio_pin}')
                     status = 'Yes' if enabled else 'No'
-                    time_windows = list(pin_config.get('time_windows', {}).keys())
-                    windows_str = ', '.join(time_windows) if time_windows else 'None'
-                    html_parts.append(f"<tr><td>GP{gpio_pin} ({pin_name})</td><td>{status}</td><td>{windows_str}</td></tr>")
+                    html_parts.append(f"<tr><td>GP{gpio_pin}</td><td>{pin_name}</td><td>{status}</td></tr>")
                 
                 html_parts.append("</table>")
                 
-                # Pin configuration form
+                # Simplified pin configuration form
                 html_parts.extend([
-                    "<h3>Pin Configuration</h3>",
-                    "<form method='post' action='/api/pins'>",
-                    "<table id='pinTable'><thead><tr><th>Pin</th><th>Enabled</th><th>Action</th></tr></thead><tbody>"
+                    "<h2>Configure Pins</h2>",
+                    "<form method='post' action='/api/pins'>"
                 ])
                 
                 # Show current pins in editable form
@@ -468,53 +435,72 @@ class ConfigWebServer:
                     pin_name = pin_config.get('name', f'Pin {gpio_pin}')
                     checked = 'checked' if enabled else ''
                     
-                    # For existing pins, show static text instead of dropdown
+                    # Simplified form elements
                     html_parts.extend([
-                        f"<tr><td>GP{gpio_pin} ({pin_name})",
+                        f"<p>GP{gpio_pin} ({pin_name}): ",
                         f"<input type='hidden' name='pin_{pin_index}_number' value='{gpio_pin}'>",
-                        f"</td><td><input type='checkbox' name='pin_{pin_index}_enabled' {checked}></td>",
-                        f"<td><button type='button' class='remove-btn' onclick='removePinRow(this)'>Remove</button></td></tr>"
+                        f"<label><input type='checkbox' name='pin_{pin_index}_enabled' {checked}> Enabled</label> ",
+                        f"<button type='button' class='remove-btn' onclick='this.parentElement.remove()'>Remove</button></p>"
                     ])
                     pin_index += 1
                 
-                # If no pins, add one empty row
-                if pin_index == 0:
-                    html_parts.extend([
-                        f"<tr><td><select name='pin_0_number'>",
-                        "<option value=''>Select Pin...</option>"
-                    ])
-                    for pin in available_pins:
-                        if pin not in used_pins:
-                            html_parts.append(f"<option value='{pin}'>GP{pin}</option>")
-                    html_parts.extend([
-                        "</select></td><td><input type='checkbox' name='pin_0_enabled'></td>",
-                        "<td><button type='button' class='remove-btn' onclick='removePinRow(this)'>Remove</button></td></tr>"
-                    ])
+                # Add pin button
+                html_parts.extend([
+                    "<p><button type='button' onclick='addPin()'>Add Pin</button></p>",
+                    "<div id='new_pins'></div>",
+                    "<p><button type='submit'>Save</button></p>",
+                    "</form>",
+                    "<script>",
+                    "function addPin(){",
+                    "var container=document.getElementById('new_pins');",
+                    "var div=document.createElement('div');",
+                    "div.innerHTML='<select name=\"pin_new_\"+container.children.length+\"_number\">"
+                ])
+                
+                # Add available pins to JavaScript (excluding currently used pins)
+                try:
+                    pin_options = gpio_utils.get_pin_options_for_dropdown(exclude_current_usage=True)
+                    if pin_options:
+                        for pin_num, display_name in pin_options:
+                            html_parts.append(f"<option value=\"{pin_num}\">GP{pin_num}</option>")
+                    else:
+                        html_parts.append("<option value=\"\">No pins available</option>")
+                except Exception as e:
+                    log.error(f"[WEB] Error getting pin options: {e}")
+                    # Fallback to common PWM pins
+                    common_pins = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
+                    for pin in common_pins:
+                        html_parts.append(f"<option value=\"{pin}\">GP{pin}</option>")
                 
                 html_parts.extend([
-                    "</tbody></table>",
-                    "<p><button type='button' onclick='addPinRow()'>Add Pin</button> ",
-                    "<button type='submit'>Save Pin Configuration</button></p>",
-                    "</form>",
-                    "<p class='note'><strong>Note:</strong> Maximum 5 PWM pins allowed. ",
-                    "Pins used for I2C (GP0, GP1 for RTC) are not available. ",
-                    "After changing pins, configure time windows for each pin on the Time Windows page.</p>"
+                    "</select> <label><input type=\"checkbox\" name=\"pin_new_\"+container.children.length+\"_enabled\"> Enabled</label>';",
+                    "container.appendChild(div);",
+                    "}",
+                    "</script>"
                 ])
                 
             except Exception as e:
                 log.error(f"[WEB] Error loading pin config: {e}")
                 html_parts.extend([
-                    "<p>Error loading pin configuration. Using defaults.</p>",
+                    "<p>Error loading pin configuration.</p>",
                     "<form method='post' action='/api/pins'>",
-                    "<p>Pin: <select name='pin_0_number'><option value='15'>GP15</option></select> ",
-                    "Enabled: <input type='checkbox' name='pin_0_enabled' checked></p>",
                     "<p><button type='submit'>Save</button></p></form>"
                 ])
             
-            html_parts.extend([
-                "<hr><p><a href='/'>Back to Status</a> | <a href='/windows'>Time Windows</a></p>",
-                "</body></html>"
-            ])
+            # Add memory debugging information
+            try:
+                gc.collect()
+                free_memory = gc.mem_free()
+                html_parts.extend([
+                    f"<p><strong>Memory:</strong> {free_memory} bytes free</p>",
+                    "<hr><p><a href='/'>Home</a></p>",
+                    "</body></html>"
+                ])
+            except:
+                html_parts.extend([
+                    "<hr><p><a href='/'>Home</a></p>",
+                    "</body></html>"
+                ])
             
             # Join all parts at once to minimize memory fragmentation
             html = "".join(html_parts)
@@ -1263,17 +1249,21 @@ class ConfigWebServer:
                 enabled = pin_enabled.get(pin_index, False)
                 pin_key = f"pin_{pin_number}"  # Use pin_XX format
                 
-                # Get existing time windows for this pin if it exists
+                # Get existing configuration for this pin if it exists
                 try:
                     current_config = config_manager.get_config_dict()
                     existing_pin_config = current_config.get('pwm_pins', {}).get(pin_key, {})
+                    
+                    # Preserve existing settings or use defaults
+                    pin_name = existing_pin_config.get('name', f'Pin {pin_number}')
                     time_windows = existing_pin_config.get('time_windows', {
                         'day': {'duty_cycle': 0},
                         'evening': {'start': '19:00', 'end': '23:00', 'duty_cycle': 30},
                         'night': {'start': '23:00', 'end': '06:00', 'duty_cycle': 10}
                     })
                 except:
-                    # Default time windows if config can't be loaded
+                    # Default configuration if we can't get existing
+                    pin_name = f'Pin {pin_number}'
                     time_windows = {
                         'day': {'duty_cycle': 0},
                         'evening': {'start': '19:00', 'end': '23:00', 'duty_cycle': 30},
@@ -1281,7 +1271,7 @@ class ConfigWebServer:
                     }
                 
                 pin_config['pwm_pins'][pin_key] = {
-                    'name': f'Pin {pin_number}',
+                    'name': pin_name,
                     'gpio_pin': pin_number,
                     'enabled': enabled,
                     'time_windows': time_windows
