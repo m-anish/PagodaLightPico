@@ -94,7 +94,7 @@ class ConfigManager:
                 base_dict[key] = value
     
     def _setup_attributes(self):
-        """Set up attributes for backward compatibility with config.py format."""
+        """Set up attributes for module-level access."""
         # WiFi settings
         self.WIFI_SSID = self.config.get("wifi", {}).get("ssid", "")
         self.WIFI_PASSWORD = self.config.get("wifi", {}).get("password", "")
@@ -107,7 +107,6 @@ class ConfigManager:
         hardware = self.config.get("hardware", {})
         self.RTC_I2C_SDA_PIN = hardware.get("rtc_i2c_sda_pin", 20)
         self.RTC_I2C_SCL_PIN = hardware.get("rtc_i2c_scl_pin", 21)
-        self.LED_PWM_PIN = hardware.get("led_pwm_pin", 16)
         self.PWM_FREQUENCY = hardware.get("pwm_frequency", 1000)
         
         # System settings
@@ -125,8 +124,8 @@ class ConfigManager:
         self.NOTIFY_ON_WINDOW_CHANGE = notifications.get("notify_on_window_change", True)
         self.NOTIFY_ON_ERRORS = notifications.get("notify_on_errors", True)
         
-        # Time windows
-        self.TIME_WINDOWS = self.config.get("time_windows", {})
+        # PWM pins configuration
+        self.PWM_PINS = self.config.get("pwm_pins", {})
     
     def _validate_config(self):
         """Validate configuration values."""
@@ -147,7 +146,7 @@ class ConfigManager:
         
         # Validate hardware pins
         hardware = self.config.get("hardware", {})
-        pins_to_check = ["rtc_i2c_sda_pin", "rtc_i2c_scl_pin", "led_pwm_pin"]
+        pins_to_check = ["rtc_i2c_sda_pin", "rtc_i2c_scl_pin"]
         for pin_name in pins_to_check:
             pin_value = hardware.get(pin_name)
             if not isinstance(pin_value, int) or pin_value < 0 or pin_value > 28:
@@ -168,26 +167,86 @@ class ConfigManager:
         if not isinstance(update_interval, int) or update_interval < 1:
             errors.append("Update interval must be a positive integer")
         
-        # Validate time windows
-        time_windows = self.config.get("time_windows", {})
-        for window_name, window_config in time_windows.items():
-            if not isinstance(window_config, dict):
-                continue
-            
+        # Validate PWM pins configuration
+        pwm_pins = self.config.get("pwm_pins", {})
+        enabled_pins = 0
+        used_gpio_pins = set()
+        
+        for pin_key, pin_config in pwm_pins.items():
             # Skip comment fields
-            if window_name.startswith("_"):
+            if pin_key.startswith("_"):
+                continue
+                
+            if not isinstance(pin_config, dict):
+                errors.append(f"PWM pin config {pin_key} must be a dictionary")
                 continue
             
-            # Validate time format
-            for time_field in ["start", "end"]:
-                time_value = window_config.get(time_field)
-                if not self._is_valid_time_format(time_value):
-                    errors.append(f"Invalid time format for {window_name}.{time_field}: {time_value}")
+            # Validate required fields
+            if "gpio_pin" not in pin_config:
+                errors.append(f"PWM pin {pin_key} missing gpio_pin")
+                continue
+                
+            gpio_pin = pin_config.get("gpio_pin")
+            if not isinstance(gpio_pin, int) or gpio_pin < 0 or gpio_pin > 28:
+                errors.append(f"PWM pin {pin_key} gpio_pin must be integer 0-28")
+                continue
+                
+            # Check for duplicate GPIO pins
+            if gpio_pin in used_gpio_pins:
+                errors.append(f"GPIO pin {gpio_pin} used multiple times")
+            used_gpio_pins.add(gpio_pin)
             
-            # Validate duty cycle
-            duty_cycle = window_config.get("duty_cycle")
-            if not isinstance(duty_cycle, int) or duty_cycle < 0 or duty_cycle > 100:
-                errors.append(f"Duty cycle for {window_name} must be between 0 and 100")
+            # Check if pin conflicts with I2C pins
+            if gpio_pin == hardware.get("rtc_i2c_sda_pin") or gpio_pin == hardware.get("rtc_i2c_scl_pin"):
+                errors.append(f"GPIO pin {gpio_pin} conflicts with I2C pins")
+            
+            # Validate name
+            if "name" not in pin_config or not pin_config.get("name"):
+                errors.append(f"PWM pin {pin_key} missing name")
+            
+            # Count enabled pins
+            if pin_config.get("enabled", False):
+                enabled_pins += 1
+                
+                # Validate time windows for enabled pins
+                time_windows = pin_config.get("time_windows", {})
+                if not isinstance(time_windows, dict):
+                    errors.append(f"PWM pin {pin_key} time_windows must be a dictionary")
+                    continue
+                
+                # Must have at least day window
+                if "day" not in time_windows:
+                    errors.append(f"PWM pin {pin_key} must have 'day' time window")
+                
+                window_count = 0
+                for window_name, window_config in time_windows.items():
+                    if window_name.startswith("_"):
+                        continue
+                    window_count += 1
+                    
+                    if not isinstance(window_config, dict):
+                        continue
+                    
+                    # Validate time format
+                    for time_field in ["start", "end"]:
+                        time_value = window_config.get(time_field)
+                        if not self._is_valid_time_format(time_value):
+                            errors.append(f"Invalid time format for {pin_key}.{window_name}.{time_field}: {time_value}")
+                    
+                    # Validate duty cycle
+                    duty_cycle = window_config.get("duty_cycle")
+                    if not isinstance(duty_cycle, int) or duty_cycle < 0 or duty_cycle > 100:
+                        errors.append(f"Duty cycle for {pin_key}.{window_name} must be between 0 and 100")
+                
+                # Validate window count (2-5 windows)
+                if window_count < 2 or window_count > 5:
+                    errors.append(f"PWM pin {pin_key} must have 2-5 time windows")
+        
+        # Validate pin count (1-5 enabled pins)
+        if enabled_pins < 1:
+            errors.append("At least one PWM pin must be enabled")
+        elif enabled_pins > 5:
+            errors.append("Maximum 5 PWM pins can be enabled")
         
         if errors:
             error_msg = "Configuration validation failed: " + "; ".join(errors)
@@ -225,15 +284,14 @@ class ConfigManager:
 # Global configuration instance for backward compatibility
 config_manager = ConfigManager()
 
-# Export attributes at module level for backward compatibility
+# Export attributes at module level for compatibility
 WIFI_SSID = config_manager.WIFI_SSID
 WIFI_PASSWORD = config_manager.WIFI_PASSWORD
 TIMEZONE_NAME = config_manager.TIMEZONE_NAME
 TIMEZONE_OFFSET = config_manager.TIMEZONE_OFFSET
 RTC_I2C_SDA_PIN = config_manager.RTC_I2C_SDA_PIN
 RTC_I2C_SCL_PIN = config_manager.RTC_I2C_SCL_PIN
-LED_PWM_PIN = config_manager.LED_PWM_PIN
 PWM_FREQUENCY = config_manager.PWM_FREQUENCY
 LOG_LEVEL = config_manager.LOG_LEVEL
 UPDATE_INTERVAL = config_manager.UPDATE_INTERVAL
-TIME_WINDOWS = config_manager.TIME_WINDOWS
+PWM_PINS = config_manager.PWM_PINS

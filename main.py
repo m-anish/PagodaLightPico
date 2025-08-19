@@ -3,7 +3,7 @@ main.py
 
 Main application script for PagodaLightPico.
 
-Controls LED lighting PWM duty cycle based on configurable time windows
+Controls multiple LED lighting PWM outputs based on individual configurable time windows
 and dynamically calculated sunrise and sunset times from sun_times_leh module.
 
 The "day" time window start and end times are set dynamically each check
@@ -13,7 +13,7 @@ Configuration is now managed via JSON files (config.json) with runtime updates
 supported through a web interface accessible when WiFi is connected.
 
 The script reads real-time clock (RTC) time using rtc_module and sets PWM
-on an assigned GPIO pin accordingly.
+on multiple assigned GPIO pins according to their individual schedules.
 
 Logging is done via simple_logger with timestamps and levels.
 
@@ -29,15 +29,12 @@ import rtc_module
 from simple_logger import Logger
 from wifi_connect import connect_wifi, sync_time_ntp
 import time
-from lib.pwm_control import PWMController
+from lib.pwm_control import multi_pwm
 from lib.web_server import web_server
 from lib.mqtt_notifier import mqtt_notifier
 from lib.system_status import system_status
 
 log = Logger()
-
-# Initialize PWM controller
-led_pwm = PWMController(freq=config.PWM_FREQUENCY, pin=config.LED_PWM_PIN)
 
 log.info("Starting system")
 
@@ -164,51 +161,72 @@ def get_current_window(time_windows, current_time_tuple):
     return None, 0
 
 
-def update_led():
+def update_pwm_pins():
     """
-    Reads the current time from RTC and updates the LED PWM duty cycle
-    based on the active time window. Also updates system status and sends
+    Reads the current time from RTC and updates all enabled PWM pin duty cycles
+    based on their individual time windows. Also updates system status and sends
     MQTT notifications when windows change.
     """
     try:
         current_time_tuple = rtc_module.get_current_time()
-        window, duty_cycle = get_current_window(config.TIME_WINDOWS,
-                                                current_time_tuple)
+        config_dict = config.config_manager.get_config_dict()
+        pwm_pins = config_dict.get('pwm_pins', {})
         
-        # Get window start/end times for status and notifications
-        window_start = None
-        window_end = None
-        if window and window in config.TIME_WINDOWS:
-            window_config = config.TIME_WINDOWS[window]
-            window_start = window_config.get("start")
-            window_end = window_config.get("end")
+        # Process each enabled PWM pin
+        pin_updates = {}
+        for pin_key, pin_config in pwm_pins.items():
+            # Skip comment fields and disabled pins
+            if pin_key.startswith('_') or not pin_config.get('enabled', False):
+                continue
+                
+            pin_name = pin_config.get('name', pin_key)
+            time_windows = pin_config.get('time_windows', {})
             
-            # For day window, use actual sunrise/sunset times
-            if window == "day":
-                month = current_time_tuple[1]
-                day = current_time_tuple[2]
-                sunrise_h, sunrise_m, sunset_h, sunset_m = sun_times_leh.get_sunrise_sunset(month, day)
-                window_start = int_to_time_str(sunrise_h, sunrise_m)
-                window_end = int_to_time_str(sunset_h, sunset_m)
+            # Get current window for this pin
+            window, duty_cycle = get_current_window(time_windows, current_time_tuple)
+            
+            # Get window start/end times for status and notifications
+            window_start = None
+            window_end = None
+            if window and window in time_windows:
+                window_config = time_windows[window]
+                window_start = window_config.get("start")
+                window_end = window_config.get("end")
+                
+                # For day window, use actual sunrise/sunset times
+                if window == "day":
+                    month = current_time_tuple[1]
+                    day = current_time_tuple[2]
+                    sunrise_h, sunrise_m, sunset_h, sunset_m = sun_times_leh.get_sunrise_sunset(month, day)
+                    window_start = int_to_time_str(sunrise_h, sunrise_m)
+                    window_end = int_to_time_str(sunset_h, sunset_m)
+            
+            # Update PWM for this pin
+            if window:
+                log.info(f"Pin {pin_name}: Active window '{window}', setting duty cycle: {duty_cycle}%")
+                multi_pwm.set_pin_duty_percent(pin_key, duty_cycle)
+            else:
+                log.warn(f"Pin {pin_name}: No active window detected, turning off")
+                multi_pwm.set_pin_duty_percent(pin_key, 0)
+                duty_cycle = 0
+            
+            # Store pin update info for status and notifications
+            pin_updates[pin_key] = {
+                'name': pin_name,
+                'window': window,
+                'duty_cycle': duty_cycle,
+                'window_start': window_start,
+                'window_end': window_end
+            }
         
-        if window:
-            log.info(f"Active window: {window}, setting duty cycle: {duty_cycle}%")
-            led_pwm.set_duty_percent(duty_cycle)
-            
-            # Update system status
-            system_status.update_led_status(duty_cycle, window, window_start, window_end)
-            
-            # Send MQTT notification if window changed
-            mqtt_notifier.notify_window_change(window, duty_cycle, window_start, window_end)
-        else:
-            log.warn("No active window detected, turning LED off")
-            led_pwm.set_duty_percent(0)
-            
-            # Update system status for no active window
-            system_status.update_led_status(0, None, None, None)
+        # Update system status with all pin information
+        system_status.update_multi_pin_status(pin_updates)
+        
+        # Send MQTT notifications for changed windows
+        mqtt_notifier.notify_multi_pin_changes(pin_updates)
             
     except Exception as e:
-        error_msg = f"Error updating LED: {e}"
+        error_msg = f"Error updating PWM pins: {e}"
         log.error(error_msg)
         
         # Record error in system status
@@ -217,20 +235,23 @@ def update_led():
         # Send error notification
         mqtt_notifier.notify_error(error_msg)
         
-        # Turn off LED in case of error
-        led_pwm.set_duty_percent(0)
-        system_status.update_led_status(0, None, None, None)
+        # Turn off all pins in case of error
+        try:
+            multi_pwm.set_all_pins_duty_percent(0)
+            system_status.update_multi_pin_status({})
+        except Exception as cleanup_error:
+            log.error(f"Error during cleanup: {cleanup_error}")
 
 
 def main_loop():
     """
-    Main loop that repeatedly updates the LED PWM and handles web requests.
+    Main loop that repeatedly updates all PWM pins and handles web requests.
     
-    The loop now integrates web server request handling with LED updates,
+    The loop now integrates web server request handling with multi-pin PWM updates,
     and supports runtime configuration reloading when updates are received
     via the web interface.
     """
-    last_led_update = 0
+    last_pwm_update = 0
     web_request_interval = 0.1  # Handle web requests every 100ms
     
     while True:
@@ -241,19 +262,26 @@ def main_loop():
             if web_server.running:
                 web_server.handle_requests(timeout=web_request_interval)
             
-            # Update LED based on configured interval
-            if current_time - last_led_update >= config.UPDATE_INTERVAL:
+            # Update PWM pins based on configured interval
+            if current_time - last_pwm_update >= config.UPDATE_INTERVAL:
                 # Check if configuration was updated via web interface
-                if config.config_manager.config != config.config_manager.get_config_dict():
-                    log.info("Configuration change detected, reloading...")
-                    config.config_manager.reload()
-                    # Re-initialize PWM controller if pin or frequency changed
-                    global led_pwm
-                    led_pwm.deinit()
-                    led_pwm = PWMController(freq=config.PWM_FREQUENCY, pin=config.LED_PWM_PIN)
+                current_config = config.config_manager.get_config_dict()
+                if hasattr(config.config_manager, '_last_config_hash'):
+                    import json
+                    current_hash = hash(json.dumps(current_config, sort_keys=True))
+                    if current_hash != config.config_manager._last_config_hash:
+                        log.info("Configuration change detected, reloading...")
+                        config.config_manager.reload()
+                        # Re-initialize multi-PWM manager with new configuration
+                        multi_pwm.reload_config()
+                        config.config_manager._last_config_hash = current_hash
+                else:
+                    # Initialize hash tracking
+                    import json
+                    config.config_manager._last_config_hash = hash(json.dumps(current_config, sort_keys=True))
                 
-                update_led()
-                last_led_update = current_time
+                update_pwm_pins()
+                last_pwm_update = current_time
             else:
                 # Short sleep to prevent excessive CPU usage
                 time.sleep(web_request_interval)
@@ -262,7 +290,11 @@ def main_loop():
             log.info("Shutdown requested")
             if web_server.running:
                 web_server.stop()
-            # No additional cleanup needed
+            # Clean up PWM controllers
+            try:
+                multi_pwm.deinit_all()
+            except Exception as cleanup_error:
+                log.error(f"Error during PWM cleanup: {cleanup_error}")
             break
         except Exception as e:
             log.error(f"Error in main loop: {e}")

@@ -14,7 +14,6 @@
   "hardware": {
     "rtc_i2c_sda_pin": 20,
     "rtc_i2c_scl_pin": 21,
-    "led_pwm_pin": 16,
     "pwm_frequency": 1000,
     "_comment": "Pico W GPIO pins: 0-28, PWM frequency: 1-40000000 Hz"
   },
@@ -33,42 +32,51 @@
     "notify_on_errors": true,
     "_comment": "Set enabled=true and configure MQTT broker for push notifications"
   },
-  "time_windows": {
-    "day": {
-      "start": "06:00",
-      "end": "18:00",
-      "duty_cycle": 0,
-      "_comment": "Day window start/end times are replaced dynamically with sunrise/sunset"
+  "pwm_pins": {
+    "pin_16": {
+      "name": "Main LED Strip",
+      "gpio_pin": 16,
+      "enabled": true,
+      "time_windows": {
+        "day": {
+          "start": "06:00",
+          "end": "18:00",
+          "duty_cycle": 0,
+          "_comment": "Day window start/end times are replaced dynamically with sunrise/sunset"
+        },
+        "evening": {
+          "start": "18:00",
+          "end": "22:00",
+          "duty_cycle": 60,
+          "_comment": "Evening meditation period with 60% brightness"
+        },
+        "night": {
+          "start": "22:00",
+          "end": "06:00",
+          "duty_cycle": 20,
+          "_comment": "Night period with minimal lighting (crosses midnight)"
+        }
+      }
     },
-    "window_1": {
-      "start": "18:00",
-      "end": "20:00",
-      "duty_cycle": 60,
-      "_comment": "Evening meditation period with 60% brightness"
+    "_example_pin_15": {
+      "name": "Accent Lighting",
+      "gpio_pin": 15,
+      "enabled": false,
+      "time_windows": {
+        "day": {
+          "start": "06:00",
+          "end": "18:00",
+          "duty_cycle": 0
+        },
+        "night": {
+          "start": "18:00",
+          "end": "06:00",
+          "duty_cycle": 30
+        }
+      },
+      "_comment": "Example of a second pin configuration - remove _ prefix to enable"
     },
-    "window_2": {
-      "start": "20:00",
-      "end": "22:00",
-      "duty_cycle": 40,
-      "_comment": "Late evening with reduced brightness"
-    },
-    "window_3": {
-      "start": "22:00",
-      "end": "00:00",
-      "duty_cycle": 20,
-      "_comment": "Night period with minimal lighting"
-    },
-    "window_4": {
-      "start": "00:00",
-      "end": "04:00",
-      "duty_cycle": 10,
-      "_comment": "Deep night with very low lighting"
-    },
-    "window_5": {
-      "start": "04:00",
-      "end": "06:00",
-      "duty_cycle": 30,
-      "_comment": "Pre-dawn meditation period"
-    }
+    "_format_comment": "Pin configurations: pin_<gpio_number> with name, gpio_pin, enabled, and time_windows",
+    "_limits_comment": "Maximum 5 pins, minimum 1 pin. Each pin can have 2-5 time windows including mandatory 'day' window"
   }
 }

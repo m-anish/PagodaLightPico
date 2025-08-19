@@ -23,10 +23,7 @@ class SystemStatus:
     
     def __init__(self):
         self.startup_time = time.time()
-        self.current_duty_cycle = 0
-        self.current_window = None
-        self.current_window_start = None
-        self.current_window_end = None
+        self.pin_status = {}  # {pin_key: {name, duty_cycle, window, window_start, window_end, gpio_pin}}
         self.last_update_time = 0
         self.total_updates = 0
         self.error_count = 0
@@ -35,24 +32,41 @@ class SystemStatus:
         self.mqtt_connected = False
         self.web_server_running = False
     
-    def update_led_status(self, duty_cycle, window_name=None, start_time=None, end_time=None):
+    def update_multi_pin_status(self, pin_updates):
         """
-        Update current LED status.
+        Update status for multiple PWM pins.
         
         Args:
-            duty_cycle (int): Current PWM duty cycle percentage (0-100)
-            window_name (str): Name of active time window
-            start_time (str): Window start time (HH:MM)  
-            end_time (str): Window end time (HH:MM)
+            pin_updates (dict): {pin_key: {name, window, duty_cycle, window_start, window_end}}
         """
-        self.current_duty_cycle = duty_cycle
-        self.current_window = window_name
-        self.current_window_start = start_time
-        self.current_window_end = end_time
+        # Add GPIO pin information from config
+        config_dict = config_manager.get_config_dict()
+        pwm_pins = config_dict.get('pwm_pins', {})
+        
+        for pin_key, update_info in pin_updates.items():
+            pin_config = pwm_pins.get(pin_key, {})
+            gpio_pin = pin_config.get('gpio_pin')
+            
+            self.pin_status[pin_key] = {
+                'name': update_info.get('name', pin_key),
+                'duty_cycle': update_info.get('duty_cycle', 0),
+                'window': update_info.get('window'),
+                'window_start': update_info.get('window_start'),
+                'window_end': update_info.get('window_end'),
+                'gpio_pin': gpio_pin
+            }
+        
+        # Remove pins that are no longer in the update
+        current_pins = set(pin_updates.keys())
+        stored_pins = set(self.pin_status.keys())
+        for removed_pin in stored_pins - current_pins:
+            del self.pin_status[removed_pin]
+        
         self.last_update_time = time.time()
         self.total_updates += 1
         
-        log.debug(f"[STATUS] Updated: {duty_cycle}% duty cycle, window: {window_name}")
+        active_count = sum(1 for info in pin_updates.values() if info.get('duty_cycle', 0) > 0)
+        log.debug(f"[STATUS] Updated {len(pin_updates)} pins, {active_count} active")
     
     def record_error(self, error_message):
         """
@@ -185,6 +199,21 @@ class SystemStatus:
         time_info = self.get_current_time_info()
         network_info = self.get_network_info()
         
+        # Format pin status for display
+        pins_display = {}
+        for pin_key, pin_info in self.pin_status.items():
+            pins_display[pin_key] = {
+                'name': pin_info.get('name', pin_key),
+                'gpio_pin': pin_info.get('gpio_pin'),
+                'duty_cycle': pin_info.get('duty_cycle', 0),
+                'duty_cycle_display': f"{pin_info.get('duty_cycle', 0)}%",
+                'status': "ON" if pin_info.get('duty_cycle', 0) > 0 else "OFF",
+                'window': pin_info.get('window'),
+                'window_display': self._safe_format_window_name(pin_info.get('window')),
+                'window_start': pin_info.get('window_start'),
+                'window_end': pin_info.get('window_end')
+            }
+        
         return {
             "system": {
                 "uptime": self.get_uptime(),
@@ -199,18 +228,7 @@ class SystemStatus:
                 "web_server": self.web_server_running
             },
             "network": network_info,
-            "led": {
-                "duty_cycle": self.current_duty_cycle,
-                "duty_cycle_display": f"{self.current_duty_cycle}%",
-                "status": "ON" if self.current_duty_cycle > 0 else "OFF"
-            },
-            "time_window": {
-                "current": self.current_window,
-                "current_display": self._safe_format_window_name(self.current_window),
-                "start_time": self.current_window_start,
-                "end_time": self.current_window_end,
-                "last_update": self.last_update_time
-            },
+            "pins": pins_display,
             "time": time_info,
             "config": {
                 "update_interval": config_manager.UPDATE_INTERVAL,
@@ -256,10 +274,12 @@ class SystemStatus:
             str: Status summary string
         """
         time_info = self.get_current_time_info()
-        window_display = self._safe_format_window_name(self.current_window)
         
-        return (f"LED: {self.current_duty_cycle}%, "
-                f"Window: {window_display}, "
+        # Count active pins
+        active_pins = sum(1 for info in self.pin_status.values() if info.get('duty_cycle', 0) > 0)
+        total_pins = len(self.pin_status)
+        
+        return (f"Pins: {active_pins}/{total_pins} active, "
                 f"Time: {time_info['current_time']}, "
                 f"Uptime: {self.get_uptime_string()}")
 

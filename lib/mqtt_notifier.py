@@ -40,7 +40,7 @@ class MQTTNotifier:
     def __init__(self):
         self.client = None
         self.connected = False
-        self.last_window = None
+        self.last_windows = {}  # {pin_key: last_window}
         self.notifications_enabled = False
         self._load_config()
     
@@ -76,7 +76,7 @@ class MQTTNotifier:
             # Send startup notification
             self._send_notification("system", {
                 "event": "system_startup",
-                "message": "🏯 PagodaLight system started",
+                "message": "[STARTUP] PagodaLight system started",
                 "timestamp": time.time(),
                 "device": self.client_id
             })
@@ -95,7 +95,7 @@ class MQTTNotifier:
                 # Send shutdown notification
                 self._send_notification("system", {
                     "event": "system_shutdown", 
-                    "message": "🏯 PagodaLight system stopping",
+                    "message": "[SHUTDOWN] PagodaLight system stopping",
                     "timestamp": time.time(),
                     "device": self.client_id
                 })
@@ -106,51 +106,6 @@ class MQTTNotifier:
             finally:
                 self.connected = False
     
-    def notify_window_change(self, window_name, duty_cycle, start_time, end_time):
-        """
-        Send notification when time window changes.
-        
-        Args:
-            window_name (str): Name of the active window
-            duty_cycle (int): LED brightness percentage (0-100)
-            start_time (str): Window start time (HH:MM)
-            end_time (str): Window end time (HH:MM)
-        """
-        if not self.notify_on_window_change or not self.connected:
-            return
-        
-        # Only notify if window actually changed
-        if self.last_window == window_name:
-            return
-            
-        self.last_window = window_name
-        
-        # Format notification message
-        if window_name == "day":
-            icon = "🌅"
-            description = "Day (sunrise to sunset)"
-        elif duty_cycle == 0:
-            icon = "🌙"  
-            description = f"Lights off"
-        else:
-            icon = "💡"
-            description = f"Meditation lighting"
-        
-        message = f"{icon} {description} - {duty_cycle}% brightness"
-        
-        notification_data = {
-            "event": "window_change",
-            "window": window_name,
-            "duty_cycle": duty_cycle,
-            "start_time": start_time,
-            "end_time": end_time,
-            "message": message,
-            "timestamp": time.time(),
-            "device": self.client_id
-        }
-        
-        self._send_notification("window_change", notification_data)
-        log.info(f"[MQTT] Sent window change notification: {message}")
     
     def notify_error(self, error_message):
         """
@@ -164,7 +119,7 @@ class MQTTNotifier:
         
         notification_data = {
             "event": "error",
-            "message": f"⚠️ PagodaLight Error: {error_message}",
+            "message": f"[ERROR] PagodaLight Error: {error_message}",
             "timestamp": time.time(),
             "device": self.client_id,
             "severity": "error"
@@ -173,6 +128,82 @@ class MQTTNotifier:
         self._send_notification("error", notification_data)
         log.info(f"[MQTT] Sent error notification: {error_message}")
     
+    def notify_multi_pin_changes(self, pin_updates):
+        """
+        Send notifications for multiple pin window changes.
+        
+        Args:
+            pin_updates (dict): {pin_key: {name, window, duty_cycle, window_start, window_end}}
+        """
+        if not self.notify_on_window_change or not self.connected:
+            return
+        
+        # Check each pin for window changes
+        changed_pins = []
+        for pin_key, update_info in pin_updates.items():
+            current_window = update_info.get('window')
+            last_window = self.last_windows.get(pin_key)
+            
+            # Only notify if window actually changed
+            if current_window != last_window:
+                self.last_windows[pin_key] = current_window
+                changed_pins.append((pin_key, update_info))
+        
+        if not changed_pins:
+            return
+        
+        # Send individual notifications for each changed pin
+        for pin_key, update_info in changed_pins:
+            pin_name = update_info.get('name', pin_key)
+            window_name = update_info.get('window')
+            duty_cycle = update_info.get('duty_cycle', 0)
+            start_time = update_info.get('window_start')
+            end_time = update_info.get('window_end')
+            
+            # Format notification message without emojis
+            if window_name == "day":
+                prefix = "DAY"
+                description = "sunrise to sunset"
+            elif duty_cycle == 0:
+                prefix = "OFF"
+                description = "lights off"
+            else:
+                prefix = "ON"
+                description = f"meditation lighting"
+            
+            message = f"[{prefix}] {pin_name}: {description} - {duty_cycle}% brightness"
+            
+            notification_data = {
+                "event": "pin_window_change",
+                "pin_key": pin_key,
+                "pin_name": pin_name,
+                "window": window_name,
+                "duty_cycle": duty_cycle,
+                "start_time": start_time,
+                "end_time": end_time,
+                "message": message,
+                "timestamp": time.time(),
+                "device": self.client_id
+            }
+            
+            self._send_notification("pin_change", notification_data)
+            log.info(f"[MQTT] Sent pin change notification: {message}")
+        
+        # Also send a summary notification if multiple pins changed
+        if len(changed_pins) > 1:
+            summary_message = f"[UPDATE] {len(changed_pins)} pins changed windows"
+            summary_data = {
+                "event": "multi_pin_change",
+                "changed_pin_count": len(changed_pins),
+                "changed_pins": [pin_key for pin_key, _ in changed_pins],
+                "message": summary_message,
+                "timestamp": time.time(),
+                "device": self.client_id
+            }
+            
+            self._send_notification("summary", summary_data)
+            log.info(f"[MQTT] Sent multi-pin summary: {summary_message}")
+    
     def notify_config_change(self):
         """Send notification when configuration is updated."""
         if not self.connected:
@@ -180,7 +211,7 @@ class MQTTNotifier:
         
         notification_data = {
             "event": "config_update",
-            "message": "⚙️ Configuration updated via web interface",
+            "message": "[CONFIG] Configuration updated via web interface",
             "timestamp": time.time(),
             "device": self.client_id
         }
