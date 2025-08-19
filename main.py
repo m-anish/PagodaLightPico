@@ -132,16 +132,17 @@ def get_current_window(time_windows, current_time_tuple):
     month = current_time_tuple[1]
     day = current_time_tuple[2]
 
-    log.debug(f"[MAIN] RTC current time: {current_time_tuple}")
+    # Reduce debug logging to save memory
+    # log.debug(f"[MAIN] RTC current time: {current_time_tuple}")
     sunrise_h, sunrise_m, sunset_h, sunset_m = \
         sun_times_leh.get_sunrise_sunset(month, day)
-    log.debug(f"[MAIN] Sunrise/sunset times for {month}/{day}: "
-              f"{sunrise_h:02d}:{sunrise_m:02d}, "
-              f"{sunset_h:02d}:{sunset_m:02d}")
+    # log.debug(f"[MAIN] Sunrise/sunset times for {month}/{day}: "
+    #           f"{sunrise_h:02d}:{sunrise_m:02d}, "
+    #           f"{sunset_h:02d}:{sunset_m:02d}")
 
     sunrise_str = int_to_time_str(sunrise_h, sunrise_m)
     sunset_str = int_to_time_str(sunset_h, sunset_m)
-    log.debug(f"[MAIN] Formatted sunrise/sunset times: {sunrise_str}, {sunset_str}")
+    # log.debug(f"[MAIN] Formatted sunrise/sunset times: {sunrise_str}, {sunset_str}")
 
     windows = dict(time_windows)
     if "day" in windows:
@@ -154,22 +155,22 @@ def get_current_window(time_windows, current_time_tuple):
         end = time_str_to_minutes(window["end"])
         duty = window["duty_cycle"]
 
-        log.debug(f"[MAIN] Checking window '{window_name}' start: {window['start']} "
-                  f"({start}), end: {window['end']} ({end}), duty: {duty}")
+        # log.debug(f"[MAIN] Checking window '{window_name}' start: {window['start']} "
+        #           f"({start}), end: {window['end']} ({end}), duty: {duty}")
 
         if start <= end:
             if start <= current_minutes < end:
-                log.debug(f"[MAIN] Current time {current_minutes} is within window "
-                          f"'{window_name}'")
+                # log.debug(f"[MAIN] Current time {current_minutes} is within window "
+                #           f"'{window_name}'")
                 return window_name, duty
         else:
             # Handle overnight windows crossing midnight
             if current_minutes >= start or current_minutes < end:
-                log.debug(
-                    f"[MAIN] Current time {current_minutes} is within overnight "
-                    f"window '{window_name}'")
+                # log.debug(
+                #     f"[MAIN] Current time {current_minutes} is within overnight "
+                #     f"window '{window_name}'")
                 return window_name, duty
-    log.debug("[MAIN] No matching time window found")
+    # log.debug("[MAIN] No matching time window found")
     return None, 0
 
 
@@ -215,10 +216,11 @@ def update_pwm_pins():
             
             # Update PWM for this pin
             if window:
-                log.info(f"Pin {pin_name}: Active window '{window}', setting duty cycle: {duty_cycle}%")
+                # Reduce debug logging to save memory
+                # log.info(f"Pin {pin_name}: Active window '{window}', setting duty cycle: {duty_cycle}%")
                 multi_pwm.set_pin_duty_percent(pin_key, duty_cycle)
             else:
-                log.warn(f"Pin {pin_name}: No active window detected, turning off")
+                # log.warn(f"Pin {pin_name}: No active window detected, turning off")
                 multi_pwm.set_pin_duty_percent(pin_key, 0)
                 duty_cycle = 0
             
@@ -282,7 +284,8 @@ def main_loop():
                     import json
                     current_hash = hash(json.dumps(current_config))
                     if current_hash != config.config_manager._last_config_hash:
-                        log.info("Configuration change detected, reloading...")
+                        # Reduce debug logging to save memory
+                        # log.info("Configuration change detected, reloading...")
                         config.config_manager.reload()
                         # Re-initialize multi-PWM manager with new configuration
                         multi_pwm.reload_config()

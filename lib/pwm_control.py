@@ -44,7 +44,8 @@ class PWMController:
         duty_value = int(percent * 65535 / 100)
         self.pwm.duty_u16(duty_value)
         self.current_duty = percent
-        log.debug(f"[PWM] {self.name} duty cycle set to {percent}% (duty_u16={duty_value})")
+        # Reduce logging to save memory
+        # log.debug(f"[PWM] {self.name} duty cycle set to {percent}% (duty_u16={duty_value})")
 
     def get_duty_percent(self):
         return self.current_duty

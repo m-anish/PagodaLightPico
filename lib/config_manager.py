@@ -250,10 +250,12 @@ class ConfigManager:
         
         if errors:
             error_msg = "Configuration validation failed: " + "; ".join(errors)
-            log.error(f"[CONFIG] {error_msg}")
+            # Reduce logging to save memory
+            # log.error(f"[CONFIG] {error_msg}")
             raise ValueError(error_msg)
         
-        log.debug("[CONFIG] Validation passed")
+        # Reduce logging to save memory
+        # log.debug("[CONFIG] Validation passed")
     
     def _is_valid_time_format(self, time_str):
         """Validate time format HH:MM."""

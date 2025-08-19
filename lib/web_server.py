@@ -165,7 +165,8 @@ class ConfigWebServer:
             '/upload': self._page_upload,
             '/api/config': self._api_config_get,
             '/api/status': self._api_status_get,
-            '/api/download': self._api_download_config,
+            # Temporarily disable download config to reduce memory usage
+            # '/api/download': self._api_download_config,
         }
         
         handler = routes.get(path)
@@ -285,8 +286,7 @@ class ConfigWebServer:
             # Simplified navigation - removed System Settings and Windows to reduce memory usage
             html_parts.extend([
                 "<hr><p><a href='/config'>WiFi Config</a> | ",
-                "<a href='/pins'>Add/Remove Controllers</a> | ",
-                "<a href='/api/download'>Download Config</a></p>",
+                "<a href='/pins'>Add/Remove Controllers</a></p>",
                 "</body></html>"
             ])
             
@@ -427,7 +427,8 @@ class ConfigWebServer:
                         continue  # Skip comment entries
                     
                     if not isinstance(pin_config, dict):
-                        log.error(f"[WEB] Invalid pin config for {pin_key}: expected dict, got {type(pin_config)}")
+                        # Reduce logging to save memory
+                        # log.error(f"[WEB] Invalid pin config for {pin_key}: expected dict, got {type(pin_config)}")
                         continue
                     
                     enabled = pin_config.get('enabled', False)
@@ -466,7 +467,8 @@ class ConfigWebServer:
                     else:
                         html_parts.append("<option value=\"\">No pins available</option>")
                 except Exception as e:
-                    log.error(f"[WEB] Error getting pin options: {e}")
+                    # Reduce logging to save memory
+                    # log.error(f"[WEB] Error getting pin options: {e}")
                     # Fallback to common PWM pins
                     common_pins = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
                     for pin in common_pins:
@@ -480,7 +482,8 @@ class ConfigWebServer:
                 ])
                 
             except Exception as e:
-                log.error(f"[WEB] Error loading pin config: {e}")
+                # Reduce logging to save memory
+                # log.error(f"[WEB] Error loading pin config: {e}")
                 html_parts.extend([
                     "<p>Error loading pin configuration.</p>",
                     "<form method='post' action='/api/pins'>",
@@ -507,7 +510,8 @@ class ConfigWebServer:
             return self._create_html_response(html)
             
         except Exception as e:
-            log.error(f"[WEB] Error creating pins page: {e}")
+            # Reduce logging to save memory
+            # log.error(f"[WEB] Error creating pins page: {e}")
             return self._create_html_response("<html><body><h1>Error</h1><p>Could not load pin settings.</p></body></html>")
     
     def _page_windows_disabled(self):
