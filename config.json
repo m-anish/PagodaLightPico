@@ -18,6 +18,15 @@
     "log_level": "DEBUG",
     "update_interval": 60
   },
+  "notifications": {
+    "enabled": false,
+    "mqtt_broker": "broker.hivemq.com",
+    "mqtt_port": 1883,
+    "mqtt_topic": "pagoda_light/notifications",
+    "mqtt_client_id": "pagoda_light_pico",
+    "notify_on_window_change": true,
+    "notify_on_errors": true
+  },
   "time_windows": {
     "day": {
       "start": "06:00",

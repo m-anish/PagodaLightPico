@@ -7,8 +7,12 @@ management interface for updating system settings at runtime.
 
 import socket
 import json
+import time
 from lib.config_manager import config_manager
 from simple_logger import Logger
+import rtc_module
+import sun_times_leh
+from lib.system_status import system_status
 
 log = Logger()
 
@@ -114,6 +118,8 @@ class ConfigWebServer:
             return self._create_config_page()
         elif path == "/api/config":
             return self._create_json_response(config_manager.get_config_dict())
+        elif path == "/api/status":
+            return self._create_json_response(system_status.get_status_dict())
         else:
             return self._create_error_response(404, "Not Found")
     

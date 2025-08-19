@@ -117,6 +117,16 @@ class ConfigManager:
         self.LOG_LEVEL = system.get("log_level", "INFO")
         self.UPDATE_INTERVAL = system.get("update_interval", 60)
         
+        # Notification settings  
+        notifications = self.config.get("notifications", {})
+        self.NOTIFICATIONS_ENABLED = notifications.get("enabled", False)
+        self.MQTT_BROKER = notifications.get("mqtt_broker", "broker.hivemq.com")
+        self.MQTT_PORT = notifications.get("mqtt_port", 1883)
+        self.MQTT_TOPIC = notifications.get("mqtt_topic", "pagoda_light/notifications")
+        self.MQTT_CLIENT_ID = notifications.get("mqtt_client_id", "pagoda_light_pico")
+        self.NOTIFY_ON_WINDOW_CHANGE = notifications.get("notify_on_window_change", True)
+        self.NOTIFY_ON_ERRORS = notifications.get("notify_on_errors", True)
+        
         # Time windows
         self.TIME_WINDOWS = self.config.get("time_windows", {})
     
