@@ -149,15 +149,18 @@ class ConfigWebServer:
             return self._create_error_response(405, "Method Not Allowed")
     
     def _handle_get(self, path):
-        """Handle GET requests."""
-        if path == "/":
-            return self._create_config_page()  # Status page by default
-        elif path == "/config":
-            return self._create_minimal_config_page()  # Minimal config form
-        elif path == "/api/config":
-            return self._create_json_response(config_manager.get_config_dict())
-        elif path == "/api/status":
-            return self._create_json_response(system_status.get_status_dict())
+        """Handle GET requests using micro-framework routing."""
+        # Simple routing table - easy to extend
+        routes = {
+            '/': self._page_status,
+            '/config': self._page_config,
+            '/api/config': self._api_config_get,
+            '/api/status': self._api_status_get,
+        }
+        
+        handler = routes.get(path)
+        if handler:
+            return handler()
         else:
             return self._create_error_response(404, "Not Found")
     
@@ -199,6 +202,106 @@ class ConfigWebServer:
         except Exception as e:
             log.error(f"[WEB] Error updating configuration: {e}")
             return self._create_json_response({"status": "error", "message": str(e)}, 500)
+    
+    # ========== PAGE HANDLERS ==========
+    
+    def _page_status(self):
+        """Status page - shows current system state."""
+        try:
+            html = "<html><head><title>PagodaLight Status</title>"
+            html += "<style>body{font-family:Arial;margin:15px}h1{color:#333}p{margin:8px 0}"
+            html += "a{color:#007acc;text-decoration:none}</style></head><body>"
+            html += "<h1>🏯 PagodaLight Status</h1>"
+            
+            # Current time
+            try:
+                current_time = rtc_module.get_current_time()
+                html += f"<p><strong>⏰ Time:</strong> {current_time[3]:02d}:{current_time[4]:02d}:{current_time[5]:02d}</p>"
+            except:
+                html += "<p><strong>⏰ Time:</strong> Unknown</p>"
+            
+            # LED status with visual indicator
+            try:
+                duty_cycle = system_status.current_duty_cycle
+                status_icon = "🔆" if duty_cycle > 0 else "🔅"
+                html += f"<p><strong>💡 LED:</strong> {status_icon} {duty_cycle}%</p>"
+            except:
+                html += "<p><strong>💡 LED:</strong> Unknown</p>"
+            
+            # Current window
+            try:
+                window = system_status.current_window or "None"
+                window_display = window.replace('_', ' ').title() if window != "None" else "None"
+                html += f"<p><strong>🕐 Window:</strong> {window_display}</p>"
+            except:
+                html += "<p><strong>🕐 Window:</strong> Unknown</p>"
+            
+            # Window times if available
+            try:
+                if system_status.current_window_start and system_status.current_window_end:
+                    html += f"<p><strong>📅 Times:</strong> {system_status.current_window_start} - {system_status.current_window_end}</p>"
+            except:
+                pass
+            
+            # Navigation links
+            html += "<hr><p><a href='/config'>⚙️ WiFi Config</a> | "
+            html += "<a href='/api/status'>📊 JSON Status</a> | "
+            html += "<a href='/api/config'>🔧 JSON Config</a></p>"
+            html += "</body></html>"
+            
+            return self._create_html_response(html)
+            
+        except Exception as e:
+            log.error(f"[WEB] Error creating status page: {e}")
+            return self._create_html_response("<html><body><h1>PagodaLight</h1><p>Memory Error</p></body></html>")
+    
+    def _page_config(self):
+        """Configuration page - minimal WiFi settings."""
+        try:
+            html = "<html><head><title>PagodaLight Config</title>"
+            html += "<style>body{font-family:Arial;margin:15px}input{width:100%;padding:8px;margin:5px 0;border:1px solid #ccc}"
+            html += "button{background:#007acc;color:white;padding:10px 20px;border:none;cursor:pointer}</style></head><body>"
+            html += "<h1>📶 WiFi Configuration</h1>"
+            html += "<form method='post' action='/api/config'>"
+            
+            try:
+                config_data = config_manager.get_config_dict()
+                ssid = config_data.get('wifi', {}).get('ssid', '')
+                html += f"<p><label>Network Name (SSID):</label><input name='ssid' value='{ssid}' required></p>"
+            except:
+                html += "<p><label>Network Name (SSID):</label><input name='ssid' required></p>"
+            
+            html += "<p><label>Password:</label><input type='password' name='password' required></p>"
+            html += "<p><button type='submit'>💾 Save WiFi Settings</button></p>"
+            html += "</form>"
+            html += "<hr><p><a href='/'>← Back to Status</a></p>"
+            html += "</body></html>"
+            
+            return self._create_html_response(html)
+            
+        except Exception as e:
+            log.error(f"[WEB] Error creating config page: {e}")
+            return self._create_html_response("<html><body><h1>Error</h1><p>Could not load configuration.</p></body></html>")
+    
+    # ========== API HANDLERS ==========
+    
+    def _api_status_get(self):
+        """API endpoint for status data."""
+        try:
+            return self._create_json_response(system_status.get_status_dict())
+        except Exception as e:
+            log.error(f"[WEB] Error getting status: {e}")
+            return self._create_json_response({"error": str(e)}, 500)
+    
+    def _api_config_get(self):
+        """API endpoint for configuration data."""
+        try:
+            return self._create_json_response(config_manager.get_config_dict())
+        except Exception as e:
+            log.error(f"[WEB] Error getting config: {e}")
+            return self._create_json_response({"error": str(e)}, 500)
+    
+    # ========== LEGACY METHODS (for compatibility) ==========
     
     def _create_config_page(self):
         """Create minimal status-only page for severe memory constraints."""
