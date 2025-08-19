@@ -74,8 +74,8 @@ else:
     system_status.set_connection_status(wifi=False, web_server=False, mqtt=False)
     web_server = None
 
-# Initialize PWM controller
-multi_pwm.initialize()
+# Initialize PWM controller (already initialized in constructor)
+# multi_pwm is ready to use
 
 def get_current_window_for_pin(pin_config):
     """
@@ -175,8 +175,8 @@ async def update_pwm_pins():
                 duty_cycle = window_config.get('duty_cycle', 0)
                 pin_name = pin_config.get('name', f'Pin {gpio_pin}')
                 
-                # Update PWM
-                multi_pwm.set_duty_cycle(gpio_pin, duty_cycle)
+                # Update PWM using pin_key instead of gpio_pin
+                multi_pwm.set_pin_duty_percent(pin_key, duty_cycle)
                 
                 # Store update info for notifications
                 pin_updates[pin_key] = {
