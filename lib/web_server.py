@@ -154,6 +154,7 @@ class ConfigWebServer:
         routes = {
             '/': self._page_status,
             '/config': self._page_config,
+            '/system': self._page_system,
             '/api/config': self._api_config_get,
             '/api/status': self._api_status_get,
         }
@@ -210,43 +211,46 @@ class ConfigWebServer:
         try:
             html = "<html><head><title>PagodaLight Status</title>"
             html += "<style>body{font-family:Arial;margin:15px}h1{color:#333}p{margin:8px 0}"
-            html += "a{color:#007acc;text-decoration:none}</style></head><body>"
-            html += "<h1>🏯 PagodaLight Status</h1>"
+            html += "a{color:#007acc;text-decoration:none}.status{background:#f8f9fa;padding:10px;border-radius:5px;margin:10px 0}"
+            html += ".led-on{color:#28a745}.led-off{color:#6c757d}</style></head><body>"
+            html += "<h1>PagodaLight Status</h1>"
             
             # Current time
             try:
                 current_time = rtc_module.get_current_time()
-                html += f"<p><strong>⏰ Time:</strong> {current_time[3]:02d}:{current_time[4]:02d}:{current_time[5]:02d}</p>"
+                html += f"<p><strong>Time:</strong> {current_time[3]:02d}:{current_time[4]:02d}:{current_time[5]:02d}</p>"
             except:
-                html += "<p><strong>⏰ Time:</strong> Unknown</p>"
+                html += "<p><strong>Time:</strong> Unknown</p>"
             
             # LED status with visual indicator
             try:
                 duty_cycle = system_status.current_duty_cycle
-                status_icon = "🔆" if duty_cycle > 0 else "🔅"
-                html += f"<p><strong>💡 LED:</strong> {status_icon} {duty_cycle}%</p>"
+                status_class = "led-on" if duty_cycle > 0 else "led-off"
+                status_text = "ON" if duty_cycle > 0 else "OFF"
+                html += f"<p><strong>LED:</strong> <span class='{status_class}'>{status_text} ({duty_cycle}%)</span></p>"
             except:
-                html += "<p><strong>💡 LED:</strong> Unknown</p>"
+                html += "<p><strong>LED:</strong> Unknown</p>"
             
             # Current window
             try:
                 window = system_status.current_window or "None"
                 window_display = window.replace('_', ' ').title() if window != "None" else "None"
-                html += f"<p><strong>🕐 Window:</strong> {window_display}</p>"
+                html += f"<p><strong>Window:</strong> {window_display}</p>"
             except:
-                html += "<p><strong>🕐 Window:</strong> Unknown</p>"
+                html += "<p><strong>Window:</strong> Unknown</p>"
             
             # Window times if available
             try:
                 if system_status.current_window_start and system_status.current_window_end:
-                    html += f"<p><strong>📅 Times:</strong> {system_status.current_window_start} - {system_status.current_window_end}</p>"
+                    html += f"<p><strong>Times:</strong> {system_status.current_window_start} - {system_status.current_window_end}</p>"
             except:
                 pass
             
             # Navigation links
-            html += "<hr><p><a href='/config'>⚙️ WiFi Config</a> | "
-            html += "<a href='/api/status'>📊 JSON Status</a> | "
-            html += "<a href='/api/config'>🔧 JSON Config</a></p>"
+            html += "<hr><p><a href='/config'>WiFi Config</a> | "
+            html += "<a href='/system'>System Settings</a> | "
+            html += "<a href='/api/status'>JSON Status</a> | "
+            html += "<a href='/api/config'>JSON Config</a></p>"
             html += "</body></html>"
             
             return self._create_html_response(html)
@@ -258,10 +262,11 @@ class ConfigWebServer:
     def _page_config(self):
         """Configuration page - minimal WiFi settings."""
         try:
-            html = "<html><head><title>PagodaLight Config</title>"
-            html += "<style>body{font-family:Arial;margin:15px}input{width:100%;padding:8px;margin:5px 0;border:1px solid #ccc}"
-            html += "button{background:#007acc;color:white;padding:10px 20px;border:none;cursor:pointer}</style></head><body>"
-            html += "<h1>📶 WiFi Configuration</h1>"
+            html = "<html><head><title>PagodaLight WiFi Config</title>"
+            html += "<style>body{font-family:Arial;margin:15px}input{width:100%;padding:8px;margin:5px 0;border:1px solid #ccc;border-radius:3px}"
+            html += "button{background:#007acc;color:white;padding:10px 20px;border:none;cursor:pointer;border-radius:3px}"
+            html += "label{font-weight:bold}</style></head><body>"
+            html += "<h1>WiFi Configuration</h1>"
             html += "<form method='post' action='/api/config'>"
             
             try:
@@ -272,9 +277,9 @@ class ConfigWebServer:
                 html += "<p><label>Network Name (SSID):</label><input name='ssid' required></p>"
             
             html += "<p><label>Password:</label><input type='password' name='password' required></p>"
-            html += "<p><button type='submit'>💾 Save WiFi Settings</button></p>"
+            html += "<p><button type='submit'>Save WiFi Settings</button></p>"
             html += "</form>"
-            html += "<hr><p><a href='/'>← Back to Status</a></p>"
+            html += "<hr><p><a href='/'>Back to Status</a></p>"
             html += "</body></html>"
             
             return self._create_html_response(html)
@@ -282,6 +287,51 @@ class ConfigWebServer:
         except Exception as e:
             log.error(f"[WEB] Error creating config page: {e}")
             return self._create_html_response("<html><body><h1>Error</h1><p>Could not load configuration.</p></body></html>")
+    
+    def _page_system(self):
+        """System settings page - log level and update interval."""
+        try:
+            html = "<html><head><title>PagodaLight System Settings</title>"
+            html += "<style>body{font-family:Arial;margin:15px}select,input{width:100%;padding:8px;margin:5px 0;border:1px solid #ccc;border-radius:3px}"
+            html += "button{background:#007acc;color:white;padding:10px 20px;border:none;cursor:pointer;border-radius:3px}"
+            html += "label{font-weight:bold}</style></head><body>"
+            html += "<h1>System Settings</h1>"
+            html += "<form method='post' action='/api/config'>"
+            
+            try:
+                config_data = config_manager.get_config_dict()
+                current_log = config_data.get('system', {}).get('log_level', 'INFO')
+                current_interval = config_data.get('system', {}).get('update_interval', 60)
+                
+                # Log level selection
+                html += "<p><label>Log Level:</label><select name='log_level'>"
+                for level in ['FATAL', 'ERROR', 'WARN', 'INFO', 'DEBUG']:
+                    selected = 'selected' if level == current_log else ''
+                    html += f"<option value='{level}' {selected}>{level}</option>"
+                html += "</select></p>"
+                
+                # Update interval
+                html += f"<p><label>Update Interval (seconds):</label><input type='number' name='update_interval' value='{current_interval}' min='10' max='300'></p>"
+                
+            except:
+                # Fallback if config loading fails
+                html += "<p><label>Log Level:</label><select name='log_level'>"
+                html += "<option value='ERROR'>ERROR</option>"
+                html += "<option value='INFO' selected>INFO</option>"
+                html += "<option value='DEBUG'>DEBUG</option>"
+                html += "</select></p>"
+                html += "<p><label>Update Interval (seconds):</label><input type='number' name='update_interval' value='60' min='10' max='300'></p>"
+            
+            html += "<p><button type='submit'>Save System Settings</button></p>"
+            html += "</form>"
+            html += "<hr><p><a href='/'>Back to Status</a></p>"
+            html += "</body></html>"
+            
+            return self._create_html_response(html)
+            
+        except Exception as e:
+            log.error(f"[WEB] Error creating system page: {e}")
+            return self._create_html_response("<html><body><h1>Error</h1><p>Could not load system settings.</p></body></html>")
     
     # ========== API HANDLERS ==========
     
