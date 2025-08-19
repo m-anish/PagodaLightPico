@@ -150,8 +150,10 @@ class ConfigWebServer:
     
     def _handle_get(self, path):
         """Handle GET requests."""
-        if path == "/" or path == "/config":
-            return self._create_config_page()
+        if path == "/":
+            return self._create_config_page()  # Status page by default
+        elif path == "/config":
+            return self._create_minimal_config_page()  # Minimal config form
         elif path == "/api/config":
             return self._create_json_response(config_manager.get_config_dict())
         elif path == "/api/status":
@@ -199,49 +201,66 @@ class ConfigWebServer:
             return self._create_json_response({"status": "error", "message": str(e)}, 500)
     
     def _create_config_page(self):
-        """Create ultra-lightweight HTML configuration page."""
+        """Create minimal status-only page for severe memory constraints."""
         try:
-            config_data = config_manager.get_config_dict()
+            # Create absolute minimal HTML - no configuration form
+            html = "<html><body><h1>PagodaLight Status</h1>"
             
-            # Create extremely minimal HTML to avoid memory allocation failures
-            html = """<!DOCTYPE html><html><head><title>PagodaLight</title>
-<style>body{font-family:Arial;margin:10px}input,select{width:100%;padding:5px;margin:5px 0}
-.btn{background:#007acc;color:white;padding:10px;border:none;cursor:pointer}</style>
-</head><body><h1>PagodaLight Config</h1><form action="/api/config" method="post">
-<h3>WiFi</h3><label>SSID:</label><input name="ssid" value="""
+            # Get basic status without complex operations
+            try:
+                # Get current time safely
+                current_time = rtc_module.get_current_time()
+                html += f"<p>Time: {current_time[3]:02d}:{current_time[4]:02d}</p>"
+            except:
+                html += "<p>Time: Unknown</p>"
             
-            # Add only essential fields to minimize memory usage
-            html += config_data.get('wifi', {}).get('ssid', '')
-            html += '" required><label>Password:</label><input type="password" name="password" value="'
-            html += config_data.get('wifi', {}).get('password', '')
-            html += '" required><h3>System</h3><label>Log Level:</label><select name="log_level">'
+            # Get LED status safely
+            try:
+                duty_cycle = system_status.current_duty_cycle
+                html += f"<p>LED: {duty_cycle}%</p>"
+            except:
+                html += "<p>LED: Unknown</p>"
             
-            current_log = config_data.get('system', {}).get('log_level', 'INFO')
-            for level in ['ERROR', 'INFO', 'DEBUG']:
-                selected = 'selected' if level == current_log else ''
-                html += f'<option value="{level}" {selected}>{level}</option>'
+            # Get current window safely
+            try:
+                window = system_status.current_window or "None"
+                html += f"<p>Window: {window}</p>"
+            except:
+                html += "<p>Window: Unknown</p>"
             
-            html += '</select><h3>Time Windows</h3>'
+            html += "<p><a href='/api/status'>JSON Status</a></p>"
+            html += "<p><a href='/config'>Try Config</a></p>"
+            html += "</body></html>"
             
-            # Add time windows with minimal formatting
-            time_windows = config_data.get('time_windows', {})
-            for window_name, window_config in time_windows.items():
-                if not window_name.startswith('_'):
-                    display_name = window_name.replace('_', ' ').title() if window_name != 'day' else 'Day (Auto)'
-                    readonly = 'readonly' if window_name == 'day' else ''
-                    html += f'<h4>{display_name}</h4>'
-                    html += f'<label>Start:</label><input type="time" name="{window_name}_start" value="{window_config.get("start", "")}" {readonly}>'
-                    html += f'<label>End:</label><input type="time" name="{window_name}_end" value="{window_config.get("end", "")}" {readonly}>'
-                    html += f'<label>Brightness %:</label><input type="number" name="{window_name}_duty" value="{window_config.get("duty_cycle", 0)}" min="0" max="100">'
+            return self._create_html_response(html)
             
-            html += '<br><button type="submit" class="btn">Save Config</button></form></body></html>'
+        except Exception as e:
+            log.error(f"[WEB] Error creating status page: {e}")
+            # Return absolute minimal error page
+            return self._create_html_response("<html><body><h1>PagodaLight</h1><p>Memory Error</p></body></html>")
+    
+    def _create_minimal_config_page(self):
+        """Create minimal config page - only if specifically requested."""
+        try:
+            # Only show WiFi config to minimize memory usage
+            html = "<html><body><h1>WiFi Config</h1><form method='post' action='/api/config'>"
+            
+            try:
+                config_data = config_manager.get_config_dict()
+                ssid = config_data.get('wifi', {}).get('ssid', '')
+                html += f"<p>SSID: <input name='ssid' value='{ssid}'></p>"
+                html += "<p>Pass: <input type='password' name='password'></p>"
+            except:
+                html += "<p>SSID: <input name='ssid'></p>"
+                html += "<p>Pass: <input type='password' name='password'></p>"
+            
+            html += "<p><button type='submit'>Save</button></p></form></body></html>"
             
             return self._create_html_response(html)
             
         except Exception as e:
             log.error(f"[WEB] Error creating config page: {e}")
-            # Return minimal error page
-            return self._create_html_response("<html><body><h1>Error</h1><p>Memory allocation failed. Please try refreshing.</p></body></html>")
+            return self._create_html_response("<html><body><h1>Error</h1></body></html>")
     
     def _create_html_response(self, html):
         """Create HTTP response with HTML content."""
