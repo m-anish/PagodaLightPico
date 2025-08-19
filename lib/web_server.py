@@ -190,12 +190,54 @@ class ConfigWebServer:
         .status.success {{ background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }}
         .status.error {{ background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }}
         .readonly {{ background-color: #f8f9fa; }}
+        .status-grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; }}
+        .status-card {{ padding: 15px; border-radius: 5px; background: #f8f9fa; border-left: 4px solid #007acc; }}
+        .status-value {{ font-size: 1.2em; font-weight: bold; color: #007acc; }}
+        .status-label {{ font-size: 0.9em; color: #666; margin-bottom: 5px; }}
+        .connection-status {{ display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 0.8em; font-weight: bold; }}
+        .connected {{ background: #d4edda; color: #155724; }}
+        .disconnected {{ background: #f8d7da; color: #721c24; }}
+        .refresh-info {{ font-size: 0.8em; color: #666; text-align: center; margin-top: 10px; }}
     </style>
 </head>
 <body>
     <div class="container">
         <h1>🏯 PagodaLight Configuration</h1>
         <p>Configure your meditation center lighting system settings below.</p>
+        
+        <div class="section">
+            <h3>📊 System Status</h3>
+            <div id="systemStatus" class="status-grid">
+                <div class="status-card">
+                    <div class="status-label">LED Status</div>
+                    <div class="status-value" id="ledStatus">Loading...</div>
+                </div>
+                <div class="status-card">
+                    <div class="status-label">Current Time</div>
+                    <div class="status-value" id="currentTime">Loading...</div>
+                </div>
+                <div class="status-card">
+                    <div class="status-label">Active Window</div>
+                    <div class="status-value" id="activeWindow">Loading...</div>
+                </div>
+                <div class="status-card">
+                    <div class="status-label">Window Times</div>
+                    <div class="status-value" id="windowTimes">Loading...</div>
+                </div>
+                <div class="status-card">
+                    <div class="status-label">System Uptime</div>
+                    <div class="status-value" id="systemUptime">Loading...</div>
+                </div>
+                <div class="status-card">
+                    <div class="status-label">Connections</div>
+                    <div class="status-value">
+                        <span id="wifiStatus" class="connection-status">WiFi</span>
+                        <span id="mqttStatus" class="connection-status">MQTT</span>
+                    </div>
+                </div>
+            </div>
+            <div class="refresh-info">Status updates every 60 seconds</div>
+        </div>
         
         <form id="configForm">
             <div class="section">
@@ -368,6 +410,61 @@ class ConfigWebServer:
                 status.textContent = '❌ Network error: ' + error.message;
             });
         });
+        
+        // Status update functionality with 1-minute refresh
+        function updateStatus() {
+            fetch('/api/status')
+            .then(response => response.json())
+            .then(data => {
+                // Update LED status
+                document.getElementById('ledStatus').textContent = 
+                    data.led.status + ' (' + data.led.duty_cycle_display + ')';
+                
+                // Update current time
+                document.getElementById('currentTime').textContent = 
+                    data.time.current_time + ' ' + data.time.timezone;
+                
+                // Update active window
+                document.getElementById('activeWindow').textContent = 
+                    data.time_window.current_display || 'None';
+                
+                // Update window times
+                if (data.time_window.start_time && data.time_window.end_time) {
+                    document.getElementById('windowTimes').textContent = 
+                        data.time_window.start_time + ' - ' + data.time_window.end_time;
+                } else {
+                    document.getElementById('windowTimes').textContent = 'N/A';
+                }
+                
+                // Update system uptime
+                document.getElementById('systemUptime').textContent = 
+                    data.system.uptime_string;
+                
+                // Update connection status
+                const wifiStatus = document.getElementById('wifiStatus');
+                wifiStatus.className = 'connection-status ' + (data.connections.wifi ? 'connected' : 'disconnected');
+                wifiStatus.textContent = 'WiFi ' + (data.connections.wifi ? '✓' : '✗');
+                
+                const mqttStatus = document.getElementById('mqttStatus');
+                mqttStatus.className = 'connection-status ' + (data.connections.mqtt ? 'connected' : 'disconnected');
+                mqttStatus.textContent = 'MQTT ' + (data.connections.mqtt ? '✓' : '✗');
+            })
+            .catch(error => {
+                console.error('Error fetching status:', error);
+                // Show error state in status cards
+                document.getElementById('ledStatus').textContent = 'Error loading';
+                document.getElementById('currentTime').textContent = 'Error loading';
+                document.getElementById('activeWindow').textContent = 'Error loading';
+                document.getElementById('windowTimes').textContent = 'Error loading';
+                document.getElementById('systemUptime').textContent = 'Error loading';
+            });
+        }
+        
+        // Initial status load
+        updateStatus();
+        
+        // Set up 1-minute refresh interval (60000 ms)
+        setInterval(updateStatus, 60000);
     </script>
 </body>
 </html>"""

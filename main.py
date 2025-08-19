@@ -31,6 +31,8 @@ from wifi_connect import connect_wifi, sync_time_ntp
 import time
 from lib.pwm_control import PWMController
 from lib.web_server import web_server
+from lib.mqtt_notifier import mqtt_notifier
+from lib.system_status import system_status
 
 log = Logger()
 
@@ -42,16 +44,29 @@ log.info("Starting system")
 wifi_connected = connect_wifi()
 if wifi_connected:
     log.info("WiFi connected successfully")
+    system_status.set_connection_status(wifi=True)
+    
     if not sync_time_ntp():
         log.warn("Using RTC time due to NTP sync failure")
     
     # Start web server for configuration management
     if web_server.start():
         log.info("Web configuration server started - access via http://[pico-ip]/")
+        system_status.set_connection_status(web_server=True)
     else:
         log.error("Failed to start web configuration server")
+        system_status.set_connection_status(web_server=False)
+    
+    # Start MQTT notifications if enabled
+    if mqtt_notifier.connect():
+        log.info("MQTT notifications enabled")
+        system_status.set_connection_status(mqtt=True)
+    else:
+        log.warn("MQTT notifications not available")
+        system_status.set_connection_status(mqtt=False)
 else:
     log.warn("Using RTC time due to WiFi connection failure")
+    system_status.set_connection_status(wifi=False, web_server=False, mqtt=False)
 
 
 def time_str_to_minutes(time_str):
@@ -148,23 +163,59 @@ def get_current_window(time_windows, current_time_tuple):
 def update_led():
     """
     Reads the current time from RTC and updates the LED PWM duty cycle
-    based on the active time window.
+    based on the active time window. Also updates system status and sends
+    MQTT notifications when windows change.
     """
     try:
-        current_time = rtc_module.get_current_time()
+        current_time_tuple = rtc_module.get_current_time()
         window, duty_cycle = get_current_window(config.TIME_WINDOWS,
-                                                current_time)
+                                                current_time_tuple)
+        
+        # Get window start/end times for status and notifications
+        window_start = None
+        window_end = None
+        if window and window in config.TIME_WINDOWS:
+            window_config = config.TIME_WINDOWS[window]
+            window_start = window_config.get("start")
+            window_end = window_config.get("end")
+            
+            # For day window, use actual sunrise/sunset times
+            if window == "day":
+                month = current_time_tuple[1]
+                day = current_time_tuple[2]
+                sunrise_h, sunrise_m, sunset_h, sunset_m = sun_times_leh.get_sunrise_sunset(month, day)
+                window_start = int_to_time_str(sunrise_h, sunrise_m)
+                window_end = int_to_time_str(sunset_h, sunset_m)
+        
         if window:
-            log.info(f"Active window: {window}, setting duty cycle: "
-                     f"{duty_cycle}%")
+            log.info(f"Active window: {window}, setting duty cycle: {duty_cycle}%")
             led_pwm.set_duty_percent(duty_cycle)
+            
+            # Update system status
+            system_status.update_led_status(duty_cycle, window, window_start, window_end)
+            
+            # Send MQTT notification if window changed
+            mqtt_notifier.notify_window_change(window, duty_cycle, window_start, window_end)
         else:
             log.warn("No active window detected, turning LED off")
             led_pwm.set_duty_percent(0)
+            
+            # Update system status for no active window
+            system_status.update_led_status(0, None, None, None)
+            
     except Exception as e:
-        log.error(f"Error updating LED: {e}")
+        error_msg = f"Error updating LED: {e}"
+        log.error(error_msg)
+        
+        # Record error in system status
+        system_status.record_error(error_msg)
+        
+        # Send error notification
+        mqtt_notifier.notify_error(error_msg)
+        
         # Turn off LED in case of error
         led_pwm.set_duty_percent(0)
+        system_status.update_led_status(0, None, None, None)
 
 
 def main_loop():
