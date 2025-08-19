@@ -8,6 +8,7 @@ management interface for updating system settings at runtime.
 import socket
 import json
 import time
+import gc
 from lib.config_manager import config_manager
 from simple_logger import Logger
 import rtc_module
@@ -332,6 +333,20 @@ class ConfigWebServer:
             except:
                 pass
             
+            # Memory information
+            try:
+                gc.collect()  # Force garbage collection
+                free_memory = gc.mem_free()
+                allocated_memory = gc.mem_alloc()
+                total_memory = free_memory + allocated_memory
+                memory_usage_percent = (allocated_memory / total_memory) * 100
+                
+                html += f"<p><strong>Memory:</strong> {free_memory} bytes free ({memory_usage_percent:.1f}% used)</p>"
+                log.debug(f"[WEB] Memory: {free_memory} free, {allocated_memory} allocated, {memory_usage_percent:.1f}% used")
+            except Exception as e:
+                log.debug(f"[WEB] Error getting memory info: {e}")
+                html += "<p><strong>Memory:</strong> Unknown</p>"
+            
             # Navigation links
             html += "<hr><p><a href='/config'>WiFi Config</a> | "
             html += "<a href='/system'>System Settings</a> | "
@@ -423,6 +438,10 @@ class ConfigWebServer:
     def _page_windows(self):
         """Time window configuration page."""
         try:
+            # Force garbage collection before loading page
+            gc.collect()
+            free_before = gc.mem_free()
+            log.debug(f"[WEB] Windows page starting with {free_before} bytes free")
             html = "<html><head><title>PagodaLight Time Windows</title>"
             html += "<style>body{font-family:Arial;margin:15px}table{border-collapse:collapse;width:100%}"
             html += "th,td{border:1px solid #ddd;padding:8px;text-align:left}th{background:#f2f2f2}"
@@ -456,15 +475,25 @@ class ConfigWebServer:
                 
                 # Other windows
                 for window_name, config in time_windows.items():
-                    if window_name == 'day' or window_name.startswith('_'):
+                    try:
+                        # Ensure window_name is a string and skip special entries
+                        if not isinstance(window_name, str) or window_name == 'day' or window_name.startswith('_'):
+                            continue
+                        
+                        # Ensure config is a dictionary
+                        if not isinstance(config, dict):
+                            log.debug(f"[WEB] Skipping invalid window config for {window_name}: {type(config)}")
+                            continue
+                        
+                        start_time = config.get('start', '00:00')
+                        end_time = config.get('end', '00:00')
+                        brightness = config.get('brightness', 50)
+                        
+                        display_name = window_name.replace('_', ' ').title()
+                        html += f"<tr><td>{display_name}</td><td>{start_time}</td><td>{end_time}</td><td>{brightness}</td></tr>"
+                    except Exception as window_error:
+                        log.error(f"[WEB] Error processing window {window_name}: {window_error}")
                         continue
-                    
-                    start_time = config.get('start', '00:00')
-                    end_time = config.get('end', '00:00')
-                    brightness = config.get('brightness', 50)
-                    
-                    display_name = window_name.replace('_', ' ').title()
-                    html += f"<tr><td>{display_name}</td><td>{start_time}</td><td>{end_time}</td><td>{brightness}</td></tr>"
                 
                 html += "</table>"
                 
