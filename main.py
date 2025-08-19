@@ -268,7 +268,7 @@ def main_loop():
                 current_config = config.config_manager.get_config_dict()
                 if hasattr(config.config_manager, '_last_config_hash'):
                     import json
-                    current_hash = hash(json.dumps(current_config, sort_keys=True))
+                    current_hash = hash(json.dumps(current_config))
                     if current_hash != config.config_manager._last_config_hash:
                         log.info("Configuration change detected, reloading...")
                         config.config_manager.reload()
@@ -278,7 +278,7 @@ def main_loop():
                 else:
                     # Initialize hash tracking
                     import json
-                    config.config_manager._last_config_hash = hash(json.dumps(current_config, sort_keys=True))
+                    config.config_manager._last_config_hash = hash(json.dumps(current_config))
                 
                 update_pwm_pins()
                 last_pwm_update = current_time
