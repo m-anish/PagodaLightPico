@@ -18,8 +18,7 @@ on an assigned GPIO pin accordingly.
 Logging is done via simple_logger with timestamps and levels.
 
 Web Interface:
-- When WiFi is connected, access http://lighthouse.local/ or http://[pico-ip]/ for configuration management
-- Device discoverable via mDNS/Bonjour as 'lighthouse.local' (customizable in mdns_service.py)
+- When WiFi is connected, access http://[pico-ip]/ for configuration management
 - All settings can be updated in real-time without restarting the system
 - Changes are validated and applied immediately
 """
@@ -55,13 +54,12 @@ if wifi_connected:
         log.info("Web configuration server started - access via http://[pico-ip]/")
         system_status.set_connection_status(web_server=True)
         
-        # Device accessible via hostname set in config or direct IP
+        # Device accessible via configured hostname or direct IP
         hostname = config.config_manager.get_config_dict().get('hostname', 'PagodaLightPico')
-        log.info(f"Device hostname: {hostname} (use direct IP if mDNS not available)")
-        system_status.set_connection_status(mdns=False)
+        log.info(f"Device hostname: {hostname}")
     else:
         log.error("Failed to start web configuration server")
-        system_status.set_connection_status(web_server=False, mdns=False)
+        system_status.set_connection_status(web_server=False)
     
     # Start MQTT notifications if enabled
     if mqtt_notifier.connect():
@@ -264,7 +262,7 @@ def main_loop():
             log.info("Shutdown requested")
             if web_server.running:
                 web_server.stop()
-            # mDNS service removed - no cleanup needed
+            # No additional cleanup needed
             break
         except Exception as e:
             log.error(f"Error in main loop: {e}")

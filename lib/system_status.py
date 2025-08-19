@@ -34,7 +34,6 @@ class SystemStatus:
         self.wifi_connected = False
         self.mqtt_connected = False
         self.web_server_running = False
-        self.mdns_running = False
     
     def update_led_status(self, duty_cycle, window_name=None, start_time=None, end_time=None):
         """
@@ -69,7 +68,7 @@ class SystemStatus:
         }
         log.debug(f"[STATUS] Error recorded: {error_message}")
     
-    def set_connection_status(self, wifi=None, mqtt=None, web_server=None, mdns=None):
+    def set_connection_status(self, wifi=None, mqtt=None, web_server=None):
         """
         Update connection status.
         
@@ -77,7 +76,6 @@ class SystemStatus:
             wifi (bool): WiFi connection status
             mqtt (bool): MQTT connection status  
             web_server (bool): Web server running status
-            mdns (bool): mDNS service running status
         """
         if wifi is not None:
             self.wifi_connected = wifi
@@ -85,8 +83,6 @@ class SystemStatus:
             self.mqtt_connected = mqtt
         if web_server is not None:
             self.web_server_running = web_server
-        if mdns is not None:
-            self.mdns_running = mdns
     
     def get_current_time_info(self):
         """
@@ -200,8 +196,7 @@ class SystemStatus:
             "connections": {
                 "wifi": self.wifi_connected,
                 "mqtt": self.mqtt_connected,
-                "web_server": self.web_server_running,
-                "mdns": self.mdns_running
+                "web_server": self.web_server_running
             },
             "network": network_info,
             "led": {
