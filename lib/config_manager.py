@@ -35,27 +35,37 @@ class ConfigManager:
     def load_config(self):
         """Load configuration from JSON file."""
         try:
+            # Check if file exists
             os.stat(self.config_file)
             
+            # Load and parse JSON with minimal memory usage
             with open(self.config_file, 'r') as f:
+                # For MicroPython, we don't have many options to optimize JSON parsing
+                # but we can ensure we're not keeping unnecessary references
                 self.config = json.load(f)
             
-            log.info(f"[CONFIG] Configuration loaded from {self.config_file}")
+            # Reduce logging to save memory
+            # log.info(f"[CONFIG] Configuration loaded from {self.config_file}")
             self._validate_config()
             
         except Exception as e:
-            log.error(f"[CONFIG] Failed to load configuration: {e}")
+            # Reduce logging to save memory
+            # log.error(f"[CONFIG] Failed to load configuration: {e}")
             raise
     
     def save_config(self):
         """Save current configuration to JSON file."""
         try:
+            # For MicroPython, we don't have many options to optimize JSON writing
+            # but we can ensure we're not keeping unnecessary references
             with open(self.config_file, 'w') as f:
-                json.dump(self.config, f, indent=2)
-            log.info(f"[CONFIG] Configuration saved to {self.config_file}")
+                json.dump(self.config, f)
+            # Reduce logging to save memory
+            # log.info(f"[CONFIG] Configuration saved to {self.config_file}")
             return True
         except Exception as e:
-            log.error(f"[CONFIG] Failed to save configuration: {e}")
+            # Reduce logging to save memory
+            # log.error(f"[CONFIG] Failed to save configuration: {e}")
             return False
     
     def update_config(self, updates):
