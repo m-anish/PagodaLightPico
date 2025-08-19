@@ -55,6 +55,8 @@
       "enabled": false,
       "time_windows": {
         "day": {
+          "start": "06:00",
+          "end": "18:00",
           "duty_cycle": 0
         },
         "night": {

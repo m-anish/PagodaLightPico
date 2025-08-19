@@ -266,7 +266,11 @@ def main_loop():
     via the web interface.
     """
     last_pwm_update = 0
+    last_network_check = 0
+
     web_request_interval = 0.1  # Handle web requests every 100ms
+    
+    network_check_interval = 30  # Check network health every 30 seconds
     
     while True:
         try:
@@ -276,15 +280,46 @@ def main_loop():
             if web_server.running:
                 web_server.handle_requests(timeout=web_request_interval)
             
+            # Periodic network health check
+            if current_time - last_network_check >= network_check_interval:
+                try:
+                    import network
+                    wlan = network.WLAN(network.STA_IF)
+                    if not wlan.isconnected():
+                        log.warn("[MAIN] WiFi connection lost, attempting reconnection...")
+                        system_status.set_connection_status(wifi=False, web_server=False, mqtt=False)
+                        # Try to reconnect
+                        if connect_wifi():
+                            log.info("[MAIN] WiFi reconnected successfully")
+                            system_status.set_connection_status(wifi=True)
+                            # Restart web server if needed
+                            if not web_server.running:
+                                if web_server.start():
+                                    system_status.set_connection_status(web_server=True)
+                            # Reconnect MQTT if needed
+                            if not mqtt_notifier.connected:
+                                if mqtt_notifier.connect():
+                                    system_status.set_connection_status(mqtt=True)
+                    else:
+                        # Check MQTT connection health
+                        if mqtt_notifier.notifications_enabled and not mqtt_notifier.connected:
+                            log.info("[MAIN] MQTT disconnected, attempting reconnection...")
+                            if mqtt_notifier.connect():
+                                system_status.set_connection_status(mqtt=True)
+                                log.info("[MAIN] MQTT reconnected successfully")
+                    
+                    last_network_check = current_time
+                except Exception as e:
+                    log.error(f"[MAIN] Network health check error: {e}")
+                    last_network_check = current_time
+            
             # Update PWM pins based on configured interval
             if current_time - last_pwm_update >= config.UPDATE_INTERVAL:
                 # Check if configuration was updated via web interface
                 current_config = config.config_manager.get_config_dict()
-                log.info(f"[MAIN] Current PWM pins config: {current_config.get('pwm_pins', {})}")
                 if hasattr(config.config_manager, '_last_config_hash'):
                     import json
                     current_hash = hash(json.dumps(current_config))
-                    log.info(f"[MAIN] Current hash: {current_hash}, Last hash: {config.config_manager._last_config_hash}")
                     if current_hash != config.config_manager._last_config_hash:
                         log.info("Configuration change detected, reloading...")
                         config.config_manager.reload()
