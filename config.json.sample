@@ -58,14 +58,12 @@
         }
       }
     },
-    "_example_pin_15": {
+    "pin_15": {
       "name": "Accent Lighting",
       "gpio_pin": 15,
       "enabled": false,
       "time_windows": {
         "day": {
-          "start": "06:00",
-          "end": "18:00",
           "duty_cycle": 0
         },
         "night": {
@@ -74,7 +72,7 @@
           "duty_cycle": 30
         }
       },
-      "_comment": "Example of a second pin configuration - remove _ prefix to enable"
+      "_comment": "Example of a second pin configuration - set enabled=true to activate"
     },
     "_format_comment": "Pin configurations: pin_<gpio_number> with name, gpio_pin, enabled, and time_windows",
     "_limits_comment": "Maximum 5 pins, minimum 1 pin. Each pin can have 2-5 time windows including mandatory 'day' window"
