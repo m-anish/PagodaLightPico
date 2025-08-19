@@ -1041,54 +1041,8 @@ class ConfigWebServer:
                     except ValueError:
                         pass  # Skip invalid values
             
-            # Handle time window settings
-            time_window_fields = ['day_brightness', 'evening_start', 'evening_end', 'evening_brightness',
-                                  'night_start', 'night_end', 'night_brightness']
-            
-            if any(field in form_data for field in time_window_fields):
-                config_update['time_windows'] = {}
-                
-                # Day window
-                if 'day_brightness' in form_data:
-                    try:
-                        brightness = int(form_data['day_brightness'])
-                        config_update['time_windows']['day'] = {'brightness': brightness}
-                    except ValueError:
-                        pass
-                
-                # Evening window
-                evening_fields = ['evening_start', 'evening_end', 'evening_brightness']
-                if any(field in form_data for field in evening_fields):
-                    evening_config = {}
-                    if 'evening_start' in form_data:
-                        evening_config['start'] = form_data['evening_start']
-                    if 'evening_end' in form_data:
-                        evening_config['end'] = form_data['evening_end']
-                    if 'evening_brightness' in form_data:
-                        try:
-                            evening_config['brightness'] = int(form_data['evening_brightness'])
-                        except ValueError:
-                            pass
-                    
-                    if evening_config:
-                        config_update['time_windows']['evening'] = evening_config
-                
-                # Night window
-                night_fields = ['night_start', 'night_end', 'night_brightness']
-                if any(field in form_data for field in night_fields):
-                    night_config = {}
-                    if 'night_start' in form_data:
-                        night_config['start'] = form_data['night_start']
-                    if 'night_end' in form_data:
-                        night_config['end'] = form_data['night_end']
-                    if 'night_brightness' in form_data:
-                        try:
-                            night_config['brightness'] = int(form_data['night_brightness'])
-                        except ValueError:
-                            pass
-                    
-                    if night_config:
-                        config_update['time_windows']['night'] = night_config
+            # Note: Legacy global time_windows configuration has been removed.
+            # Time windows are now configured per-controller via the /api/windows endpoint.
             
             log.debug(f"[WEB] Parsed form data: {config_update}")
             return config_update
