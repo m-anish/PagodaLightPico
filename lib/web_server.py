@@ -112,14 +112,16 @@ class ConfigWebServer:
             response (str): HTTP response to send
         """
         try:
-            response_bytes = response.encode('utf-8')
-            chunk_size = 1024  # Send in 1KB chunks
+            # For memory efficiency, send response directly without encoding everything at once
+            chunk_size = 512  # Smaller chunks to reduce memory usage
+            response_len = len(response)
             
-            for i in range(0, len(response_bytes), chunk_size):
-                chunk = response_bytes[i:i + chunk_size]
-                conn.send(chunk)
+            # Send in smaller chunks
+            for i in range(0, response_len, chunk_size):
+                chunk = response[i:i + chunk_size]
+                conn.send(chunk.encode('utf-8'))
                 # Small delay between chunks to prevent overwhelming the Pico W
-                time.sleep(0.01)
+                time.sleep(0.005)  # Reduced delay for better performance
                 
         except Exception as e:
             log.error(f"[WEB] Error sending chunked response: {e}")
@@ -246,44 +248,51 @@ class ConfigWebServer:
             # Force garbage collection before generating page
             gc.collect()
             
-            html = "<html><head><title>PagodaLight Status</title>"
-            html += "<style>body{font-family:Arial;margin:15px}</style></head><body>"
-            html += "<h1>PagodaLight Status</h1>"
+            # Build HTML in parts to reduce memory fragmentation
+            html_parts = [
+                "<html><head><title>PagodaLight Status</title>",
+                "<style>body{font-family:Arial;margin:15px}</style></head><body>",
+                "<h1>PagodaLight Status</h1>"
+            ]
             
             # Current time - simplified
             try:
                 current_time = rtc_module.get_current_time()
                 hour = current_time[3]
                 minute = current_time[4]
-                html += f"<p><strong>Time:</strong> {hour:02d}:{minute:02d}</p>"
+                html_parts.append(f"<p><strong>Time:</strong> {hour:02d}:{minute:02d}</p>")
             except:
-                html += "<p><strong>Time:</strong> Unknown</p>"
+                html_parts.append("<p><strong>Time:</strong> Unknown</p>")
             
             # Simplified status - just basic info
             try:
                 config_data = config_manager.get_config_dict()
                 pwm_pins = config_data.get('pwm_pins', {})
                 pin_count = len([k for k in pwm_pins.keys() if not k.startswith('_')])
-                html += f"<p><strong>Controllers:</strong> {pin_count} configured</p>"
+                html_parts.append(f"<p><strong>Controllers:</strong> {pin_count} configured</p>")
             except:
-                html += "<p><strong>Controllers:</strong> Unknown</p>"
+                html_parts.append("<p><strong>Controllers:</strong> Unknown</p>")
             
             # Memory info
             try:
                 gc.collect()
                 free_memory = gc.mem_free()
-                html += f"<p><strong>Memory:</strong> {free_memory} bytes free</p>"
+                html_parts.append(f"<p><strong>Memory:</strong> {free_memory} bytes free</p>")
             except:
-                html += "<p><strong>Memory:</strong> Unknown</p>"
+                html_parts.append("<p><strong>Memory:</strong> Unknown</p>")
             
             # Simple navigation
-            html += "<hr><p><a href='/config'>WiFi Config</a> | "
-            html += "<a href='/system'>System Settings</a> | "
-            html += "<a href='/pins'>Add/Remove Controllers</a> | "
-            html += "<a href='/windows'>Manage Controllers</a> | "
-            html += "<a href='/api/download'>Download Config</a></p>"
-            html += "</body></html>"
+            html_parts.extend([
+                "<hr><p><a href='/config'>WiFi Config</a> | ",
+                "<a href='/system'>System Settings</a> | ",
+                "<a href='/pins'>Add/Remove Controllers</a> | ",
+                "<a href='/windows'>Manage Controllers</a> | ",
+                "<a href='/api/download'>Download Config</a></p>",
+                "</body></html>"
+            ])
             
+            # Join all parts at once to minimize memory fragmentation
+            html = "".join(html_parts)
             return self._create_html_response(html)
             
         except Exception as e:
@@ -372,40 +381,46 @@ class ConfigWebServer:
         try:
             from lib.gpio_utils import gpio_utils
             
-            html = "<html><head><title>PagodaLight Pin Configuration</title>"
-            html += "<style>body{font-family:Arial;margin:15px}table{border-collapse:collapse;width:100%}"
-            html += "th,td{border:1px solid #ddd;padding:8px;text-align:left}th{background:#f2f2f2}"
-            html += "select,input{padding:4px;border:1px solid #ccc;border-radius:3px;margin:2px}"
-            html += "button{background:#007acc;color:white;padding:10px 20px;border:none;cursor:pointer;border-radius:3px;margin:5px}"
-            html += ".remove-btn{background:#dc3545}"
-            html += "label{font-weight:bold}.note{color:#666;font-size:0.9em}</style>"
+            # Build HTML in chunks to reduce memory usage
+            html_parts = []
             
-            html += "<script>"
-            html += "function addPinRow(){var table=document.getElementById('pinTable').getElementsByTagName('tbody')[0];"
-            html += "var rowCount=table.rows.length;if(rowCount>=5){alert('Maximum 5 PWM pins allowed');return;}"
-            html += "var newRow=table.insertRow();"
-            # Create new row with dropdown for new pins
-            html += "newRow.innerHTML='<td><select name=\"pin_'+rowCount+'_number\"><option value=\"\">Select Pin...</option>"
+            # Header section
+            html_parts.extend([
+                "<html><head><title>PagodaLight Pin Configuration</title>",
+                "<style>body{font-family:Arial;margin:15px}table{border-collapse:collapse;width:100%}",
+                "th,td{border:1px solid #ddd;padding:8px;text-align:left}th{background:#f2f2f2}",
+                "select,input{padding:4px;border:1px solid #ccc;border-radius:3px;margin:2px}",
+                "button{background:#007acc;color:white;padding:10px 20px;border:none;cursor:pointer;border-radius:3px;margin:5px}",
+                ".remove-btn{background:#dc3545}",
+                "label{font-weight:bold}.note{color:#666;font-size:0.9em}</style>",
+                "<script>",
+                "function addPinRow(){var table=document.getElementById('pinTable').getElementsByTagName('tbody')[0];",
+                "var rowCount=table.rows.length;if(rowCount>=5){alert('Maximum 5 PWM pins allowed');return;}",
+                "var newRow=table.insertRow();",
+                "newRow.innerHTML='<td><select name=\"pin_'+rowCount+'_number\"><option value=\"\">Select Pin...</option>"
+            ])
             
-            # Add all available pins to the JavaScript template
+            # Add pin options to JavaScript
             try:
                 pin_options = gpio_utils.get_pin_options_for_dropdown(exclude_current_usage=False)
                 for pin_num, display_name in pin_options:
-                    html += f"<option value=\"{pin_num}\">GP{pin_num}</option>"
+                    html_parts.append(f"<option value=\"{pin_num}\">GP{pin_num}</option>")
             except:
                 # Fallback to all PWM-capable pins if gpio_utils not available
                 all_pins = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 25, 26, 27, 28]
                 for pin in all_pins:
-                    html += f"<option value=\"{pin}\">GP{pin}</option>"
+                    html_parts.append(f"<option value=\"{pin}\">GP{pin}</option>")
             
-            html += "</select></td><td><input type=\"checkbox\" name=\"pin_'+rowCount+'_enabled\"></td>"
-            html += "<td><button type=\"button\" class=\"remove-btn\" onclick=\"removePinRow(this)\">Remove</button></td>';"
-            html += "}"
-            html += "function removePinRow(btn){var row=btn.closest('tr');row.remove();}"
-            html += "</script>"
-            
-            html += "</head><body>"
-            html += "<h1>PWM Pin Configuration</h1>"
+            # Continue with JavaScript
+            html_parts.extend([
+                "</select></td><td><input type=\"checkbox\" name=\"pin_'+rowCount+'_enabled\"></td>",
+                "<td><button type=\"button\" class=\"remove-btn\" onclick=\"removePinRow(this)\">Remove</button></td>';",
+                "}",
+                "function removePinRow(btn){var row=btn.closest('tr');row.remove();}",
+                "</script>",
+                "</head><body>",
+                "<h1>PWM Pin Configuration</h1>"
+            ])
             
             try:
                 config_data = config_manager.get_config_dict()
@@ -414,8 +429,10 @@ class ConfigWebServer:
                 used_pins = set()  # We'll track used pins manually
                 
                 # Show current pin configuration
-                html += "<h3>Current PWM Pins</h3>"
-                html += "<table id='currentPins'><tr><th>Pin Number</th><th>Enabled</th><th>Time Windows</th></tr>"
+                html_parts.extend([
+                    "<h3>Current PWM Pins</h3>",
+                    "<table id='currentPins'><tr><th>Pin Number</th><th>Enabled</th><th>Time Windows</th></tr>"
+                ])
                 
                 for pin_key, pin_config in pwm_pins.items():
                     if pin_key.startswith('_'):
@@ -426,14 +443,16 @@ class ConfigWebServer:
                     status = 'Yes' if enabled else 'No'
                     time_windows = list(pin_config.get('time_windows', {}).keys())
                     windows_str = ', '.join(time_windows) if time_windows else 'None'
-                    html += f"<tr><td>GP{gpio_pin} ({pin_name})</td><td>{status}</td><td>{windows_str}</td></tr>"
+                    html_parts.append(f"<tr><td>GP{gpio_pin} ({pin_name})</td><td>{status}</td><td>{windows_str}</td></tr>")
                 
-                html += "</table>"
+                html_parts.append("</table>")
                 
                 # Pin configuration form
-                html += "<h3>Pin Configuration</h3>"
-                html += "<form method='post' action='/api/pins'>"
-                html += "<table id='pinTable'><thead><tr><th>Pin</th><th>Enabled</th><th>Action</th></tr></thead><tbody>"
+                html_parts.extend([
+                    "<h3>Pin Configuration</h3>",
+                    "<form method='post' action='/api/pins'>",
+                    "<table id='pinTable'><thead><tr><th>Pin</th><th>Enabled</th><th>Action</th></tr></thead><tbody>"
+                ])
                 
                 # Show current pins in editable form
                 pin_index = 0
@@ -451,43 +470,55 @@ class ConfigWebServer:
                     checked = 'checked' if enabled else ''
                     
                     # For existing pins, show static text instead of dropdown
-                    html += f"<tr><td>GP{gpio_pin} ({pin_name})"
-                    html += f"<input type='hidden' name='pin_{pin_index}_number' value='{gpio_pin}'>"
-                    html += f"</td><td><input type='checkbox' name='pin_{pin_index}_enabled' {checked}></td>"
-                    html += f"<td><button type='button' class='remove-btn' onclick='removePinRow(this)'>Remove</button></td></tr>"
+                    html_parts.extend([
+                        f"<tr><td>GP{gpio_pin} ({pin_name})",
+                        f"<input type='hidden' name='pin_{pin_index}_number' value='{gpio_pin}'>",
+                        f"</td><td><input type='checkbox' name='pin_{pin_index}_enabled' {checked}></td>",
+                        f"<td><button type='button' class='remove-btn' onclick='removePinRow(this)'>Remove</button></td></tr>"
+                    ])
                     pin_index += 1
                 
                 # If no pins, add one empty row
                 if pin_index == 0:
-                    html += f"<tr><td><select name='pin_0_number'>"
-                    html += "<option value=''>Select Pin...</option>"
+                    html_parts.extend([
+                        f"<tr><td><select name='pin_0_number'>",
+                        "<option value=''>Select Pin...</option>"
+                    ])
                     for pin in available_pins:
                         if pin not in used_pins:
-                            html += f"<option value='{pin}'>GP{pin}</option>"
-                    html += "</select></td><td><input type='checkbox' name='pin_0_enabled'></td>"
-                    html += "<td><button type='button' class='remove-btn' onclick='removePinRow(this)'>Remove</button></td></tr>"
+                            html_parts.append(f"<option value='{pin}'>GP{pin}</option>")
+                    html_parts.extend([
+                        "</select></td><td><input type='checkbox' name='pin_0_enabled'></td>",
+                        "<td><button type='button' class='remove-btn' onclick='removePinRow(this)'>Remove</button></td></tr>"
+                    ])
                 
-                html += "</tbody></table>"
-                
-                html += "<p><button type='button' onclick='addPinRow()'>Add Pin</button> "
-                html += "<button type='submit'>Save Pin Configuration</button></p>"
-                html += "</form>"
-                
-                html += "<p class='note'><strong>Note:</strong> Maximum 5 PWM pins allowed. "
-                html += "Pins used for I2C (GP0, GP1 for RTC) are not available. "
-                html += "After changing pins, configure time windows for each pin on the Time Windows page.</p>"
+                html_parts.extend([
+                    "</tbody></table>",
+                    "<p><button type='button' onclick='addPinRow()'>Add Pin</button> ",
+                    "<button type='submit'>Save Pin Configuration</button></p>",
+                    "</form>",
+                    "<p class='note'><strong>Note:</strong> Maximum 5 PWM pins allowed. ",
+                    "Pins used for I2C (GP0, GP1 for RTC) are not available. ",
+                    "After changing pins, configure time windows for each pin on the Time Windows page.</p>"
+                ])
                 
             except Exception as e:
                 log.error(f"[WEB] Error loading pin config: {e}")
-                html += "<p>Error loading pin configuration. Using defaults.</p>"
-                html += "<form method='post' action='/api/pins'>"
-                html += "<p>Pin: <select name='pin_0_number'><option value='15'>GP15</option></select> "
-                html += "Enabled: <input type='checkbox' name='pin_0_enabled' checked></p>"
-                html += "<p><button type='submit'>Save</button></p></form>"
+                html_parts.extend([
+                    "<p>Error loading pin configuration. Using defaults.</p>",
+                    "<form method='post' action='/api/pins'>",
+                    "<p>Pin: <select name='pin_0_number'><option value='15'>GP15</option></select> ",
+                    "Enabled: <input type='checkbox' name='pin_0_enabled' checked></p>",
+                    "<p><button type='submit'>Save</button></p></form>"
+                ])
             
-            html += "<hr><p><a href='/'>Back to Status</a> | <a href='/windows'>Time Windows</a></p>"
-            html += "</body></html>"
+            html_parts.extend([
+                "<hr><p><a href='/'>Back to Status</a> | <a href='/windows'>Time Windows</a></p>",
+                "</body></html>"
+            ])
             
+            # Join all parts at once to minimize memory fragmentation
+            html = "".join(html_parts)
             return self._create_html_response(html)
             
         except Exception as e:
@@ -502,38 +533,41 @@ class ConfigWebServer:
             free_before = gc.mem_free()
             log.debug(f"[WEB] Windows page starting with {free_before} bytes free")
             
-            html = "<html><head><title>PagodaLight Controller Management</title>"
-            html += "<style>body{font-family:Arial;margin:15px}table{border-collapse:collapse;width:100%}"
-            html += "th,td{border:1px solid #ddd;padding:8px;text-align:left}th{background:#f2f2f2}"
-            html += "input{padding:4px;border:1px solid #ccc;border-radius:3px;margin:2px}"
-            html += "button{background:#007acc;color:white;padding:10px 20px;border:none;cursor:pointer;border-radius:3px;margin:5px}"
-            html += ".add-btn{background:#28a745}.remove-btn{background:#dc3545}"
-            html += "label{font-weight:bold}.note{color:#666;font-size:0.9em}"
-            html += ".controller{border:2px solid #ddd;margin:15px 0;padding:15px;border-radius:8px}"
-            html += ".controller h3{margin-top:0;color:#333}"
-            html += ".window-row{background:#f9f9f9;margin:5px 0;padding:8px;border-radius:4px}"
-            html += "</style>"
+            # Build HTML in chunks to reduce memory usage
+            html_parts = []
             
-            # JavaScript for dynamic window management
-            html += "<script>"
-            html += "function addWindow(pin) {"
-            html += "  var container = document.getElementById('windows_' + pin);"
-            html += "  var windowCount = container.children.length;"
-            html += "  if (windowCount >= 5) { alert('Maximum 5 time windows per controller'); return; }"
-            html += "  var newWindow = document.createElement('div');"
-            html += "  newWindow.className = 'window-row';"
-            html += "  newWindow.innerHTML = '<label>Window Name:</label> <input type=\"text\" name=\"' + pin + '_window_' + windowCount + '_name\" placeholder=\"e.g. morning\"> '"
-            html += "    + '<label>Start:</label> <input type=\"time\" name=\"' + pin + '_window_' + windowCount + '_start\"> '"
-            html += "    + '<label>End:</label> <input type=\"time\" name=\"' + pin + '_window_' + windowCount + '_end\"> '"
-            html += "    + '<label>Duty Cycle (%):</label> <input type=\"number\" name=\"' + pin + '_window_' + windowCount + '_duty_cycle\" min=\"0\" max=\"100\" style=\"width:60px\"> '"
-            html += "    + '<button type=\"button\" class=\"remove-btn\" onclick=\"removeWindow(this)\">Remove</button>';"
-            html += "  container.appendChild(newWindow);"
-            html += "}"
-            html += "function removeWindow(btn) { btn.parentElement.remove(); }"
-            html += "</script>"
-            
-            html += "</head><body>"
-            html += "<h1>Controller Management</h1>"
+            # Header section
+            html_parts.extend([
+                "<html><head><title>PagodaLight Controller Management</title>",
+                "<style>body{font-family:Arial;margin:15px}table{border-collapse:collapse;width:100%}",
+                "th,td{border:1px solid #ddd;padding:8px;text-align:left}th{background:#f2f2f2}",
+                "input{padding:4px;border:1px solid #ccc;border-radius:3px;margin:2px}",
+                "button{background:#007acc;color:white;padding:10px 20px;border:none;cursor:pointer;border-radius:3px;margin:5px}",
+                ".add-btn{background:#28a745}.remove-btn{background:#dc3545}",
+                "label{font-weight:bold}.note{color:#666;font-size:0.9em}",
+                ".controller{border:2px solid #ddd;margin:15px 0;padding:15px;border-radius:8px}",
+                ".controller h3{margin-top:0;color:#333}",
+                ".window-row{background:#f9f9f9;margin:5px 0;padding:8px;border-radius:4px}",
+                "</style>",
+                "<script>",
+                "function addWindow(pin) {",
+                "  var container = document.getElementById('windows_' + pin);",
+                "  var windowCount = container.children.length;",
+                "  if (windowCount >= 5) { alert('Maximum 5 time windows per controller'); return; }",
+                "  var newWindow = document.createElement('div');",
+                "  newWindow.className = 'window-row';",
+                "  newWindow.innerHTML = '<label>Window Name:</label> <input type=\"text\" name=\"' + pin + '_window_' + windowCount + '_name\" placeholder=\"e.g. morning\"> '",
+                "    + '<label>Start:</label> <input type=\"time\" name=\"' + pin + '_window_' + windowCount + '_start\"> '",
+                "    + '<label>End:</label> <input type=\"time\" name=\"' + pin + '_window_' + windowCount + '_end\"> '",
+                "    + '<label>Duty Cycle (%):</label> <input type=\"number\" name=\"' + pin + '_window_' + windowCount + '_duty_cycle\" min=\"0\" max=\"100\" style=\"width:60px\"> '",
+                "    + '<button type=\"button\" class=\"remove-btn\" onclick=\"removeWindow(this)\">Remove</button>';",
+                "  container.appendChild(newWindow);",
+                "}",
+                "function removeWindow(btn) { btn.parentElement.remove(); }",
+                "</script>",
+                "</head><body>",
+                "<h1>Controller Management</h1>"
+            ])
             
             try:
                 config_data = config_manager.get_config_dict()
@@ -545,13 +579,17 @@ class ConfigWebServer:
                 day = current_time[2]
                 sunrise_h, sunrise_m, sunset_h, sunset_m = sun_times_leh.get_sunrise_sunset(month, day)
                 
-                html += f"<p class='note'><strong>Today's Sunrise:</strong> {sunrise_h:02d}:{sunrise_m:02d} | "
-                html += f"<strong>Sunset:</strong> {sunset_h:02d}:{sunset_m:02d}</p>"
+                html_parts.extend([
+                    f"<p class='note'><strong>Today's Sunrise:</strong> {sunrise_h:02d}:{sunrise_m:02d} | ",
+                    f"<strong>Sunset:</strong> {sunset_h:02d}:{sunset_m:02d}</p>"
+                ])
                 
                 if not pwm_pins:
-                    html += "<p>No controllers configured. Please <a href='/pins'>add controllers</a> first.</p>"
+                    html_parts.append("<p>No controllers configured. Please <a href='/pins'>add controllers</a> first.</p>")
                 else:
-                    html += "<form method='post' action='/api/windows'>"
+                    html_parts.extend([
+                        "<form method='post' action='/api/windows'>"
+                    ])
                     
                     # Per-controller configuration
                     for pin_key, pin_config in pwm_pins.items():
@@ -570,18 +608,22 @@ class ConfigWebServer:
                         pin_name = pin_config.get('name', f'Pin {gpio_pin}')
                         time_windows = pin_config.get('time_windows', {})
                         
-                        html += f"<div class='controller'>"
-                        html += f"<h3>Controller {pin_name} (GP{gpio_pin})</h3>"
+                        html_parts.extend([
+                            f"<div class='controller'>",
+                            f"<h3>Controller {pin_name} (GP{gpio_pin})</h3>",
+                            "<h4>Current Time Windows:</h4>"
+                        ])
                         
                         # Show current windows for this controller
-                        html += "<h4>Current Time Windows:</h4>"
                         if time_windows:
-                            html += "<table><tr><th>Window</th><th>Start</th><th>End</th><th>Duty Cycle</th></tr>"
+                            html_parts.extend([
+                                "<table><tr><th>Window</th><th>Start</th><th>End</th><th>Duty Cycle</th></tr>"
+                            ])
                             
                             # Always show day window first (calculated from sunrise/sunset)
                             if 'day' in time_windows:
                                 day_duty_cycle = time_windows['day'].get('duty_cycle', 80)
-                                html += f"<tr><td>Day</td><td>{sunrise_h:02d}:{sunrise_m:02d}</td><td>{sunset_h:02d}:{sunset_m:02d}</td><td>{day_duty_cycle}%</td></tr>"
+                                html_parts.append(f"<tr><td>Day</td><td>{sunrise_h:02d}:{sunrise_m:02d}</td><td>{sunset_h:02d}:{sunset_m:02d}</td><td>{day_duty_cycle}%</td></tr>")
                             
                             # Show other windows
                             for window_name, window_config in time_windows.items():
@@ -596,24 +638,26 @@ class ConfigWebServer:
                                 # Manual title case since .title() might not be available
                                 if display_name:
                                     display_name = display_name[0].upper() + display_name[1:].lower() if len(display_name) > 1 else display_name.upper()
-                                html += f"<tr><td>{display_name}</td><td>{start_time}</td><td>{end_time}</td><td>{duty_cycle}%</td></tr>"
+                                html_parts.append(f"<tr><td>{display_name}</td><td>{start_time}</td><td>{end_time}</td><td>{duty_cycle}%</td></tr>")
                             
-                            html += "</table>"
+                            html_parts.append("</table>")
                         else:
-                            html += "<p>No time windows configured for this controller.</p>"
+                            html_parts.append("<p>No time windows configured for this controller.</p>")
                         
                         # Configuration form for this controller
-                        html += "<h4>Configure Time Windows:</h4>"
+                        html_parts.extend([
+                            "<h4>Configure Time Windows:</h4>",
+                        ])
                         
                         # Day window (always present)
                         day_duty_cycle = time_windows.get('day', {}).get('duty_cycle', 80)
-                        html += f"<div class='window-row'>"
-                        html += f"<label><strong>Day Window (Sunrise-Sunset):</strong></label> "
-                        html += f"<label>Duty Cycle (%):</label> <input type='number' name='{pin_key}_day_duty_cycle' value='{day_duty_cycle}' min='0' max='100' style='width:60px'>"
-                        html += "</div>"
-                        
-                        # Dynamic windows container
-                        html += f"<div id='windows_{pin_key}'>"
+                        html_parts.extend([
+                            f"<div class='window-row'>",
+                            f"<label><strong>Day Window (Sunrise-Sunset):</strong></label> ",
+                            f"<label>Duty Cycle (%):</label> <input type='number' name='{pin_key}_day_duty_cycle' value='{day_duty_cycle}' min='0' max='100' style='width:60px'>",
+                            "</div>",
+                            f"<div id='windows_{pin_key}'>"
+                        ])
                         
                         # Existing custom windows for this controller
                         window_index = 0
@@ -625,35 +669,42 @@ class ConfigWebServer:
                             end_time = window_config.get('end', '')
                             duty_cycle = window_config.get('duty_cycle', 50)
                             
-                            html += f"<div class='window-row'>"
-                            html += f"<label>Window Name:</label> <input type='text' name='{pin_key}_window_{window_index}_name' value='{window_name}' placeholder='e.g. evening'> "
-                            html += f"<label>Start:</label> <input type='time' name='{pin_key}_window_{window_index}_start' value='{start_time}'> "
-                            html += f"<label>End:</label> <input type='time' name='{pin_key}_window_{window_index}_end' value='{end_time}'> "
-                            html += f"<label>Duty Cycle (%):</label> <input type='number' name='{pin_key}_window_{window_index}_duty_cycle' value='{duty_cycle}' min='0' max='100' style='width:60px'> "
-                            html += f"<button type='button' class='remove-btn' onclick='removeWindow(this)'>Remove</button>"
-                            html += "</div>"
+                            html_parts.extend([
+                                f"<div class='window-row'>",
+                                f"<label>Window Name:</label> <input type='text' name='{pin_key}_window_{window_index}_name' value='{window_name}' placeholder='e.g. evening'> ",
+                                f"<label>Start:</label> <input type='time' name='{pin_key}_window_{window_index}_start' value='{start_time}'> ",
+                                f"<label>End:</label> <input type='time' name='{pin_key}_window_{window_index}_end' value='{end_time}'> ",
+                                f"<label>Duty Cycle (%):</label> <input type='number' name='{pin_key}_window_{window_index}_duty_cycle' value='{duty_cycle}' min='0' max='100' style='width:60px'> ",
+                                f"<button type='button' class='remove-btn' onclick='removeWindow(this)'>Remove</button>",
+                                "</div>"
+                            ])
                             window_index += 1
                         
-                        html += "</div>"
-                        
-                        # Add window button for this controller
-                        html += f"<button type='button' class='add-btn' onclick='addWindow(\"{pin_key}\")'>Add Time Window</button>"
-                        html += "</div>"  # End controller div
+                        html_parts.extend([
+                            "</div>",
+                            f"<button type='button' class='add-btn' onclick='addWindow(\"{pin_key}\")'>Add Time Window</button>",
+                            "</div>"  # End controller div
+                        ])
                     
-                    html += "<p><button type='submit'>Save All Controller Settings</button></p>"
-                    html += "</form>"
-                    
-                    html += "<p class='note'><strong>Note:</strong> Each controller can have up to 5 time windows. "
-                    html += "Day windows are automatically calculated from sunrise/sunset times. "
-                    html += "Custom windows can span midnight (e.g., 23:00 to 06:00).</p>"
+                    html_parts.extend([
+                        "<p><button type='submit'>Save All Controller Settings</button></p>",
+                        "</form>",
+                        "<p class='note'><strong>Note:</strong> Each controller can have up to 5 time windows. ",
+                        "Day windows are automatically calculated from sunrise/sunset times. ",
+                        "Custom windows can span midnight (e.g., 23:00 to 06:00).</p>"
+                    ])
                 
             except Exception as e:
                 log.error(f"[WEB] Error loading controller config: {e}")
-                html += "<p>Error loading controller configuration.</p>"
+                html_parts.append("<p>Error loading controller configuration.</p>")
             
-            html += "<hr><p><a href='/'>Back to Status</a> | <a href='/pins'>Add/Remove Controllers</a></p>"
-            html += "</body></html>"
+            html_parts.extend([
+                "<hr><p><a href='/'>Back to Status</a> | <a href='/pins'>Add/Remove Controllers</a></p>",
+                "</body></html>"
+            ])
             
+            # Join all parts at once to minimize memory fragmentation
+            html = "".join(html_parts)
             return self._create_html_response(html)
             
         except Exception as e:
@@ -1116,12 +1167,16 @@ class ConfigWebServer:
     
     def _create_html_response(self, html):
         """Create HTTP response with HTML content."""
-        response = f"HTTP/1.1 200 OK\r\n"
-        response += f"Content-Type: text/html\r\n"
-        response += f"Content-Length: {len(html)}\r\n"
-        response += f"Connection: close\r\n"
-        response += f"\r\n"
-        response += html
+        # Pre-calculate content length to avoid multiple len() calls
+        content_length = len(html)
+        response = (
+            f"HTTP/1.1 200 OK\r\n"
+            f"Content-Type: text/html\r\n"
+            f"Content-Length: {content_length}\r\n"
+            f"Connection: close\r\n"
+            f"\r\n"
+            f"{html}"
+        )
         return response
     
     def _create_json_response(self, data, status_code=200):
