@@ -67,37 +67,32 @@ class AsyncWebServer:
         try:
             log.debug(f"[WEB] Handling connection from {addr}")
             
-            # Set client socket to non-blocking
-            client_socket.setblocking(False)
+            # Keep socket blocking for simpler handling
+            client_socket.settimeout(5.0)  # 5 second timeout
             
             # Read request with timeout
             request_data = b""
             try:
                 log.debug(f"[WEB] Starting to read request from {addr}")
-                # Try to read request data
-                read_attempts = 0
+                
+                # Read the request in a simpler way
                 while True:
                     try:
                         chunk = client_socket.recv(1024)
-                        read_attempts += 1
                         if not chunk:
-                            log.debug(f"[WEB] No more data after {read_attempts} attempts, total: {len(request_data)} bytes")
                             break
                         request_data += chunk
-                        log.debug(f"[WEB] Read {len(chunk)} bytes, total: {len(request_data)} bytes")
                         # Check if we have a complete HTTP request
-                        if b'\r\n\r\n' in request_data or b'\n\n' in request_data:
-                            log.debug(f"[WEB] Complete HTTP request received ({len(request_data)} bytes)")
+                        if b'\r\n\r\n' in request_data:
                             break
-                    except OSError as e:
-                        if e.errno == 11:  # EAGAIN - no more data available
-                            log.debug(f"[WEB] EAGAIN after {read_attempts} attempts, {len(request_data)} bytes read")
+                        # Prevent infinite reading
+                        if len(request_data) > 4096:  # Max 4KB request
                             break
-                        else:
-                            raise
-                    
-                    # Yield control to prevent blocking
-                    await asyncio.sleep(0.001)
+                    except Exception as e:
+                        log.debug(f"[WEB] Recv exception: {e}")
+                        break
+                
+                log.debug(f"[WEB] Read {len(request_data)} bytes total")
             
             except Exception as e:
                 log.error(f"[WEB] Error reading request: {e}")
@@ -106,13 +101,14 @@ class AsyncWebServer:
             if request_data:
                 try:
                     request = request_data.decode('utf-8')
-                    log.debug(f"[WEB] Request received: {request[:100]}...")  # First 100 chars
+                    log.debug(f"[WEB] Request: {request.split()[0] if request.split() else 'INVALID'}")
                     
                     response = self._create_response()
                     log.debug(f"[WEB] Response created, length: {len(response)} bytes")
                     
-                    # Send response asynchronously
-                    await self._send_response_async(client_socket, response)
+                    # Send response synchronously for reliability
+                    response_bytes = response.encode('utf-8')
+                    client_socket.sendall(response_bytes)
                     log.debug(f"[WEB] Response sent successfully to {addr}")
                     
                 except Exception as e:
@@ -126,49 +122,9 @@ class AsyncWebServer:
         finally:
             try:
                 client_socket.close()
+                log.debug(f"[WEB] Connection closed for {addr}")
             except:
                 pass
-    
-    async def _send_response_async(self, client_socket, response):
-        """
-        Send HTTP response asynchronously.
-        
-        Args:
-            client_socket: Client socket
-            response (str): HTTP response to send
-        """
-        try:
-            response_bytes = response.encode('utf-8')
-            total_sent = 0
-            log.debug(f"[WEB] Starting to send {len(response_bytes)} bytes")
-            
-            while total_sent < len(response_bytes):
-                try:
-                    sent = client_socket.send(response_bytes[total_sent:])
-                    if sent == 0:
-                        log.warn(f"[WEB] Socket closed by client, sent {total_sent}/{len(response_bytes)} bytes")
-                        break
-                    total_sent += sent
-                    log.debug(f"[WEB] Sent {sent} bytes, total: {total_sent}/{len(response_bytes)}")
-                except OSError as e:
-                    if e.errno == 11:  # EAGAIN - socket buffer full
-                        log.debug("[WEB] Socket buffer full, yielding...")
-                        await asyncio.sleep(0.001)  # Brief yield
-                        continue
-                    else:
-                        log.error(f"[WEB] Socket error during send: {e}")
-                        raise
-                
-                # Yield control periodically
-                if total_sent % 512 == 0:
-                    await asyncio.sleep(0.001)
-            
-            log.debug(f"[WEB] Response sending completed: {total_sent}/{len(response_bytes)} bytes")
-                    
-        except Exception as e:
-            log.error(f"[WEB] Error sending response: {e}")
-            log.error(f"[WEB] Error type: {type(e).__name__}")
-            raise
     
     async def serve_forever(self):
         """
