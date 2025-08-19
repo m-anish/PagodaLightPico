@@ -179,18 +179,35 @@ The system now uses JSON-based configuration for easy runtime updates:
 - **System**: Log level and update interval
 - **Time Windows**: LED brightness schedules for different times of day
 
-### Web Configuration Interface
-When WiFi is connected, access the configuration interface at:
+### Web Interface (Microdot Framework)
+When WiFi is connected, access the web interface at:
 ```
 http://[pico-w-ip-address]/
 ```
 
-The web interface provides:
-- 🏯 **Real-time configuration updates** without restarting the system
-- 📱 **Mobile-friendly interface** with responsive design
-- ✅ **Live validation** of all configuration values
-- 🔒 **Automatic backup** of settings to JSON file
-- 🌅 **Visual time window editor** for lighting schedules
+The new Microdot-powered web interface provides:
+
+#### Main Dashboard (`/`)
+- 🏛️ **System status overview** with real-time information
+- ⏰ **Current time and date** display
+- 📡 **Connection status** (WiFi, MQTT, Web Server)
+- 💡 **Active PWM pins** summary with configuration details
+- 🧭 **Navigation** to configuration and status pages
+
+#### Configuration Page (`/config`)
+- ⚙️ **View current configuration** in readable format
+- 📋 **JSON configuration display** for technical users
+- 🔄 **Future: Real-time editing** capabilities
+
+#### System Status (`/status`)
+- 📊 **Detailed system information** and health monitoring
+- 🔗 **Connection health** for all network services
+- ⏱️ **System uptime** and performance metrics
+
+#### JSON API Endpoints
+- `GET /api/config` - Current configuration as JSON
+- `GET /api/status` - System status as JSON  
+- `GET /api/pins` - PWM pins status as JSON
 
 ## Usage
 
@@ -201,14 +218,16 @@ The web interface provides:
 - "Day" window is automatically adjusted to sunrise/sunset times for Leh, India
 
 ### Configuration Updates
-1. **Via Web Interface** (Recommended):
-   - Navigate to `http://[pico-ip]/` in your web browser
-   - Update any settings using the intuitive web form
-   - Changes apply immediately without system restart
+1. **Via Web Interface** (Current):
+   - Navigate to `http://[pico-ip]/` for the main dashboard
+   - View current configuration at `http://[pico-ip]/config`
+   - Monitor system status at `http://[pico-ip]/status`
+   - Access JSON APIs for programmatic integration
 
 2. **Via JSON File**:
-   - Edit `config.json` directly
+   - Edit `config.json` directly on the device
    - Changes are detected and applied on next update cycle
+   - Use `/api/config` endpoint to verify changes
 
 ### Time Window Configuration
 - **Day Window**: Automatically set to sunrise/sunset (brightness usually 0%)

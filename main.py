@@ -37,7 +37,7 @@ from simple_logger import Logger
 from lib.wifi_connect import connect_wifi, sync_time_ntp
 import time
 from lib.pwm_control import multi_pwm
-from lib.web_server_async import AsyncWebServer
+from lib.web_server import web_server
 from lib.mqtt_notifier import mqtt_notifier
 from lib.system_status import system_status
 
@@ -58,8 +58,7 @@ if wifi_connected:
     except Exception as e:
         log.error(f"NTP sync failed: {e}")
     
-    # Start async web server
-    web_server = AsyncWebServer()
+    # Web server will be started in the async main() function
     
     # Connect MQTT if enabled
     if mqtt_notifier.connect():
@@ -72,7 +71,6 @@ if wifi_connected:
 else:
     log.warn("Using RTC time due to WiFi connection failure")
     system_status.set_connection_status(wifi=False, web_server=False, mqtt=False)
-    web_server = None
 
 # Initialize PWM controller (already initialized in constructor)
 # multi_pwm is ready to use
@@ -302,9 +300,12 @@ async def network_monitor_task():
                             log.info("[NETWORK] WiFi reconnected successfully")
                             system_status.set_connection_status(wifi=True)
                             # Restart web server if needed
-                            if web_server and not web_server.running:
-                                await web_server.start()
-                                system_status.set_connection_status(web_server=True)
+                            if not web_server.running:
+                                if await web_server.start():
+                                    system_status.set_connection_status(web_server=True)
+                                    log.info("[NETWORK] Web server restarted successfully")
+                                else:
+                                    log.error("[NETWORK] Failed to restart web server")
                             # Reconnect MQTT if needed
                             if not mqtt_notifier.connected:
                                 if mqtt_notifier.connect():
@@ -336,14 +337,14 @@ async def main():
     log.info("Starting async main loop")
     
     # Start web server if WiFi is connected
-    if wifi_connected and web_server:
-        log.info("[MAIN] Starting web server...")
+    if wifi_connected:
+        log.info("[MAIN] Starting async web server...")
         server_started = await web_server.start()
         if server_started:
-            log.info("[MAIN] Web server started successfully")
+            log.info("[MAIN] Async web server started successfully")
             system_status.set_connection_status(web_server=True)
         else:
-            log.error("[MAIN] Failed to start web server")
+            log.error("[MAIN] Failed to start async web server")
             system_status.set_connection_status(web_server=False)
     
     # Create and start all async tasks
@@ -355,14 +356,10 @@ async def main():
     # Network monitoring task
     tasks.append(asyncio.create_task(network_monitor_task()))
     
-    # Web server task (if WiFi connected)
-    if wifi_connected and web_server and web_server.running:
+    # Web server task (if WiFi connected and server started)
+    if wifi_connected and web_server.running:
         log.info("[MAIN] Adding web server task to async loop")
         tasks.append(asyncio.create_task(web_server.serve_forever()))
-    elif wifi_connected and web_server and not web_server.running:
-        log.warn("[MAIN] Web server not running, skipping server task")
-    elif not wifi_connected:
-        log.info("[MAIN] WiFi not connected, skipping web server task")
     
     log.info(f"Started {len(tasks)} async tasks")
     
@@ -375,7 +372,7 @@ async def main():
         log.error(f"Error in main async loop: {e}")
     finally:
         # Cleanup
-        if wifi_connected and web_server:
+        if wifi_connected:
             web_server.stop()
         log.info("System shutdown complete")
 

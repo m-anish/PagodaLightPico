@@ -19,6 +19,9 @@ while True:
 **After (Asynchronous):**
 ```python
 async def main():
+    # Start async web server
+    await web_server.start()
+    
     tasks = [
         asyncio.create_task(pwm_update_task()),
         asyncio.create_task(network_monitor_task()),
@@ -28,10 +31,11 @@ async def main():
 ```
 
 ### 2. Web Server
-- **New file:** `lib/web_server_async.py`
+- **New file:** `lib/web_server.py`
 - **Non-blocking:** Uses `setblocking(False)` on sockets
 - **Concurrent:** Each client connection handled in separate async task
 - **Efficient:** Yields control with `await asyncio.sleep()` to prevent blocking
+- **Minimal:** Simple implementation to reduce memory usage
 
 ### 3. Task Separation
 The system now runs three concurrent async tasks:
@@ -60,13 +64,13 @@ The system now runs three concurrent async tasks:
 ## Files Changed
 
 ### New Files
-- `lib/web_server_async.py` - Async web server implementation
+- `lib/web_server.py` - Simple async web server implementation
 - `test_async.py` - Simple async functionality test
 - `ASYNC_MIGRATION.md` - This migration guide
 
 ### Modified Files
 - `main.py` - Complete rewrite with async architecture
-- Removed dependency on old `lib/web_server.py`
+- Removed dependency on old synchronous web server
 
 ## Testing the Migration
 
