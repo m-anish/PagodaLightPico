@@ -496,8 +496,16 @@ class ConfigWebServer:
                 
                 # Show current pins in editable form
                 pin_index = 0
-                for pin_num, pin_config in pwm_pins.items():
+                for pin_key, pin_config in pwm_pins.items():
+                    if pin_key.startswith('_'):
+                        continue  # Skip comment entries
+                    
+                    if not isinstance(pin_config, dict):
+                        log.error(f"[WEB] Invalid pin config for {pin_key}: expected dict, got {type(pin_config)}")
+                        continue
+                    
                     enabled = pin_config.get('enabled', False)
+                    gpio_pin = pin_config.get('gpio_pin', 0)
                     checked = 'checked' if enabled else ''
                     
                     html += f"<tr><td><select name='pin_{pin_index}_number'>"
@@ -505,8 +513,8 @@ class ConfigWebServer:
                     # Add available pins to dropdown
                     for pin in available_pins:
                         # Include current pin even if it's 'used' by this config
-                        if pin == int(pin_num) or pin not in used_pins:
-                            selected = 'selected' if pin == int(pin_num) else ''
+                        if pin == gpio_pin or pin not in used_pins:
+                            selected = 'selected' if pin == gpio_pin else ''
                             html += f"<option value='{pin}' {selected}>GP{pin}</option>"
                     
                     html += f"</select></td><td><input type='checkbox' name='pin_{pin_index}_enabled' {checked}></td>"
@@ -610,15 +618,24 @@ class ConfigWebServer:
                     html += "<form method='post' action='/api/windows'>"
                     
                     # Per-controller configuration
-                    for pin_num, pin_config in pwm_pins.items():
+                    for pin_key, pin_config in pwm_pins.items():
+                        if pin_key.startswith('_'):
+                            continue  # Skip comment entries
+                        
+                        if not isinstance(pin_config, dict):
+                            log.error(f"[WEB] Invalid pin config for {pin_key}: expected dict, got {type(pin_config)}")
+                            continue
+                        
                         enabled = pin_config.get('enabled', False)
                         if not enabled:
                             continue  # Skip disabled controllers
                         
+                        gpio_pin = pin_config.get('gpio_pin', 0)
+                        pin_name = pin_config.get('name', f'Pin {gpio_pin}')
                         time_windows = pin_config.get('time_windows', {})
                         
                         html += f"<div class='controller'>"
-                        html += f"<h3>Controller GP{pin_num}</h3>"
+                        html += f"<h3>Controller {pin_name} (GP{gpio_pin})</h3>"
                         
                         # Show current windows for this controller
                         html += "<h4>Current Time Windows:</h4>"
@@ -652,11 +669,11 @@ class ConfigWebServer:
                         day_duty_cycle = time_windows.get('day', {}).get('duty_cycle', 80)
                         html += f"<div class='window-row'>"
                         html += f"<label><strong>Day Window (Sunrise-Sunset):</strong></label> "
-                        html += f"<label>Duty Cycle (%):</label> <input type='number' name='{pin_num}_day_duty_cycle' value='{day_duty_cycle}' min='0' max='100' style='width:60px'>"
+                        html += f"<label>Duty Cycle (%):</label> <input type='number' name='{pin_key}_day_duty_cycle' value='{day_duty_cycle}' min='0' max='100' style='width:60px'>"
                         html += "</div>"
                         
                         # Dynamic windows container
-                        html += f"<div id='windows_{pin_num}'>"
+                        html += f"<div id='windows_{pin_key}'>"
                         
                         # Existing custom windows for this controller
                         window_index = 0
@@ -669,10 +686,10 @@ class ConfigWebServer:
                             duty_cycle = window_config.get('duty_cycle', 50)
                             
                             html += f"<div class='window-row'>"
-                            html += f"<label>Window Name:</label> <input type='text' name='{pin_num}_window_{window_index}_name' value='{window_name}' placeholder='e.g. evening'> "
-                            html += f"<label>Start:</label> <input type='time' name='{pin_num}_window_{window_index}_start' value='{start_time}'> "
-                            html += f"<label>End:</label> <input type='time' name='{pin_num}_window_{window_index}_end' value='{end_time}'> "
-                            html += f"<label>Duty Cycle (%):</label> <input type='number' name='{pin_num}_window_{window_index}_duty_cycle' value='{duty_cycle}' min='0' max='100' style='width:60px'> "
+                            html += f"<label>Window Name:</label> <input type='text' name='{pin_key}_window_{window_index}_name' value='{window_name}' placeholder='e.g. evening'> "
+                            html += f"<label>Start:</label> <input type='time' name='{pin_key}_window_{window_index}_start' value='{start_time}'> "
+                            html += f"<label>End:</label> <input type='time' name='{pin_key}_window_{window_index}_end' value='{end_time}'> "
+                            html += f"<label>Duty Cycle (%):</label> <input type='number' name='{pin_key}_window_{window_index}_duty_cycle' value='{duty_cycle}' min='0' max='100' style='width:60px'> "
                             html += f"<button type='button' class='remove-btn' onclick='removeWindow(this)'>Remove</button>"
                             html += "</div>"
                             window_index += 1
@@ -680,7 +697,7 @@ class ConfigWebServer:
                         html += "</div>"
                         
                         # Add window button for this controller
-                        html += f"<button type='button' class='add-btn' onclick='addWindow(\"{pin_num}\")'>Add Time Window</button>"
+                        html += f"<button type='button' class='add-btn' onclick='addWindow(\"{pin_key}\")'>Add Time Window</button>"
                         html += "</div>"  # End controller div
                     
                     html += "<p><button type='submit'>Save All Controller Settings</button></p>"
