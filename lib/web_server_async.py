@@ -73,18 +73,25 @@ class AsyncWebServer:
             # Read request with timeout
             request_data = b""
             try:
+                log.debug(f"[WEB] Starting to read request from {addr}")
                 # Try to read request data
+                read_attempts = 0
                 while True:
                     try:
                         chunk = client_socket.recv(1024)
+                        read_attempts += 1
                         if not chunk:
+                            log.debug(f"[WEB] No more data after {read_attempts} attempts, total: {len(request_data)} bytes")
                             break
                         request_data += chunk
+                        log.debug(f"[WEB] Read {len(chunk)} bytes, total: {len(request_data)} bytes")
                         # Check if we have a complete HTTP request
                         if b'\r\n\r\n' in request_data or b'\n\n' in request_data:
+                            log.debug(f"[WEB] Complete HTTP request received ({len(request_data)} bytes)")
                             break
                     except OSError as e:
                         if e.errno == 11:  # EAGAIN - no more data available
+                            log.debug(f"[WEB] EAGAIN after {read_attempts} attempts, {len(request_data)} bytes read")
                             break
                         else:
                             raise
@@ -99,13 +106,20 @@ class AsyncWebServer:
             if request_data:
                 try:
                     request = request_data.decode('utf-8')
+                    log.debug(f"[WEB] Request received: {request[:100]}...")  # First 100 chars
+                    
                     response = self._create_response()
+                    log.debug(f"[WEB] Response created, length: {len(response)} bytes")
                     
                     # Send response asynchronously
                     await self._send_response_async(client_socket, response)
+                    log.debug(f"[WEB] Response sent successfully to {addr}")
                     
                 except Exception as e:
                     log.error(f"[WEB] Error processing request: {e}")
+                    log.error(f"[WEB] Error type: {type(e).__name__}")
+            else:
+                log.warn(f"[WEB] No request data received from {addr}")
             
         except Exception as e:
             log.error(f"[WEB] Error handling client {addr}: {e}")
@@ -126,26 +140,34 @@ class AsyncWebServer:
         try:
             response_bytes = response.encode('utf-8')
             total_sent = 0
+            log.debug(f"[WEB] Starting to send {len(response_bytes)} bytes")
             
             while total_sent < len(response_bytes):
                 try:
                     sent = client_socket.send(response_bytes[total_sent:])
                     if sent == 0:
+                        log.warn(f"[WEB] Socket closed by client, sent {total_sent}/{len(response_bytes)} bytes")
                         break
                     total_sent += sent
+                    log.debug(f"[WEB] Sent {sent} bytes, total: {total_sent}/{len(response_bytes)}")
                 except OSError as e:
                     if e.errno == 11:  # EAGAIN - socket buffer full
+                        log.debug("[WEB] Socket buffer full, yielding...")
                         await asyncio.sleep(0.001)  # Brief yield
                         continue
                     else:
+                        log.error(f"[WEB] Socket error during send: {e}")
                         raise
                 
                 # Yield control periodically
                 if total_sent % 512 == 0:
                     await asyncio.sleep(0.001)
+            
+            log.debug(f"[WEB] Response sending completed: {total_sent}/{len(response_bytes)} bytes")
                     
         except Exception as e:
             log.error(f"[WEB] Error sending response: {e}")
+            log.error(f"[WEB] Error type: {type(e).__name__}")
             raise
     
     async def serve_forever(self):
