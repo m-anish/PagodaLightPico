@@ -52,8 +52,8 @@ class MQTTNotifier:
         self.notifications_enabled = notifications.get('enabled', False)
         self.broker = notifications.get('mqtt_broker', 'broker.hivemq.com')
         self.port = notifications.get('mqtt_port', 1883)
-        self.topic = notifications.get('mqtt_topic', 'pagoda_light/notifications')
-        self.client_id = notifications.get('mqtt_client_id', 'pagoda_light_pico')
+        self.topic = notifications.get('mqtt_topic', 'PagodaLightPico/notifications')
+        self.client_id = notifications.get('mqtt_client_id', 'PagodaLightPico')
         self.notify_on_window_change = notifications.get('notify_on_window_change', True)
         self.notify_on_errors = notifications.get('notify_on_errors', True)
     

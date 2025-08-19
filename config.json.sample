@@ -5,7 +5,7 @@
     "ssid": "your_wifi_ssid_here",
     "password": "your_wifi_password_here"
   },
-  "hostname": "pagoda-light",
+  "hostname": "PagodaLightPico",
   "timezone": {
     "name": "IST",
     "offset": 5.5,
@@ -27,8 +27,8 @@
     "enabled": false,
     "mqtt_broker": "broker.hivemq.com",
     "mqtt_port": 1883,
-    "mqtt_topic": "pagoda_light/notifications",
-    "mqtt_client_id": "pagoda_light_pico",
+    "mqtt_topic": "PagodaLightPico/notifications",
+    "mqtt_client_id": "PagodaLightPico",
     "notify_on_window_change": true,
     "notify_on_errors": true,
     "_comment": "Set enabled=true and configure MQTT broker for push notifications"

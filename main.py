@@ -56,7 +56,7 @@ if wifi_connected:
         system_status.set_connection_status(web_server=True)
         
         # Device accessible via hostname set in config or direct IP
-        hostname = config.config_manager.get_config_dict().get('hostname', 'pagoda-light')
+        hostname = config.config_manager.get_config_dict().get('hostname', 'PagodaLightPico')
         log.info(f"Device hostname: {hostname} (use direct IP if mDNS not available)")
         system_status.set_connection_status(mdns=False)
     else:

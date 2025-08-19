@@ -1,6 +1,6 @@
-# Free MQTT Brokers for PagodaLight Project
+# Free MQTT Brokers for PagodaLightPico Project
 
-This document recommends free-tier MQTT brokers that you can use with your PagodaLight system for receiving notifications about lighting changes and system events.
+This document recommends free-tier MQTT brokers that you can use with your PagodaLightPico system for receiving notifications about lighting changes and system events.
 
 ## Recommended Free MQTT Brokers
 
@@ -79,8 +79,8 @@ This document recommends free-tier MQTT brokers that you can use with your Pagod
     "enabled": true,
     "mqtt_broker": "c-your-cluster.emqx.cloud",
     "mqtt_port": 1883,
-    "mqtt_topic": "pagoda_light/notifications",
-    "mqtt_client_id": "pagoda_light_pico",
+    "mqtt_topic": "PagodaLightPico/notifications",
+    "mqtt_client_id": "PagodaLightPico",
     "notify_on_window_change": true,
     "notify_on_errors": true
   }
@@ -96,8 +96,8 @@ Simply update your config.json:
     "enabled": true,
     "mqtt_broker": "broker.hivemq.com",
     "mqtt_port": 1883,
-    "mqtt_topic": "pagoda_light/notifications",
-    "mqtt_client_id": "pagoda_light_pico_unique_id",
+    "mqtt_topic": "PagodaLightPico/notifications",
+    "mqtt_client_id": "PagodaLightPico_unique_id",
     "notify_on_window_change": true,
     "notify_on_errors": true
   }
@@ -112,7 +112,7 @@ Once your MQTT broker is configured, you can receive notifications through:
 
 ### 1. **Pushover** (Mobile push notifications)
 - Use a service like Node-RED or Home Assistant to bridge MQTT → Pushover
-- Subscribe to `pagoda_light/notifications/+` topic
+- Subscribe to `PagodaLightPico/notifications/+` topic
 
 ### 2. **Home Assistant**
 - Add MQTT integration
@@ -140,18 +140,18 @@ def on_message(client, userdata, message):
 client = mqtt.Client()
 client.on_message = on_message
 client.connect("broker.hivemq.com", 1883, 60)
-client.subscribe("pagoda_light/notifications/+")
+client.subscribe("PagodaLightPico/notifications/+")
 client.loop_forever()
 ```
 
 ## Topic Structure
 
-Your PagodaLight device publishes to these topics:
+Your PagodaLightPico device publishes to these topics:
 
-- `pagoda_light/notifications/window_change` - Time window changes
-- `pagoda_light/notifications/error` - System errors
-- `pagoda_light/notifications/system` - Startup/shutdown events
-- `pagoda_light/notifications/config` - Configuration updates
+- `PagodaLightPico/notifications/window_change` - Time window changes
+- `PagodaLightPico/notifications/error` - System errors
+- `PagodaLightPico/notifications/system` - Startup/shutdown events
+- `PagodaLightPico/notifications/config` - Configuration updates
 
 Each message contains JSON data with event details, timestamps, and device information.
 
