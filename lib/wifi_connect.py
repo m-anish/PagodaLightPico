@@ -46,7 +46,14 @@ def connect_wifi(timeout=10, max_attempts=3):
     
     # Check if already connected
     if wlan.isconnected():
+        ip_info = wlan.ifconfig()
         log.info("[WIFI] Already connected")
+        log.info(f"[WIFI] Network Details:")
+        log.info(f"[WIFI]   IP Address: {ip_info[0]}")
+        log.info(f"[WIFI]   Subnet Mask: {ip_info[1]}")
+        log.info(f"[WIFI]   Gateway: {ip_info[2]}")
+        log.info(f"[WIFI]   DNS Server: {ip_info[3]}")
+        log.info(f"[WIFI] Web interface available at: http://{ip_info[0]}/")
         led.value(1)  # LED ON when connected
         return True
     
