@@ -280,12 +280,13 @@ def main_loop():
             if current_time - last_pwm_update >= config.UPDATE_INTERVAL:
                 # Check if configuration was updated via web interface
                 current_config = config.config_manager.get_config_dict()
+                log.info(f"[MAIN] Current PWM pins config: {current_config.get('pwm_pins', {})}")
                 if hasattr(config.config_manager, '_last_config_hash'):
                     import json
                     current_hash = hash(json.dumps(current_config))
+                    log.info(f"[MAIN] Current hash: {current_hash}, Last hash: {config.config_manager._last_config_hash}")
                     if current_hash != config.config_manager._last_config_hash:
-                        # Reduce debug logging to save memory
-                        # log.info("Configuration change detected, reloading...")
+                        log.info("Configuration change detected, reloading...")
                         config.config_manager.reload()
                         # Re-initialize multi-PWM manager with new configuration
                         multi_pwm.reload_config()
