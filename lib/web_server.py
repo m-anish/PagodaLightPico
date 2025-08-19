@@ -250,9 +250,9 @@ class ConfigWebServer:
             
             # Build HTML in parts to reduce memory fragmentation
             html_parts = [
-                "<html><head><title>PagodaLight Status</title>",
+                "<html><head><title>PagodaLight</title>",
                 "<style>body{font-family:Arial;margin:15px}</style></head><body>",
-                "<h1>PagodaLight Status</h1>"
+                "<h1>PagodaLight</h1>"
             ]
             
             # Current time - simplified
@@ -281,10 +281,9 @@ class ConfigWebServer:
             except:
                 html_parts.append("<p><strong>Memory:</strong> Unknown</p>")
             
-            # Simple navigation
+            # Simplified navigation - removed System Settings to reduce memory usage
             html_parts.extend([
                 "<hr><p><a href='/config'>WiFi Config</a> | ",
-                "<a href='/system'>System Settings</a> | ",
                 "<a href='/pins'>Add/Remove Controllers</a> | ",
                 "<a href='/windows'>Manage Controllers</a> | ",
                 "<a href='/api/download'>Download Config</a></p>",
@@ -533,41 +532,19 @@ class ConfigWebServer:
             free_before = gc.mem_free()
             log.debug(f"[WEB] Windows page starting with {free_before} bytes free")
             
-            # Build HTML in chunks to reduce memory usage
-            html_parts = []
-            
-            # Header section
-            html_parts.extend([
-                "<html><head><title>PagodaLight Controller Management</title>",
-                "<style>body{font-family:Arial;margin:15px}table{border-collapse:collapse;width:100%}",
-                "th,td{border:1px solid #ddd;padding:8px;text-align:left}th{background:#f2f2f2}",
-                "input{padding:4px;border:1px solid #ccc;border-radius:3px;margin:2px}",
-                "button{background:#007acc;color:white;padding:10px 20px;border:none;cursor:pointer;border-radius:3px;margin:5px}",
+            # Minimal HTML to reduce memory usage
+            html_parts = [
+                "<html><head><title>PagodaLight Windows</title>",
+                "<style>body{font-family:sans-serif;margin:10px}table{border-collapse:collapse;width:100%;font-size:0.9em}",
+                "th,td{border:1px solid #ccc;padding:4px}th{background:#eee}",
+                "input{padding:2px;margin:1px;font-size:0.9em;width:80px}",
+                "button{background:#007acc;color:white;padding:5px 10px;border:none;cursor:pointer;margin:2px;font-size:0.9em}",
                 ".add-btn{background:#28a745}.remove-btn{background:#dc3545}",
-                "label{font-weight:bold}.note{color:#666;font-size:0.9em}",
-                ".controller{border:2px solid #ddd;margin:15px 0;padding:15px;border-radius:8px}",
-                ".controller h3{margin-top:0;color:#333}",
-                ".window-row{background:#f9f9f9;margin:5px 0;padding:8px;border-radius:4px}",
+                "label{font-weight:bold}.controller{border:1px solid #ccc;margin:10px 0;padding:10px}",
                 "</style>",
-                "<script>",
-                "function addWindow(pin) {",
-                "  var container = document.getElementById('windows_' + pin);",
-                "  var windowCount = container.children.length;",
-                "  if (windowCount >= 5) { alert('Maximum 5 time windows per controller'); return; }",
-                "  var newWindow = document.createElement('div');",
-                "  newWindow.className = 'window-row';",
-                "  newWindow.innerHTML = '<label>Window Name:</label> <input type=\"text\" name=\"' + pin + '_window_' + windowCount + '_name\" placeholder=\"e.g. morning\"> '",
-                "    + '<label>Start:</label> <input type=\"time\" name=\"' + pin + '_window_' + windowCount + '_start\"> '",
-                "    + '<label>End:</label> <input type=\"time\" name=\"' + pin + '_window_' + windowCount + '_end\"> '",
-                "    + '<label>Duty Cycle (%):</label> <input type=\"number\" name=\"' + pin + '_window_' + windowCount + '_duty_cycle\" min=\"0\" max=\"100\" style=\"width:60px\"> '",
-                "    + '<button type=\"button\" class=\"remove-btn\" onclick=\"removeWindow(this)\">Remove</button>';",
-                "  container.appendChild(newWindow);",
-                "}",
-                "function removeWindow(btn) { btn.parentElement.remove(); }",
-                "</script>",
                 "</head><body>",
-                "<h1>Controller Management</h1>"
-            ])
+                "<h1>Time Windows</h1>"
+            ]
             
             try:
                 config_data = config_manager.get_config_dict()
@@ -580,7 +557,7 @@ class ConfigWebServer:
                 sunrise_h, sunrise_m, sunset_h, sunset_m = sun_times_leh.get_sunrise_sunset(month, day)
                 
                 html_parts.extend([
-                    f"<p class='note'><strong>Today's Sunrise:</strong> {sunrise_h:02d}:{sunrise_m:02d} | ",
+                    f"<p><strong>Sunrise:</strong> {sunrise_h:02d}:{sunrise_m:02d} | ",
                     f"<strong>Sunset:</strong> {sunset_h:02d}:{sunset_m:02d}</p>"
                 ])
                 
@@ -591,7 +568,7 @@ class ConfigWebServer:
                         "<form method='post' action='/api/windows'>"
                     ])
                     
-                    # Per-controller configuration
+                    # Per-controller configuration - simplified
                     for pin_key, pin_config in pwm_pins.items():
                         if pin_key.startswith('_'):
                             continue  # Skip comment entries
@@ -610,56 +587,17 @@ class ConfigWebServer:
                         
                         html_parts.extend([
                             f"<div class='controller'>",
-                            f"<h3>Controller {pin_name} (GP{gpio_pin})</h3>",
-                            "<h4>Current Time Windows:</h4>"
-                        ])
-                        
-                        # Show current windows for this controller
-                        if time_windows:
-                            html_parts.extend([
-                                "<table><tr><th>Window</th><th>Start</th><th>End</th><th>Duty Cycle</th></tr>"
-                            ])
-                            
-                            # Always show day window first (calculated from sunrise/sunset)
-                            if 'day' in time_windows:
-                                day_duty_cycle = time_windows['day'].get('duty_cycle', 80)
-                                html_parts.append(f"<tr><td>Day</td><td>{sunrise_h:02d}:{sunrise_m:02d}</td><td>{sunset_h:02d}:{sunset_m:02d}</td><td>{day_duty_cycle}%</td></tr>")
-                            
-                            # Show other windows
-                            for window_name, window_config in time_windows.items():
-                                if window_name == 'day':
-                                    continue  # Already shown above
-                                
-                                start_time = window_config.get('start', '00:00')
-                                end_time = window_config.get('end', '00:00')
-                                duty_cycle = window_config.get('duty_cycle', 50)
-                                # Safe string formatting for MicroPython
-                                display_name = window_name.replace('_', ' ')
-                                # Manual title case since .title() might not be available
-                                if display_name:
-                                    display_name = display_name[0].upper() + display_name[1:].lower() if len(display_name) > 1 else display_name.upper()
-                                html_parts.append(f"<tr><td>{display_name}</td><td>{start_time}</td><td>{end_time}</td><td>{duty_cycle}%</td></tr>")
-                            
-                            html_parts.append("</table>")
-                        else:
-                            html_parts.append("<p>No time windows configured for this controller.</p>")
-                        
-                        # Configuration form for this controller
-                        html_parts.extend([
-                            "<h4>Configure Time Windows:</h4>",
+                            f"<h3>{pin_name} (GP{gpio_pin})</h3>"
                         ])
                         
                         # Day window (always present)
                         day_duty_cycle = time_windows.get('day', {}).get('duty_cycle', 80)
                         html_parts.extend([
-                            f"<div class='window-row'>",
-                            f"<label><strong>Day Window (Sunrise-Sunset):</strong></label> ",
-                            f"<label>Duty Cycle (%):</label> <input type='number' name='{pin_key}_day_duty_cycle' value='{day_duty_cycle}' min='0' max='100' style='width:60px'>",
-                            "</div>",
-                            f"<div id='windows_{pin_key}'>"
+                            f"<p><label>Day Window:</label> ",
+                            f"<input type='number' name='{pin_key}_day_duty_cycle' value='{day_duty_cycle}' min='0' max='100'>%</p>"
                         ])
                         
-                        # Existing custom windows for this controller
+                        # Custom windows
                         window_index = 0
                         for window_name, window_config in time_windows.items():
                             if window_name == 'day':
@@ -670,28 +608,30 @@ class ConfigWebServer:
                             duty_cycle = window_config.get('duty_cycle', 50)
                             
                             html_parts.extend([
-                                f"<div class='window-row'>",
-                                f"<label>Window Name:</label> <input type='text' name='{pin_key}_window_{window_index}_name' value='{window_name}' placeholder='e.g. evening'> ",
-                                f"<label>Start:</label> <input type='time' name='{pin_key}_window_{window_index}_start' value='{start_time}'> ",
-                                f"<label>End:</label> <input type='time' name='{pin_key}_window_{window_index}_end' value='{end_time}'> ",
-                                f"<label>Duty Cycle (%):</label> <input type='number' name='{pin_key}_window_{window_index}_duty_cycle' value='{duty_cycle}' min='0' max='100' style='width:60px'> ",
-                                f"<button type='button' class='remove-btn' onclick='removeWindow(this)'>Remove</button>",
-                                "</div>"
+                                f"<p><label>{window_name}:</label> ",
+                                f"<input type='time' name='{pin_key}_window_{window_index}_start' value='{start_time}'> to ",
+                                f"<input type='time' name='{pin_key}_window_{window_index}_end' value='{end_time}'> ",
+                                f"<input type='number' name='{pin_key}_window_{window_index}_duty_cycle' value='{duty_cycle}' min='0' max='100'>% ",
+                                f"<button type='button' class='remove-btn' onclick='this.parentElement.remove()'>Remove</button></p>"
                             ])
                             window_index += 1
                         
                         html_parts.extend([
-                            "</div>",
-                            f"<button type='button' class='add-btn' onclick='addWindow(\"{pin_key}\")'>Add Time Window</button>",
-                            "</div>"  # End controller div
+                            f"<p><button type='button' class='add-btn' onclick='addWindow(\"{pin_key}\")'>Add Window</button></p>",
+                            "</div>"
                         ])
                     
                     html_parts.extend([
-                        "<p><button type='submit'>Save All Controller Settings</button></p>",
+                        "<p><button type='submit'>Save</button></p>",
                         "</form>",
-                        "<p class='note'><strong>Note:</strong> Each controller can have up to 5 time windows. ",
-                        "Day windows are automatically calculated from sunrise/sunset times. ",
-                        "Custom windows can span midnight (e.g., 23:00 to 06:00).</p>"
+                        "<script>",
+                        "function addWindow(pin){",
+                        "var container=document.querySelector('.controller h3').parentElement;",
+                        "var p=document.createElement('p');",
+                        "p.innerHTML='<label>New:</label> <input type=\"time\" name=\"'+pin+'_window_new_start\"> to <input type=\"time\" name=\"'+pin+'_window_new_end\"> <input type=\"number\" name=\"'+pin+'_window_new_duty_cycle\" min=\"0\" max=\"100\">% <button type=\"button\" class=\"remove-btn\" onclick=\"this.parentElement.remove()\">Remove</button>';",
+                        "container.appendChild(p);",
+                        "}",
+                        "</script>"
                     ])
                 
             except Exception as e:
@@ -699,7 +639,7 @@ class ConfigWebServer:
                 html_parts.append("<p>Error loading controller configuration.</p>")
             
             html_parts.extend([
-                "<hr><p><a href='/'>Back to Status</a> | <a href='/pins'>Add/Remove Controllers</a></p>",
+                "<hr><p><a href='/'>Home</a> | <a href='/pins'>Pins</a></p>",
                 "</body></html>"
             ])
             
