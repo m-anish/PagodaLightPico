@@ -21,15 +21,23 @@ import config
 import sun_times_leh
 import rtc_module
 from simple_logger import Logger
-from machine import PWM, Pin
 from wifi_connect import connect_wifi, sync_time_ntp
 import time
+from lib.pwm_control import PWMController
+from lib.config_validator import validate_config
 
 log = Logger()
 
-led_pin = Pin(config.LED_PWM_PIN)  # PWM pin from config
-led_pwm = PWM(led_pin)
-led_pwm.freq(config.PWM_FREQUENCY)
+# Validate configuration
+config_errors = validate_config()
+if config_errors:
+    log.fatal("Configuration validation failed:")
+    for error in config_errors:
+        log.fatal(f"  - {error}")
+    raise SystemExit("Invalid configuration")
+
+# Initialize PWM controller
+led_pwm = PWMController(freq=config.PWM_FREQUENCY, pin=config.LED_PWM_PIN)
 
 log.info("Starting system")
 
@@ -71,14 +79,17 @@ def int_to_time_str(hour, minute):
 
 def get_current_window(time_windows, current_time_tuple):
     """
-    Determine the currently active time window and corresponding PWM duty cycle.
+    Determine the currently active time window and corresponding PWM duty
+    cycle.
 
-    The "day" window's start and end times are dynamically updated from sunrise
-    and sunset times retrieved via sun_times_leh.get_sunrise_sunset().
+    The "day" window's start and end times are dynamically updated from
+    sunrise and sunset times retrieved via sun_times_leh.get_sunrise_sunset().
 
     Args:
-        time_windows (dict): Dictionary of time windows with start/end times and duty cycles.
-        current_time_tuple (tuple): Current local time tuple (year, month, day, hour, minute, ...).
+        time_windows (dict): Dictionary of time windows with start/end times
+            and duty cycles.
+        current_time_tuple (tuple): Current local time tuple (year, month,
+            day, hour, minute, ...).
 
     Returns:
         tuple (str, int): The active window name and duty cycle percentage.
@@ -89,9 +100,11 @@ def get_current_window(time_windows, current_time_tuple):
     day = current_time_tuple[2]
 
     log.debug(f"RTC current time: {current_time_tuple}")
-    sunrise_h, sunrise_m, sunset_h, sunset_m = sun_times_leh.get_sunrise_sunset(month, day)
+    sunrise_h, sunrise_m, sunset_h, sunset_m = \
+        sun_times_leh.get_sunrise_sunset(month, day)
     log.debug(f"Sunrise/sunset times for {month}/{day}: "
-              f"{sunrise_h:02d}:{sunrise_m:02d}, {sunset_h:02d}:{sunset_m:02d}")
+              f"{sunrise_h:02d}:{sunrise_m:02d}, "
+              f"{sunset_h:02d}:{sunset_m:02d}")
 
     sunrise_str = int_to_time_str(sunrise_h, sunrise_m)
     sunset_str = int_to_time_str(sunset_h, sunset_m)
@@ -108,17 +121,20 @@ def get_current_window(time_windows, current_time_tuple):
         end = time_str_to_minutes(window["end"])
         duty = window["duty_cycle"]
 
-        log.debug(f"Checking window '{window_name}' start: {window['start']} ({start}), "
-                  f"end: {window['end']} ({end}), duty: {duty}")
+        log.debug(f"Checking window '{window_name}' start: {window['start']} "
+                  f"({start}), end: {window['end']} ({end}), duty: {duty}")
 
         if start <= end:
             if start <= current_minutes < end:
-                log.debug(f"Current time {current_minutes} is within window '{window_name}'")
+                log.debug(f"Current time {current_minutes} is within window "
+                          f"'{window_name}'")
                 return window_name, duty
         else:
             # Handle overnight windows crossing midnight
             if current_minutes >= start or current_minutes < end:
-                log.debug(f"Current time {current_minutes} is within overnight window '{window_name}'")
+                log.debug(
+                    f"Current time {current_minutes} is within overnight "
+                    f"window '{window_name}'")
                 return window_name, duty
     log.debug("No matching time window found")
     return None, 0
@@ -129,14 +145,21 @@ def update_led():
     Reads the current time from RTC and updates the LED PWM duty cycle
     based on the active time window.
     """
-    current_time = rtc_module.get_current_time()
-    window, duty_cycle = get_current_window(config.TIME_WINDOWS, current_time)
-    if window:
-        log.info(f"Active window: {window}, setting duty cycle: {duty_cycle}%")
-        led_pwm.duty_u16(int(duty_cycle / 100 * 65535))
-    else:
-        log.warn("No active window detected, turning LED off")
-        led_pwm.duty_u16(0)
+    try:
+        current_time = rtc_module.get_current_time()
+        window, duty_cycle = get_current_window(config.TIME_WINDOWS,
+                                                current_time)
+        if window:
+            log.info(f"Active window: {window}, setting duty cycle: "
+                     f"{duty_cycle}%")
+            led_pwm.set_duty_percent(duty_cycle)
+        else:
+            log.warn("No active window detected, turning LED off")
+            led_pwm.set_duty_percent(0)
+    except Exception as e:
+        log.error(f"Error updating LED: {e}")
+        # Turn off LED in case of error
+        led_pwm.set_duty_percent(0)
 
 
 def main_loop():
@@ -144,8 +167,12 @@ def main_loop():
     Main loop that repeatedly updates the LED PWM every configured interval.
     """
     while True:
-        update_led()
-        time.sleep(config.UPDATE_INTERVAL)
+        try:
+            update_led()
+        except Exception as e:
+            log.error(f"Error in main loop: {e}")
+        finally:
+            time.sleep(config.UPDATE_INTERVAL)
 
 
 if __name__ == "__main__":

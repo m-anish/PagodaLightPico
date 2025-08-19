@@ -13,16 +13,13 @@ import network
 import time
 import ntptime
 from config import WIFI_SSID, WIFI_PASSWORD, TIMEZONE_OFFSET
-from machine import Pin, I2C
+from machine import Pin
 import urtc
 from simple_logger import Logger
+from lib.rtc_shared import rtc
 
 led = Pin(25, Pin.OUT)
 log = Logger()
-
-# Initialize I2C for DS3231 RTC using pins from config
-i2c = I2C(0, scl=Pin(21), sda=Pin(20))  # Adjust pins if required
-rtc = urtc.DS3231(i2c)
 
 
 def connect_wifi(timeout=10):
@@ -44,7 +41,8 @@ def connect_wifi(timeout=10):
         start = time.time()
         while not wlan.isconnected():
             if time.time() - start > timeout:
-                log.error("WiFi connection timed out after {} seconds".format(timeout))
+                log.error("WiFi connection timed out after {} seconds"
+                          .format(timeout))
                 led.value(0)  # LED OFF when not connected
                 return False
             time.sleep(0.1)
@@ -59,7 +57,8 @@ def sync_time_ntp():
     """
     Synchronize system time from NTP server using ntptime.
 
-    Applies timezone offset from config and writes corrected time back to DS3231 RTC.
+    Applies timezone offset from config and writes corrected time back to
+    DS3231 RTC.
 
     Returns:
         bool: True if successful, False otherwise.

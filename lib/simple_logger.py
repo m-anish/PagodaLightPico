@@ -10,10 +10,8 @@ Timestamps are formatted as:
 e.g. <Mon 18 Aug 2025 - 15:55:10 IST(UTC+5:30)>
 """
 
-import time
-import urtc
-from machine import I2C, Pin
-from config import LOG_LEVEL, TIMEZONE_NAME, TIMEZONE_OFFSET, RTC_I2C_SDA_PIN, RTC_I2C_SCL_PIN
+from config import LOG_LEVEL, TIMEZONE_NAME, TIMEZONE_OFFSET
+from lib.rtc_shared import rtc
 
 class Logger:
     """
@@ -30,7 +28,8 @@ class Logger:
         level (str): Minimum logging level to output. Default is from config.
 
     Methods:
-        fatal(msg), error(msg), warn(msg), info(msg), debug(msg): Log messages at corresponding levels.
+        fatal(msg), error(msg), warn(msg), info(msg), debug(msg): Log messages
+        at corresponding levels.
     """
 
     LEVELS = {'FATAL': 0, 'ERROR': 1, 'WARN': 2, 'INFO': 3, 'DEBUG': 4}
@@ -41,14 +40,12 @@ class Logger:
 
     def __init__(self, level=None):
         self.level = self.LEVELS.get(level or LOG_LEVEL, 3)
-
-        # Initialize I2C and DS3231 RTC instance from urtc
-        self.i2c = I2C(0, scl=Pin(RTC_I2C_SCL_PIN), sda=Pin(RTC_I2C_SDA_PIN))
-        self.rtc = urtc.DS3231(self.i2c)
+        self.rtc = rtc
 
     def _format_offset(self):
         """
-        Format the timezone offset (float hours) to a string like '+5:30' or '-4:00'.
+        Format the timezone offset (float hours) to a string like '+5:30' or
+        '-4:00'.
         """
         total_minutes = int(abs(TIMEZONE_OFFSET) * 60)
         sign = '+' if TIMEZONE_OFFSET >= 0 else '-'
@@ -72,7 +69,8 @@ class Logger:
         hour = dt.hour
         minute = dt.minute
         second = dt.second
-        weekday_idx = dt.weekday - 1  # urtc weekday: Monday=1,...Sunday=7; map to 0-based
+        # urtc weekday: Monday=1,...Sunday=7; map to 0-based
+        weekday_idx = dt.weekday - 1
 
         weekday_str = self.WEEKDAYS[weekday_idx if 0 <= weekday_idx < 7 else 0]
         month_str = self.MONTHS[month-1] if 1 <= month <= 12 else "Jan"
