@@ -414,42 +414,82 @@ class ConfigWebServer:
                 
                 html_parts.append("</table>")
                 
-                # Simplified pin configuration form - very basic
-                html_parts.extend([
-                    "<h2>Configure Pins</h2>",
-                    "<form method='post' action='/api/pins'>"
-                ])
+                # Simplified pin configuration form
+            html_parts.extend([
+                "<h2>Configure Pins</h2>",
+                "<form method='post' action='/api/pins'>"
+            ])
+            
+            # Show current pins in editable form
+            pin_index = 0
+            for pin_key, pin_config in pwm_pins.items():
+                if pin_key.startswith('_'):
+                    continue  # Skip comment entries
                 
-                # Show current pins in editable form
-                pin_index = 0
-                for pin_key, pin_config in pwm_pins.items():
-                    if pin_key.startswith('_'):
-                        continue  # Skip comment entries
-                    
-                    if not isinstance(pin_config, dict):
-                        # Reduce logging to save memory
-                        # log.error(f"[WEB] Invalid pin config for {pin_key}: expected dict, got {type(pin_config)}")
-                        continue
-                    
-                    enabled = pin_config.get('enabled', False)
-                    gpio_pin = pin_config.get('gpio_pin', 0)
-                    pin_name = pin_config.get('name', f'Pin {gpio_pin}')
-                    checked = 'checked' if enabled else ''
-                    
-                    # Very basic form elements
-                    html_parts.extend([
-                        f"<p>",
-                        f"<input type='hidden' name='pin_{pin_index}_number' value='{gpio_pin}'>",
-                        f"GP{gpio_pin} ({pin_name}): <input type='checkbox' name='pin_{pin_index}_enabled' value='1' {checked}> Enabled",
-                        f"</p>"
-                    ])
-                    pin_index += 1
+                if not isinstance(pin_config, dict):
+                    # Reduce logging to save memory
+                    # log.error(f"[WEB] Invalid pin config for {pin_key}: expected dict, got {type(pin_config)}")
+                    continue
                 
-                # Simple submit button
+                enabled = pin_config.get('enabled', False)
+                gpio_pin = pin_config.get('gpio_pin', 0)
+                pin_name = pin_config.get('name', f'Pin {gpio_pin}')
+                checked = 'checked' if enabled else ''
+                
+                # Very simple form elements
                 html_parts.extend([
-                    "<p><input type='submit' value='Save'></p>",
-                    "</form>"
+                    f"<div>",
+                    f"<input type='hidden' name='pin_{pin_index}_number' value='{gpio_pin}'>",
+                    f"GP{gpio_pin} ({pin_name}): <input type='checkbox' name='pin_{pin_index}_enabled' value='1' {checked}> Enabled",
+                    f"</div>"
                 ])
+                pin_index += 1
+            
+            # Add pin button
+            html_parts.extend([
+                "<div id='new_pins'></div>",
+                "<p><button type='button' onclick='addPin()'>Add Pin</button></p>",
+                "<p><input type='submit' value='Save'></p>",
+                "</form>"
+            ])
+            
+            # Simplified JavaScript without complex HTML generation
+            html_parts.extend([
+                "<script>",
+                "function addPin(){",
+                "var container=document.getElementById('new_pins');",
+                "var select=document.createElement('select');",
+                "select.name='pin_new_'+container.children.length+'_number';",
+                "var option=document.createElement('option');",
+                "option.value='';",
+                "option.text='Select Pin...';",
+                "select.appendChild(option);"
+            ])
+            
+            # Add available pins to JavaScript
+            try:
+                pin_options = gpio_utils.get_pin_options_for_dropdown(exclude_current_usage=True)
+                for pin_num, display_name in pin_options:
+                    html_parts.append(f"option=document.createElement('option');option.value='{pin_num}';option.text='GP{pin_num}';select.appendChild(option);")
+            except Exception as e:
+                # Fallback to common PWM pins
+                common_pins = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
+                for pin in common_pins:
+                    html_parts.append(f"option=document.createElement('option');option.value='{pin}';option.text='GP{pin}';select.appendChild(option);")
+            
+            html_parts.extend([
+                "var div=document.createElement('div');",
+                "div.appendChild(select);",
+                "var checkbox=document.createElement('input');",
+                "checkbox.type='checkbox';",
+                "checkbox.name='pin_new_'+container.children.length+'_enabled';",
+                "checkbox.value='1';",
+                "div.appendChild(document.createTextNode(' Enabled'));",
+                "div.appendChild(checkbox);",
+                "container.appendChild(div);",
+                "}",
+                "</script>"
+            ])
                 
                 # Add available pins to JavaScript (excluding currently used pins)
                 try:
