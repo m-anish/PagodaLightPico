@@ -151,16 +151,14 @@ class ConfigWebServer:
     
     def _handle_get(self, path):
         """Handle GET requests using micro-framework routing."""
-        # Simple routing table - easy to extend
+        # Simplified routing table to reduce memory usage
         routes = {
             '/': self._page_status,
             '/config': self._page_config,
             '/system': self._page_system,
-            '/pins': self._page_pins,
-            '/windows': self._page_windows,
             '/api/config': self._api_config_get,
             '/api/status': self._api_status_get,
-            '/api/pins': self._api_pins_get,
+            '/api/download': self._api_download_config,
         }
         
         handler = routes.get(path)
@@ -177,6 +175,10 @@ class ConfigWebServer:
             return self._handle_pins_update(request)
         elif path == "/api/windows":
             return self._handle_windows_update(request)
+        elif path == "/api/notifications":
+            return self._handle_notifications_update(request)
+        elif path == "/api/upload":
+            return self._handle_config_upload(request)
         else:
             return self._create_error_response(404, "Not Found")
     
@@ -235,138 +237,52 @@ class ConfigWebServer:
     # ========== PAGE HANDLERS ==========
     
     def _page_status(self):
-        """Status page - shows current system state."""
+        """Simplified status page to reduce memory usage."""
         try:
+            # Force garbage collection before generating page
+            gc.collect()
+            
             html = "<html><head><title>PagodaLight Status</title>"
-            html += "<style>body{font-family:Arial;margin:15px}h1{color:#333}p{margin:8px 0}"
-            html += "a{color:#007acc;text-decoration:none}.status{background:#f8f9fa;padding:10px;border-radius:5px;margin:10px 0}"
-            html += ".led-on{color:#28a745}.led-off{color:#6c757d}</style></head><body>"
+            html += "<style>body{font-family:Arial;margin:15px}</style></head><body>"
             html += "<h1>PagodaLight Status</h1>"
             
-            # Current time with day and date
+            # Current time - simplified
             try:
                 current_time = rtc_module.get_current_time()
-                # current_time format: (year, month, day, hour, minute, second, weekday, yearday)
-                weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-                months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
-                         'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-                
-                weekday = weekdays[current_time[6]] if current_time[6] < 7 else 'Unknown'
-                month = months[current_time[1] - 1] if 1 <= current_time[1] <= 12 else 'Unknown'
-                day = current_time[2]
                 hour = current_time[3]
                 minute = current_time[4]
-                
-                time_str = f"{weekday}, {month} {day}, {hour:02d}:{minute:02d}"
-                html += f"<p><strong>Time:</strong> {time_str}</p>"
-            except Exception as e:
-                log.debug(f"[WEB] Error formatting time: {e}")
+                html += f"<p><strong>Time:</strong> {hour:02d}:{minute:02d}</p>"
+            except:
                 html += "<p><strong>Time:</strong> Unknown</p>"
             
-            # LED status with visual indicator
+            # Simplified status - just basic info
             try:
-                duty_cycle = system_status.current_duty_cycle
-                status_class = "led-on" if duty_cycle > 0 else "led-off"
-                status_text = "ON" if duty_cycle > 0 else "OFF"
-                html += f"<p><strong>LED:</strong> <span class='{status_class}'>{status_text} ({duty_cycle}%)</span></p>"
+                config_data = config_manager.get_config_dict()
+                pwm_pins = config_data.get('pwm_pins', {})
+                pin_count = len([k for k in pwm_pins.keys() if not k.startswith('_')])
+                html += f"<p><strong>Controllers:</strong> {pin_count} configured</p>"
             except:
-                html += "<p><strong>LED:</strong> Unknown</p>"
+                html += "<p><strong>Controllers:</strong> Unknown</p>"
             
-            # Current window with fallback logic
+            # Memory info
             try:
-                window = system_status.current_window
-                if not window:
-                    # Fallback: determine current window based on time
-                    try:
-                        current_time = rtc_module.get_current_time()
-                        current_hour = current_time[3]
-                        current_minute = current_time[4]
-                        current_time_minutes = current_hour * 60 + current_minute
-                        
-                        # Get sunrise/sunset times
-                        month = current_time[1]
-                        day = current_time[2]
-                        sunrise_h, sunrise_m, sunset_h, sunset_m = sun_times_leh.get_sunrise_sunset(month, day)
-                        sunrise_minutes = sunrise_h * 60 + sunrise_m
-                        sunset_minutes = sunset_h * 60 + sunset_m
-                        
-                        # Check if we're in the day window (sunrise to sunset)
-                        if sunrise_minutes <= current_time_minutes <= sunset_minutes:
-                            window = "day"
-                        else:
-                            # Try to determine from config
-                            config_data = config_manager.get_config_dict()
-                            time_windows = config_data.get('time_windows', {})
-                            window = "unknown"  # fallback
-                            
-                            for window_name, window_config in time_windows.items():
-                                if window_name == 'day' or window_name.startswith('_'):
-                                    continue
-                                
-                                start_time = window_config.get('start', '')
-                                end_time = window_config.get('end', '')
-                                
-                                if start_time and end_time:
-                                    try:
-                                        start_h, start_m = map(int, start_time.split(':'))
-                                        end_h, end_m = map(int, end_time.split(':'))
-                                        start_minutes = start_h * 60 + start_m
-                                        end_minutes = end_h * 60 + end_m
-                                        
-                                        # Handle overnight windows (end < start)
-                                        if end_minutes < start_minutes:
-                                            if current_time_minutes >= start_minutes or current_time_minutes <= end_minutes:
-                                                window = window_name
-                                                break
-                                        else:
-                                            if start_minutes <= current_time_minutes <= end_minutes:
-                                                window = window_name
-                                                break
-                                    except:
-                                        continue
-                    except:
-                        window = "unknown"
-                
-                window_display = window.replace('_', ' ').title() if window and window != "unknown" else "Unknown"
-                html += f"<p><strong>Window:</strong> {window_display}</p>"
-            except:
-                html += "<p><strong>Window:</strong> Unknown</p>"
-            
-            # Window times if available
-            try:
-                if system_status.current_window_start and system_status.current_window_end:
-                    html += f"<p><strong>Times:</strong> {system_status.current_window_start} - {system_status.current_window_end}</p>"
-            except:
-                pass
-            
-            # Memory information
-            try:
-                gc.collect()  # Force garbage collection
+                gc.collect()
                 free_memory = gc.mem_free()
-                allocated_memory = gc.mem_alloc()
-                total_memory = free_memory + allocated_memory
-                memory_usage_percent = (allocated_memory / total_memory) * 100
-                
-                html += f"<p><strong>Memory:</strong> {free_memory} bytes free ({memory_usage_percent:.1f}% used)</p>"
-                log.debug(f"[WEB] Memory: {free_memory} free, {allocated_memory} allocated, {memory_usage_percent:.1f}% used")
-            except Exception as e:
-                log.debug(f"[WEB] Error getting memory info: {e}")
+                html += f"<p><strong>Memory:</strong> {free_memory} bytes free</p>"
+            except:
                 html += "<p><strong>Memory:</strong> Unknown</p>"
             
-            # Navigation links
+            # Simple navigation
             html += "<hr><p><a href='/config'>WiFi Config</a> | "
             html += "<a href='/system'>System Settings</a> | "
-            html += "<a href='/pins'>Add/Remove Controllers</a> | "
-            html += "<a href='/windows'>Manage Controllers</a> | "
-            html += "<a href='/api/status'>JSON Status</a> | "
-            html += "<a href='/api/config'>JSON Config</a></p>"
+            html += "<a href='/api/download'>Download Config</a></p>"
             html += "</body></html>"
             
             return self._create_html_response(html)
             
         except Exception as e:
             log.error(f"[WEB] Error creating status page: {e}")
-            return self._create_html_response("<html><body><h1>PagodaLight</h1><p>Memory Error</p></body></html>")
+            return self._create_html_response("<html><body><h1>PagodaLight</h1><p>Error loading status</p></body></html>")
     
     def _page_config(self):
         """Configuration page - minimal WiFi settings."""
@@ -462,13 +378,15 @@ class ConfigWebServer:
             # Create new row with dropdown for new pins
             html += "newRow.innerHTML='<td><select name=\"pin_'+rowCount+'_number\"><option value=\"\">Select Pin...</option>"
             
-            # Add available pins to the JavaScript template
+            # Add all available pins to the JavaScript template
             try:
-                for pin in available_pins:
-                    html += f"<option value=\"{pin}\">GP{pin}</option>"
+                pin_options = gpio_utils.get_pin_options_for_dropdown(exclude_current_usage=False)
+                for pin_num, display_name in pin_options:
+                    html += f"<option value=\"{pin_num}\">GP{pin_num}</option>"
             except:
-                # Fallback pins if gpio_utils not available
-                for pin in [15, 16, 17, 18, 19]:
+                # Fallback to all PWM-capable pins if gpio_utils not available
+                all_pins = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 25, 26, 27, 28]
+                for pin in all_pins:
                     html += f"<option value=\"{pin}\">GP{pin}</option>"
             
             html += "</select></td><td><input type=\"checkbox\" name=\"pin_'+rowCount+'_enabled\"></td>"
@@ -733,6 +651,124 @@ class ConfigWebServer:
             log.error(f"[WEB] Error creating controller management page: {e}")
             return self._create_html_response("<html><body><h1>Error</h1><p>Could not load controller management.</p></body></html>")
     
+    def _page_notifications(self):
+        """Push notifications configuration page."""
+        try:
+            html = "<html><head><title>PagodaLight Push Notifications</title>"
+            html += "<style>body{font-family:Arial;margin:15px}select,input{width:100%;padding:8px;margin:5px 0;border:1px solid #ccc;border-radius:3px}"
+            html += "button{background:#007acc;color:white;padding:10px 20px;border:none;cursor:pointer;border-radius:3px}"
+            html += "label{font-weight:bold}.note{color:#666;font-size:0.9em}</style></head><body>"
+            html += "<h1>Push Notifications</h1>"
+            html += "<form method='post' action='/api/notifications'>"
+            
+            try:
+                config_data = config_manager.get_config_dict()
+                notifications = config_data.get('notifications', {})
+                
+                enabled = notifications.get('enabled', False)
+                broker = notifications.get('mqtt_broker', 'broker.hivemq.com')
+                port = notifications.get('mqtt_port', 1883)
+                topic = notifications.get('mqtt_topic', 'PagodaLightPico/notifications')
+                client_id = notifications.get('mqtt_client_id', 'PagodaLightPico')
+                notify_window_change = notifications.get('notify_on_window_change', True)
+                notify_errors = notifications.get('notify_on_errors', True)
+                
+                # Enable/Disable notifications
+                checked = 'checked' if enabled else ''
+                html += f"<p><label><input type='checkbox' name='enabled' {checked}> Enable Push Notifications</label></p>"
+                
+                # MQTT Broker settings
+                html += f"<p><label>MQTT Broker:</label><input name='mqtt_broker' value='{broker}' placeholder='broker.hivemq.com'></p>"
+                html += f"<p><label>MQTT Port:</label><input type='number' name='mqtt_port' value='{port}' min='1' max='65535'></p>"
+                html += f"<p><label>MQTT Topic:</label><input name='mqtt_topic' value='{topic}' placeholder='PagodaLightPico/notifications'></p>"
+                html += f"<p><label>Client ID:</label><input name='mqtt_client_id' value='{client_id}' placeholder='PagodaLightPico'></p>"
+                
+                # Notification options
+                html += "<h3>Notification Options</h3>"
+                window_checked = 'checked' if notify_window_change else ''
+                error_checked = 'checked' if notify_errors else ''
+                html += f"<p><label><input type='checkbox' name='notify_on_window_change' {window_checked}> Notify on time window changes</label></p>"
+                html += f"<p><label><input type='checkbox' name='notify_on_errors' {error_checked}> Notify on system errors</label></p>"
+                
+            except Exception as e:
+                log.error(f"[WEB] Error loading notifications config: {e}")
+                # Fallback form
+                html += "<p><label><input type='checkbox' name='enabled'> Enable Push Notifications</label></p>"
+                html += "<p><label>MQTT Broker:</label><input name='mqtt_broker' value='broker.hivemq.com'></p>"
+                html += "<p><label>MQTT Port:</label><input type='number' name='mqtt_port' value='1883'></p>"
+                html += "<p><label>MQTT Topic:</label><input name='mqtt_topic' value='PagodaLightPico/notifications'></p>"
+                html += "<p><label>Client ID:</label><input name='mqtt_client_id' value='PagodaLightPico'></p>"
+            
+            html += "<p><button type='submit'>Save Notification Settings</button></p>"
+            html += "</form>"
+            
+            html += "<div class='note'>"
+            html += "<h3>Setup Instructions</h3>"
+            html += "<p><strong>Popular MQTT Services:</strong></p>"
+            html += "<ul>"
+            html += "<li><strong>HiveMQ:</strong> broker.hivemq.com (port 1883) - Free public broker</li>"
+            html += "<li><strong>Eclipse Mosquitto:</strong> test.mosquitto.org (port 1883) - Test broker</li>"
+            html += "<li><strong>Home Assistant:</strong> Use your HA MQTT broker IP and credentials</li>"
+            html += "</ul>"
+            html += "<p><strong>Mobile Apps:</strong></p>"
+            html += "<ul>"
+            html += "<li><strong>MQTT Dash (Android):</strong> Subscribe to your topic for notifications</li>"
+            html += "<li><strong>MQTTool (iOS):</strong> Monitor MQTT messages on your device</li>"
+            html += "<li><strong>Pushover:</strong> Use MQTT-to-Pushover bridge for push notifications</li>"
+            html += "</ul>"
+            html += "</div>"
+            
+            html += "<hr><p><a href='/'>Back to Status</a></p>"
+            html += "</body></html>"
+            
+            return self._create_html_response(html)
+            
+        except Exception as e:
+            log.error(f"[WEB] Error creating notifications page: {e}")
+            return self._create_html_response("<html><body><h1>Error</h1><p>Could not load notifications settings.</p></body></html>")
+    
+    def _page_upload(self):
+        """Configuration upload page."""
+        try:
+            html = "<html><head><title>PagodaLight Upload Configuration</title>"
+            html += "<style>body{font-family:Arial;margin:15px}input,textarea{width:100%;padding:8px;margin:5px 0;border:1px solid #ccc;border-radius:3px}"
+            html += "button{background:#007acc;color:white;padding:10px 20px;border:none;cursor:pointer;border-radius:3px;margin:5px}"
+            html += ".danger{background:#dc3545}.note{color:#666;font-size:0.9em;background:#f8f9fa;padding:10px;border-radius:5px;margin:10px 0}"
+            html += "textarea{height:300px;font-family:monospace}</style></head><body>"
+            html += "<h1>Upload Configuration</h1>"
+            
+            html += "<div class='note'>"
+            html += "<strong>⚠️ Warning:</strong> Uploading a new configuration will completely replace your current settings. "
+            html += "Make sure to <a href='/api/download'>download your current configuration</a> as a backup first."
+            html += "</div>"
+            
+            html += "<form method='post' action='/api/upload' enctype='multipart/form-data'>"
+            html += "<h3>Method 1: Upload JSON File</h3>"
+            html += "<p><input type='file' name='config_file' accept='.json'></p>"
+            html += "<p><button type='submit' name='upload_type' value='file'>Upload File</button></p>"
+            html += "</form>"
+            
+            html += "<form method='post' action='/api/upload'>"
+            html += "<h3>Method 2: Paste JSON Configuration</h3>"
+            html += "<p><textarea name='config_json' placeholder='Paste your JSON configuration here...'></textarea></p>"
+            html += "<p><button type='submit' name='upload_type' value='text'>Upload Configuration</button></p>"
+            html += "</form>"
+            
+            html += "<div class='note'>"
+            html += "<h3>Configuration Format</h3>"
+            html += "<p>The JSON configuration should include all sections: wifi, timezone, hardware, system, notifications, and pwm_pins. "
+            html += "Invalid configurations will be rejected with an error message.</p>"
+            html += "</div>"
+            
+            html += "<hr><p><a href='/'>Back to Status</a> | <a href='/api/download'>Download Current Config</a></p>"
+            html += "</body></html>"
+            
+            return self._create_html_response(html)
+            
+        except Exception as e:
+            log.error(f"[WEB] Error creating upload page: {e}")
+            return self._create_html_response("<html><body><h1>Error</h1><p>Could not load upload page.</p></body></html>")
+    
     # ========== API HANDLERS ==========
     
     def _api_status_get(self):
@@ -762,6 +798,88 @@ class ConfigWebServer:
         except Exception as e:
             log.error(f"[WEB] Error getting pins config: {e}")
             return self._create_json_response({"error": str(e)}, 500)
+    
+    def _api_download_config(self):
+        """API endpoint to download configuration as JSON file."""
+        try:
+            config_data = config_manager.get_config_dict()
+            json_data = json.dumps(config_data, indent=2)
+            
+            # Create HTTP response with file download headers
+            response = "HTTP/1.1 200 OK\r\n"
+            response += "Content-Type: application/json\r\n"
+            response += "Content-Disposition: attachment; filename=\"pagoda_config.json\"\r\n"
+            response += f"Content-Length: {len(json_data)}\r\n"
+            response += "Connection: close\r\n"
+            response += "\r\n"
+            response += json_data
+            
+            return response
+            
+        except Exception as e:
+            log.error(f"[WEB] Error downloading config: {e}")
+            return self._create_json_response({"error": str(e)}, 500)
+    
+    def _handle_notifications_update(self, request):
+        """Handle notifications configuration update via POST."""
+        try:
+            # Extract body from POST request
+            body_start = request.find('\r\n\r\n')
+            if body_start == -1:
+                body_start = request.find('\n\n')
+            
+            if body_start == -1:
+                return self._create_error_response(400, "No request body")
+            
+            body = request[body_start + 4:].strip()
+            if not body:
+                return self._create_error_response(400, "Empty request body")
+            
+            # Parse form data
+            update_data = self._parse_notifications_form_data(body)
+            
+            # Update configuration
+            if config_manager.update_config(update_data):
+                log.info("[WEB] Notifications configuration updated successfully")
+                return self._create_redirect_response('/notifications')
+            else:
+                return self._create_error_response(500, "Failed to save notifications configuration")
+                
+        except Exception as e:
+            log.error(f"[WEB] Error updating notifications configuration: {e}")
+            return self._create_error_response(500, str(e))
+    
+    def _handle_config_upload(self, request):
+        """Handle configuration file upload via POST."""
+        try:
+            # Extract body from POST request
+            body_start = request.find('\r\n\r\n')
+            if body_start == -1:
+                body_start = request.find('\n\n')
+            
+            if body_start == -1:
+                return self._create_error_response(400, "No request body")
+            
+            body = request[body_start + 4:].strip()
+            if not body:
+                return self._create_error_response(400, "Empty request body")
+            
+            # Parse upload data
+            config_data = self._parse_upload_form_data(body)
+            
+            if not config_data:
+                return self._create_error_response(400, "No valid configuration data found")
+            
+            # Validate and update configuration
+            if config_manager.update_config(config_data):
+                log.info("[WEB] Configuration uploaded and updated successfully")
+                return self._create_redirect_response('/')
+            else:
+                return self._create_error_response(500, "Failed to save uploaded configuration")
+                
+        except Exception as e:
+            log.error(f"[WEB] Error uploading configuration: {e}")
+            return self._create_error_response(500, str(e))
     
     def _handle_pins_update(self, request):
         """Handle pin configuration update via POST."""
@@ -1156,6 +1274,123 @@ class ConfigWebServer:
         except Exception as e:
             log.error(f"[WEB] Error parsing pins form data: {e}")
             return {}
+
+
+    def _parse_notifications_form_data(self, body):
+        """Parse URL-encoded form data for notifications configuration."""
+        try:
+            # Parse URL-encoded data (key=value&key2=value2)
+            pairs = body.split('&')
+            form_data = {}
+            
+            for pair in pairs:
+                if '=' in pair:
+                    key, value = pair.split('=', 1)
+                    # URL decode the key and value
+                    key = key.replace('+', ' ').replace('%20', ' ')
+                    value = value.replace('+', ' ').replace('%20', ' ')
+                    form_data[key] = value
+            
+            # Build notifications configuration from form data
+            config_update = {'notifications': {}}
+            
+            # Handle enabled checkbox
+            config_update['notifications']['enabled'] = 'enabled' in form_data
+            
+            # Handle MQTT settings
+            if 'mqtt_broker' in form_data:
+                config_update['notifications']['mqtt_broker'] = form_data['mqtt_broker']
+            if 'mqtt_port' in form_data:
+                try:
+                    config_update['notifications']['mqtt_port'] = int(form_data['mqtt_port'])
+                except ValueError:
+                    config_update['notifications']['mqtt_port'] = 1883
+            if 'mqtt_topic' in form_data:
+                config_update['notifications']['mqtt_topic'] = form_data['mqtt_topic']
+            if 'mqtt_client_id' in form_data:
+                config_update['notifications']['mqtt_client_id'] = form_data['mqtt_client_id']
+            
+            # Handle notification options
+            config_update['notifications']['notify_on_window_change'] = 'notify_on_window_change' in form_data
+            config_update['notifications']['notify_on_errors'] = 'notify_on_errors' in form_data
+            
+            log.debug(f"[WEB] Parsed notifications form data: {config_update}")
+            return config_update
+            
+        except Exception as e:
+            log.error(f"[WEB] Error parsing notifications form data: {e}")
+            return {}
+    
+    def _parse_upload_form_data(self, body):
+        """Parse form data for configuration upload (both file and text)."""
+        try:
+            # Check if this is multipart form data (file upload)
+            if 'Content-Disposition:' in body:
+                # Handle multipart form data for file upload
+                return self._parse_multipart_upload(body)
+            else:
+                # Handle regular form data for text upload
+                pairs = body.split('&')
+                form_data = {}
+                
+                for pair in pairs:
+                    if '=' in pair:
+                        key, value = pair.split('=', 1)
+                        # URL decode the key and value
+                        key = key.replace('+', ' ').replace('%20', ' ')
+                        value = value.replace('+', ' ').replace('%20', ' ')
+                        form_data[key] = value
+                
+                # Get JSON configuration from text area
+                if 'config_json' in form_data and form_data['config_json'].strip():
+                    try:
+                        config_data = json.loads(form_data['config_json'])
+                        log.debug("[WEB] Parsed JSON configuration from text upload")
+                        return config_data
+                    except json.JSONDecodeError as e:
+                        log.error(f"[WEB] Invalid JSON in text upload: {e}")
+                        return None
+                
+                return None
+                
+        except Exception as e:
+            log.error(f"[WEB] Error parsing upload form data: {e}")
+            return None
+    
+    def _parse_multipart_upload(self, body):
+        """Parse multipart form data for file upload."""
+        try:
+            # Simple multipart parser for file uploads
+            # Look for JSON content between boundaries
+            lines = body.split('\n')
+            json_content = ""
+            in_json = False
+            
+            for line in lines:
+                line = line.strip()
+                if line.startswith('Content-Type: application/json') or line.endswith('.json'):
+                    in_json = True
+                    continue
+                elif line.startswith('--') and in_json:
+                    # End of this part
+                    break
+                elif in_json and line and not line.startswith('Content-'):
+                    json_content += line
+            
+            if json_content:
+                try:
+                    config_data = json.loads(json_content)
+                    log.debug("[WEB] Parsed JSON configuration from file upload")
+                    return config_data
+                except json.JSONDecodeError as e:
+                    log.error(f"[WEB] Invalid JSON in file upload: {e}")
+                    return None
+            
+            return None
+            
+        except Exception as e:
+            log.error(f"[WEB] Error parsing multipart upload: {e}")
+            return None
 
 
 # Global web server instance
