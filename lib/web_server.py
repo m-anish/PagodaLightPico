@@ -159,7 +159,8 @@ class ConfigWebServer:
             '/config': self._page_config,
             '/system': self._page_system,
             '/pins': self._page_pins,
-            '/windows': self._page_windows,
+            # Temporarily disable windows page to reduce memory usage
+            '/windows': self._page_windows_disabled,
             '/notifications': self._page_notifications,
             '/upload': self._page_upload,
             '/api/config': self._api_config_get,
@@ -281,11 +282,10 @@ class ConfigWebServer:
             except:
                 html_parts.append("<p><strong>Memory:</strong> Unknown</p>")
             
-            # Simplified navigation - removed System Settings to reduce memory usage
+            # Simplified navigation - removed System Settings and Windows to reduce memory usage
             html_parts.extend([
                 "<hr><p><a href='/config'>WiFi Config</a> | ",
                 "<a href='/pins'>Add/Remove Controllers</a> | ",
-                "<a href='/windows'>Manage Controllers</a> | ",
                 "<a href='/api/download'>Download Config</a></p>",
                 "</body></html>"
             ])
@@ -524,6 +524,10 @@ class ConfigWebServer:
             log.error(f"[WEB] Error creating pins page: {e}")
             return self._create_html_response("<html><body><h1>Error</h1><p>Could not load pin settings.</p></body></html>")
     
+    def _page_windows_disabled(self):
+        """Temporarily disabled windows page - redirect to pins page."""
+        return self._create_redirect_response('/pins')
+    
     def _page_windows(self):
         """Controller management page - per-controller time window configuration."""
         try:
@@ -638,10 +642,20 @@ class ConfigWebServer:
                 log.error(f"[WEB] Error loading controller config: {e}")
                 html_parts.append("<p>Error loading controller configuration.</p>")
             
-            html_parts.extend([
-                "<hr><p><a href='/'>Home</a> | <a href='/pins'>Pins</a></p>",
-                "</body></html>"
-            ])
+            # Add memory debugging information
+            try:
+                gc.collect()
+                free_memory = gc.mem_free()
+                html_parts.extend([
+                    f"<p><strong>Memory:</strong> {free_memory} bytes free</p>",
+                    "<hr><p><a href='/'>Home</a></p>",
+                    "</body></html>"
+                ])
+            except:
+                html_parts.extend([
+                    "<hr><p><a href='/'>Home</a></p>",
+                    "</body></html>"
+                ])
             
             # Join all parts at once to minimize memory fragmentation
             html = "".join(html_parts)
