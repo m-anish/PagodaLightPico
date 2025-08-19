@@ -7,7 +7,20 @@ network with a friendly hostname like 'lighthouse.local' or 'pagoda.local'.
 Also advertises HTTP service for the web configuration interface.
 """
 
-import mdns
+try:
+    import mdns
+    MDNS_AVAILABLE = True
+except ImportError:
+    MDNS_AVAILABLE = False
+    # Create a dummy mdns module for graceful fallback
+    class DummyMDNS:
+        class Server:
+            def __init__(self, ip): pass
+            def start(self, hostname, description): pass
+            def stop(self): pass
+            def advertise_service(self, **kwargs): pass
+    mdns = DummyMDNS()
+
 from simple_logger import Logger
 import network
 from lib.config_manager import config_manager
@@ -46,6 +59,12 @@ class MDNSService:
             bool: True if started successfully, False otherwise
         """
         try:
+            # Check if mDNS module is available
+            if not MDNS_AVAILABLE:
+                log.warn("mDNS module not available - device will only be accessible via IP address")
+                log.info("To enable mDNS discovery, install the mdns module for MicroPython")
+                return False
+            
             # Check if WiFi is connected
             wlan = network.WLAN(network.STA_IF)
             if not wlan.isconnected():

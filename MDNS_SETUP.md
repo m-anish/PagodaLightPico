@@ -2,6 +2,8 @@
 
 Your PagodaLight device now supports mDNS (Multicast DNS) for easy discovery on your local network! This means you can access your device using a friendly hostname instead of remembering IP addresses.
 
+> **⚠️ Note**: mDNS requires additional modules that may not be included by default. If you see "ImportError: no module named 'mdns'", please see [INSTALL_MDNS.md](INSTALL_MDNS.md) for installation instructions. The system works perfectly without mDNS - you'll just need to use IP addresses instead of friendly hostnames.
+
 ## 🎯 Quick Access
 
 Once your device is connected to WiFi, you can access it at:
