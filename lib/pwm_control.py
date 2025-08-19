@@ -90,6 +90,11 @@ class MultiPWMManager:
             gpio_pin = pin_config.get('gpio_pin')
             pin_name = pin_config.get('name', f'Pin {gpio_pin}')
             
+            # Validate gpio_pin
+            if gpio_pin is None:
+                log.error(f"[PWM_MGR] No gpio_pin specified for {pin_key}")
+                continue
+                
             try:
                 controller = PWMController(
                     freq=self.pwm_frequency,

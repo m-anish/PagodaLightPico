@@ -445,7 +445,7 @@ class ConfigWebServer:
     def _page_pins(self):
         """Pin configuration page for managing PWM pins."""
         try:
-            from lib.gpio_utils import get_available_gpio_pins, get_used_pins
+            from lib.gpio_utils import gpio_utils
             
             html = "<html><head><title>PagodaLight Pin Configuration</title>"
             html += "<style>body{font-family:Arial;margin:15px}table{border-collapse:collapse;width:100%}"
@@ -469,19 +469,23 @@ class ConfigWebServer:
             try:
                 config_data = config_manager.get_config_dict()
                 pwm_pins = config_data.get('pwm_pins', {})
-                available_pins = get_available_gpio_pins()
-                used_pins = get_used_pins()
+                available_pins = gpio_utils.get_available_pins()
+                used_pins = set()  # We'll track used pins manually
                 
                 # Show current pin configuration
                 html += "<h3>Current PWM Pins</h3>"
                 html += "<table id='currentPins'><tr><th>Pin Number</th><th>Enabled</th><th>Time Windows</th></tr>"
                 
-                for pin_num, pin_config in pwm_pins.items():
+                for pin_key, pin_config in pwm_pins.items():
+                    if pin_key.startswith('_'):
+                        continue  # Skip comment entries
                     enabled = pin_config.get('enabled', False)
+                    gpio_pin = pin_config.get('gpio_pin', 'Unknown')
+                    pin_name = pin_config.get('name', f'Pin {gpio_pin}')
                     status = 'Yes' if enabled else 'No'
                     time_windows = list(pin_config.get('time_windows', {}).keys())
                     windows_str = ', '.join(time_windows) if time_windows else 'None'
-                    html += f"<tr><td>GP{pin_num}</td><td>{status}</td><td>{windows_str}</td></tr>"
+                    html += f"<tr><td>GP{gpio_pin} ({pin_name})</td><td>{status}</td><td>{windows_str}</td></tr>"
                 
                 html += "</table>"
                 
@@ -833,46 +837,6 @@ class ConfigWebServer:
             # Default to form response on error
             return self._create_error_response(500, str(e))
     
-    # ========== LEGACY METHODS (for compatibility) ==========
-    
-    def _create_config_page(self):
-        """Create minimal status-only page for severe memory constraints."""
-        try:
-            # Create absolute minimal HTML - no configuration form
-            html = "<html><body><h1>PagodaLight Status</h1>"
-            
-            # Get basic status without complex operations
-            try:
-                # Get current time safely
-                current_time = rtc_module.get_current_time()
-                html += f"<p>Time: {current_time[3]:02d}:{current_time[4]:02d}</p>"
-            except:
-                html += "<p>Time: Unknown</p>"
-            
-            # Get LED status safely
-            try:
-                duty_cycle = system_status.current_duty_cycle
-                html += f"<p>LED: {duty_cycle}%</p>"
-            except:
-                html += "<p>LED: Unknown</p>"
-            
-            # Get current window safely
-            try:
-                window = system_status.current_window or "None"
-                html += f"<p>Window: {window}</p>"
-            except:
-                html += "<p>Window: Unknown</p>"
-            
-            html += "<p><a href='/api/status'>JSON Status</a></p>"
-            html += "<p><a href='/config'>Try Config</a></p>"
-            html += "</body></html>"
-            
-            return self._create_html_response(html)
-            
-        except Exception as e:
-            log.error(f"[WEB] Error creating status page: {e}")
-            # Return absolute minimal error page
-            return self._create_html_response("<html><body><h1>PagodaLight</h1><p>Memory Error</p></body></html>")
     
     def _parse_windows_form_data(self, body):
         """Parse URL-encoded form data for per-controller time window configuration."""
@@ -1176,25 +1140,28 @@ class ConfigWebServer:
             for pin_index in pin_numbers:
                 pin_number = pin_numbers[pin_index]
                 enabled = pin_enabled.get(pin_index, False)
+                pin_key = f"pin_{pin_number}"  # Use pin_XX format
                 
                 # Get existing time windows for this pin if it exists
                 try:
                     current_config = config_manager.get_config_dict()
-                    existing_pin_config = current_config.get('pwm_pins', {}).get(str(pin_number), {})
+                    existing_pin_config = current_config.get('pwm_pins', {}).get(pin_key, {})
                     time_windows = existing_pin_config.get('time_windows', {
-                        'day': {'brightness': 80},
-                        'evening': {'start': '19:00', 'end': '23:00', 'brightness': 30},
-                        'night': {'start': '23:00', 'end': '06:00', 'brightness': 10}
+                        'day': {'duty_cycle': 0},
+                        'evening': {'start': '19:00', 'end': '23:00', 'duty_cycle': 30},
+                        'night': {'start': '23:00', 'end': '06:00', 'duty_cycle': 10}
                     })
                 except:
                     # Default time windows if config can't be loaded
                     time_windows = {
-                        'day': {'brightness': 80},
-                        'evening': {'start': '19:00', 'end': '23:00', 'brightness': 30},
-                        'night': {'start': '23:00', 'end': '06:00', 'brightness': 10}
+                        'day': {'duty_cycle': 0},
+                        'evening': {'start': '19:00', 'end': '23:00', 'duty_cycle': 30},
+                        'night': {'start': '23:00', 'end': '06:00', 'duty_cycle': 10}
                     }
                 
-                pin_config['pwm_pins'][str(pin_number)] = {
+                pin_config['pwm_pins'][pin_key] = {
+                    'name': f'Pin {pin_number}',
+                    'gpio_pin': pin_number,
                     'enabled': enabled,
                     'time_windows': time_windows
                 }
