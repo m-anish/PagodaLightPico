@@ -9,12 +9,18 @@ and dynamically calculated sunrise and sunset times from sun_times_leh module.
 The "day" time window start and end times are set dynamically each check
 based on the current date's sunrise and sunset times.
 
-Other time windows are configured statically in config.py.
+Configuration is now managed via JSON files (config.json) with runtime updates
+supported through a web interface accessible when WiFi is connected.
 
 The script reads real-time clock (RTC) time using rtc_module and sets PWM
 on an assigned GPIO pin accordingly.
 
 Logging is done via simple_logger with timestamps and levels.
+
+Web Interface:
+- When WiFi is connected, access http://[pico-ip]/ for configuration management
+- All settings can be updated in real-time without restarting the system
+- Changes are validated and applied immediately
 """
 
 from lib import config_manager as config
@@ -24,6 +30,7 @@ from simple_logger import Logger
 from wifi_connect import connect_wifi, sync_time_ntp
 import time
 from lib.pwm_control import PWMController
+from lib.web_server import web_server
 
 log = Logger()
 
@@ -32,10 +39,17 @@ led_pwm = PWMController(freq=config.PWM_FREQUENCY, pin=config.LED_PWM_PIN)
 
 log.info("Starting system")
 
-if connect_wifi():
+wifi_connected = connect_wifi()
+if wifi_connected:
     log.info("WiFi connected successfully")
     if not sync_time_ntp():
         log.warn("Using RTC time due to NTP sync failure")
+    
+    # Start web server for configuration management
+    if web_server.start():
+        log.info("Web configuration server started - access via http://[pico-ip]/")
+    else:
+        log.error("Failed to start web configuration server")
 else:
     log.warn("Using RTC time due to WiFi connection failure")
 
@@ -155,15 +169,48 @@ def update_led():
 
 def main_loop():
     """
-    Main loop that repeatedly updates the LED PWM every configured interval.
+    Main loop that repeatedly updates the LED PWM and handles web requests.
+    
+    The loop now integrates web server request handling with LED updates,
+    and supports runtime configuration reloading when updates are received
+    via the web interface.
     """
+    last_led_update = 0
+    web_request_interval = 0.1  # Handle web requests every 100ms
+    
     while True:
         try:
-            update_led()
+            current_time = time.time()
+            
+            # Handle web requests frequently (non-blocking)
+            if web_server.running:
+                web_server.handle_requests(timeout=web_request_interval)
+            
+            # Update LED based on configured interval
+            if current_time - last_led_update >= config.UPDATE_INTERVAL:
+                # Check if configuration was updated via web interface
+                if config.config_manager.config != config.config_manager.get_config_dict():
+                    log.info("Configuration change detected, reloading...")
+                    config.config_manager.reload()
+                    # Re-initialize PWM controller if pin or frequency changed
+                    global led_pwm
+                    led_pwm.deinit()
+                    led_pwm = PWMController(freq=config.PWM_FREQUENCY, pin=config.LED_PWM_PIN)
+                
+                update_led()
+                last_led_update = current_time
+            else:
+                # Short sleep to prevent excessive CPU usage
+                time.sleep(web_request_interval)
+                
+        except KeyboardInterrupt:
+            log.info("Shutdown requested")
+            if web_server.running:
+                web_server.stop()
+            break
         except Exception as e:
             log.error(f"Error in main loop: {e}")
-        finally:
-            time.sleep(config.UPDATE_INTERVAL)
+            time.sleep(1)  # Brief pause on error
 
 
 if __name__ == "__main__":
