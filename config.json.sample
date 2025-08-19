@@ -1,6 +1,4 @@
 {
-  "_comment": "Configuration for PagodaLightPico - JSON format for runtime updates",
-  "_instruction": "Copy this file to config.json and update with your actual settings",
   "wifi": {
     "ssid": "your_wifi_ssid_here",
     "password": "your_wifi_password_here"
@@ -8,19 +6,16 @@
   "hostname": "PagodaLightPico",
   "timezone": {
     "name": "IST",
-    "offset": 5.5,
-    "_comment": "Common timezones: IST=5.5, EST=-5, PST=-8, UTC=0"
+    "offset": 5.5
   },
   "hardware": {
     "rtc_i2c_sda_pin": 20,
     "rtc_i2c_scl_pin": 21,
-    "pwm_frequency": 1000,
-    "_comment": "Pico W GPIO pins: 0-28, PWM frequency: 1-40000000 Hz"
+    "pwm_frequency": 1000
   },
   "system": {
     "log_level": "INFO",
-    "update_interval": 60,
-    "_comment": "Log levels: FATAL, ERROR, WARN, INFO, DEBUG. Update interval in seconds."
+    "update_interval": 60
   },
   "notifications": {
     "enabled": false,
@@ -29,8 +24,7 @@
     "mqtt_topic": "PagodaLightPico/notifications",
     "mqtt_client_id": "PagodaLightPico",
     "notify_on_window_change": true,
-    "notify_on_errors": true,
-    "_comment": "Set enabled=true and configure MQTT broker for push notifications"
+    "notify_on_errors": true
   },
   "pwm_pins": {
     "pin_16": {
@@ -41,20 +35,17 @@
         "day": {
           "start": "06:00",
           "end": "18:00",
-          "duty_cycle": 0,
-          "_comment": "Day window start/end times are replaced dynamically with sunrise/sunset"
+          "duty_cycle": 0
         },
         "evening": {
           "start": "18:00",
           "end": "22:00",
-          "duty_cycle": 60,
-          "_comment": "Evening meditation period with 60% brightness"
+          "duty_cycle": 60
         },
         "night": {
           "start": "22:00",
           "end": "06:00",
-          "duty_cycle": 20,
-          "_comment": "Night period with minimal lighting (crosses midnight)"
+          "duty_cycle": 20
         }
       }
     },
@@ -71,10 +62,7 @@
           "end": "06:00",
           "duty_cycle": 30
         }
-      },
-      "_comment": "Example of a second pin configuration - set enabled=true to activate"
-    },
-    "_format_comment": "Pin configurations: pin_<gpio_number> with name, gpio_pin, enabled, and time_windows",
-    "_limits_comment": "Maximum 5 pins, minimum 1 pin. Each pin can have 2-5 time windows including mandatory 'day' window"
+      }
+    }
   }
 }
