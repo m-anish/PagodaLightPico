@@ -436,20 +436,20 @@ class ConfigWebServer:
                     pin_name = pin_config.get('name', f'Pin {gpio_pin}')
                     checked = 'checked' if enabled else ''
                     
-                    # Simplified form elements
+                    # Simplified form elements with proper structure
                     html_parts.extend([
-                        f"<p>GP{gpio_pin} ({pin_name}): ",
+                        f"<div>",
                         f"<input type='hidden' name='pin_{pin_index}_number' value='{gpio_pin}'>",
-                        f"<label><input type='checkbox' name='pin_{pin_index}_enabled' {checked}> Enabled</label> ",
-                        f"<button type='button' class='remove-btn' onclick='this.parentElement.remove()'>Remove</button></p>"
+                        f"<label>GP{gpio_pin} ({pin_name}): <input type='checkbox' name='pin_{pin_index}_enabled' value='1' {checked}> Enabled</label>",
+                        f"</div>"
                     ])
                     pin_index += 1
                 
                 # Add pin button
                 html_parts.extend([
-                    "<p><button type='button' onclick='addPin()'>Add Pin</button></p>",
                     "<div id='new_pins'></div>",
-                    "<p><button type='submit'>Save</button></p>",
+                    "<p><button type='button' onclick='addPin()'>Add Pin</button></p>",
+                    "<p><input type='submit' value='Save'></p>",
                     "</form>",
                     "<script>",
                     "function addPin(){",
