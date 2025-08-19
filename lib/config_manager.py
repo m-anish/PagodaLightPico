@@ -79,8 +79,14 @@ class ConfigManager:
             bool: True if successful, False otherwise
         """
         try:
+            # Debug: Log the updates being applied
+            log.info(f"[CONFIG] Applying updates: {updates}")
+            
             # Deep merge the updates into current config
             self._deep_merge(self.config, updates)
+            
+            # Debug: Log the updated config
+            log.info(f"[CONFIG] Updated config PWM pins: {self.config.get('pwm_pins', {})}")
             
             # Validate the updated configuration
             self._validate_config()
@@ -97,10 +103,13 @@ class ConfigManager:
     
     def _deep_merge(self, base_dict, update_dict):
         """Deep merge update_dict into base_dict."""
+        log.info(f"[CONFIG] Deep merging: base={base_dict}, update={update_dict}")
         for key, value in update_dict.items():
             if key in base_dict and isinstance(base_dict[key], dict) and isinstance(value, dict):
+                log.info(f"[CONFIG] Recursively merging key {key}")
                 self._deep_merge(base_dict[key], value)
             else:
+                log.info(f"[CONFIG] Setting key {key} to {value}")
                 base_dict[key] = value
     
     def _setup_attributes(self):

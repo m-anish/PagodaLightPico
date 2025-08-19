@@ -919,6 +919,13 @@ class ConfigWebServer:
                 # Parse URL-encoded form data for pins
                 update_data = self._parse_pins_form_data(body)
             
+            # Debug: Log the update data
+            log.info(f"[WEB] Pin update data: {update_data}")
+            
+            # Get current config for comparison
+            current_config = config_manager.get_config_dict()
+            log.info(f"[WEB] Current PWM pins config: {current_config.get('pwm_pins', {})}")
+            
             # Update pin configuration
             if config_manager.update_config(update_data):
                 log.info("[WEB] Pin configuration updated successfully")
@@ -928,6 +935,7 @@ class ConfigWebServer:
                 else:
                     return self._create_json_response({"status": "success", "message": "Pin configuration updated"})
             else:
+                log.error("[WEB] Failed to save pin configuration")
                 if "application/json" not in content_type:
                     return self._create_error_response(500, "Failed to save pin configuration")
                 else:
@@ -1223,6 +1231,9 @@ class ConfigWebServer:
                     value = value.replace('+', ' ').replace('%20', ' ')
                     form_data[key] = value
             
+            # Debug: Log the raw form data
+            log.info(f"[WEB] Raw form data: {form_data}")
+            
             # Build pin configuration from form data
             pin_config = {'pwm_pins': {}}
             
@@ -1247,6 +1258,10 @@ class ConfigWebServer:
                     except IndexError:
                         continue
             
+            # Debug: Log parsed pin data
+            log.info(f"[WEB] Parsed pin numbers: {pin_numbers}")
+            log.info(f"[WEB] Parsed pin enabled: {pin_enabled}")
+            
             # Combine pin numbers with enabled status
             for pin_index in pin_numbers:
                 pin_number = pin_numbers[pin_index]
@@ -1265,7 +1280,8 @@ class ConfigWebServer:
                         'evening': {'start': '19:00', 'end': '23:00', 'duty_cycle': 30},
                         'night': {'start': '23:00', 'end': '06:00', 'duty_cycle': 10}
                     })
-                except:
+                except Exception as e:
+                    log.error(f"[WEB] Error getting existing pin config: {e}")
                     # Default configuration if we can't get existing
                     pin_name = f'Pin {pin_number}'
                     time_windows = {
@@ -1281,7 +1297,7 @@ class ConfigWebServer:
                     'time_windows': time_windows
                 }
             
-            log.debug(f"[WEB] Parsed pin form data: {pin_config}")
+            log.info(f"[WEB] Parsed pin form data: {pin_config}")
             return pin_config
             
         except Exception as e:
