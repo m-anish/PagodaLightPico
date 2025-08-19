@@ -180,7 +180,7 @@ All notifications are published as JSON:
 ## Troubleshooting
 
 ### No Notifications Received
-1. Check `config.json` - ensure `enabled: true`
+1. Check `config.json` - ensure `"enabled": true` in notifications section
 2. Check MQTT broker connectivity
 3. Verify topic subscription in bridge script
 4. Check PagodaLight logs for MQTT connection status

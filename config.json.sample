@@ -1,22 +1,26 @@
 {
   "_comment": "Configuration for PagodaLightPico - JSON format for runtime updates",
+  "_instruction": "Copy this file to config.json and update with your actual settings",
   "wifi": {
-    "ssid": "iPhone",
-    "password": "this is some key"
+    "ssid": "your_wifi_ssid_here",
+    "password": "your_wifi_password_here"
   },
   "timezone": {
     "name": "IST",
-    "offset": 5.5
+    "offset": 5.5,
+    "_comment": "Common timezones: IST=5.5, EST=-5, PST=-8, UTC=0"
   },
   "hardware": {
     "rtc_i2c_sda_pin": 20,
     "rtc_i2c_scl_pin": 21,
     "led_pwm_pin": 16,
-    "pwm_frequency": 1000
+    "pwm_frequency": 1000,
+    "_comment": "Pico W GPIO pins: 0-28, PWM frequency: 1-40000000 Hz"
   },
   "system": {
-    "log_level": "DEBUG",
-    "update_interval": 60
+    "log_level": "INFO",
+    "update_interval": 60,
+    "_comment": "Log levels: FATAL, ERROR, WARN, INFO, DEBUG. Update interval in seconds."
   },
   "notifications": {
     "enabled": false,
@@ -25,7 +29,8 @@
     "mqtt_topic": "pagoda_light/notifications",
     "mqtt_client_id": "pagoda_light_pico",
     "notify_on_window_change": true,
-    "notify_on_errors": true
+    "notify_on_errors": true,
+    "_comment": "Set enabled=true and configure MQTT broker for push notifications"
   },
   "time_windows": {
     "day": {
@@ -37,27 +42,32 @@
     "window_1": {
       "start": "18:00",
       "end": "20:00",
-      "duty_cycle": 60
+      "duty_cycle": 60,
+      "_comment": "Evening meditation period with 60% brightness"
     },
     "window_2": {
       "start": "20:00",
       "end": "22:00",
-      "duty_cycle": 40
+      "duty_cycle": 40,
+      "_comment": "Late evening with reduced brightness"
     },
     "window_3": {
       "start": "22:00",
       "end": "00:00",
-      "duty_cycle": 20
+      "duty_cycle": 20,
+      "_comment": "Night period with minimal lighting"
     },
     "window_4": {
       "start": "00:00",
       "end": "04:00",
-      "duty_cycle": 10
+      "duty_cycle": 10,
+      "_comment": "Deep night with very low lighting"
     },
     "window_5": {
       "start": "04:00",
       "end": "06:00",
-      "duty_cycle": 30
+      "duty_cycle": 30,
+      "_comment": "Pre-dawn meditation period"
     }
   }
 }

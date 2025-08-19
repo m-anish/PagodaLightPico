@@ -17,8 +17,9 @@ __pycache__/
 # Files created by rshell or ampy
 .pyboard/
 
-# Local config files
+# Local config files with sensitive data
 config.py
+config.json
 
 # Log files
 *.log

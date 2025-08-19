@@ -24,8 +24,8 @@ A MicroPython-based LED lighting controller for the Dhamma Laddha Vipassana medi
 ## Installation
 
 1. Clone this repository to your local machine.
-2. Copy the contents to your Raspberry Pi Pico W.
-3. **Update `config.json`** with your WiFi credentials, timezone offset/name, I2C pins, and other settings.
+2. **Copy `config.json.sample` to `config.json`** and update it with your WiFi credentials, timezone offset/name, I2C pins, and other settings.
+3. Copy all files to your Raspberry Pi Pico W.
 4. Connect and configure hardware as described.
 5. Boot the Pico W; the system will connect to WiFi, sync time, and start LED control.
 
