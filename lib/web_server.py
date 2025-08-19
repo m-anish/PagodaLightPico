@@ -233,6 +233,7 @@ class ConfigWebServer:
                     <div class="status-value">
                         <span id="wifiStatus" class="connection-status">WiFi</span>
                         <span id="mqttStatus" class="connection-status">MQTT</span>
+                        <span id="mdnsStatus" class="connection-status">mDNS</span>
                     </div>
                 </div>
             </div>
@@ -448,6 +449,10 @@ class ConfigWebServer:
                 const mqttStatus = document.getElementById('mqttStatus');
                 mqttStatus.className = 'connection-status ' + (data.connections.mqtt ? 'connected' : 'disconnected');
                 mqttStatus.textContent = 'MQTT ' + (data.connections.mqtt ? '✓' : '✗');
+                
+                const mdnsStatus = document.getElementById('mdnsStatus');
+                mdnsStatus.className = 'connection-status ' + (data.connections.mdns ? 'connected' : 'disconnected');
+                mdnsStatus.textContent = 'mDNS ' + (data.connections.mdns ? '✓' : '✗');
             })
             .catch(error => {
                 console.error('Error fetching status:', error);

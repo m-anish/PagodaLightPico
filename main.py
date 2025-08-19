@@ -18,7 +18,8 @@ on an assigned GPIO pin accordingly.
 Logging is done via simple_logger with timestamps and levels.
 
 Web Interface:
-- When WiFi is connected, access http://[pico-ip]/ for configuration management
+- When WiFi is connected, access http://lighthouse.local/ or http://[pico-ip]/ for configuration management
+- Device discoverable via mDNS/Bonjour as 'lighthouse.local' (customizable in mdns_service.py)
 - All settings can be updated in real-time without restarting the system
 - Changes are validated and applied immediately
 """
@@ -33,6 +34,7 @@ from lib.pwm_control import PWMController
 from lib.web_server import web_server
 from lib.mqtt_notifier import mqtt_notifier
 from lib.system_status import system_status
+from lib.mdns_service import mdns_service
 
 log = Logger()
 
@@ -53,9 +55,17 @@ if wifi_connected:
     if web_server.start():
         log.info("Web configuration server started - access via http://[pico-ip]/")
         system_status.set_connection_status(web_server=True)
+        
+        # Start mDNS service for friendly hostname discovery
+        if mdns_service.start(web_server_port=80):
+            log.info(f"mDNS service enabled - access via {mdns_service.get_hostname_url()}")
+            system_status.set_connection_status(mdns=True)
+        else:
+            log.warn("mDNS service could not be started")
+            system_status.set_connection_status(mdns=False)
     else:
         log.error("Failed to start web configuration server")
-        system_status.set_connection_status(web_server=False)
+        system_status.set_connection_status(web_server=False, mdns=False)
     
     # Start MQTT notifications if enabled
     if mqtt_notifier.connect():
@@ -258,6 +268,8 @@ def main_loop():
             log.info("Shutdown requested")
             if web_server.running:
                 web_server.stop()
+            if mdns_service.running:
+                mdns_service.stop()
             break
         except Exception as e:
             log.error(f"Error in main loop: {e}")
