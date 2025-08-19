@@ -127,7 +127,7 @@ def test_mdns():
                     
                 # Test service info update
                 if i == 15:
-                    test_service.update_service_info(test_status="running", uptime=str(i))
+                    test_service.update_service_info({"test_status": "running", "uptime": str(i)})
                     log.info("🔄 Updated service info")
             
             # Stop service

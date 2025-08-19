@@ -106,30 +106,39 @@ class MDNSService:
         except Exception as e:
             log.error(f"Error stopping mDNS service: {e}")
     
-    def update_service_info(self, **txt_records):
+    def update_service_info(self, txt_records=None):
         """
         Update service information with new TXT records.
         
         Args:
-            **txt_records: Key-value pairs to add/update in service TXT records
+            txt_records (dict): Key-value pairs to add/update in service TXT records
         """
         if not self.running:
             log.warn("Cannot update service info - mDNS not running")
             return False
             
+        if txt_records is None:
+            txt_records = {}
+            
         try:
+            # Build complete TXT records dictionary
+            base_records = {
+                "path": "/",
+                "device": "PagodaLightPico", 
+                "version": "1.0",
+                "features": "lighting,config,status"
+            }
+            
+            # Add any additional records
+            for key, value in txt_records.items():
+                base_records[key] = value
+            
             # Re-advertise HTTP service with updated info
             self.mdns_server.advertise_service(
                 service_type="_http",
                 protocol="_tcp",
                 port=80,
-                txt_records={
-                    "path": "/",
-                    "device": "PagodaLightPico", 
-                    "version": "1.0",
-                    "features": "lighting,config,status",
-                    **txt_records  # Add any additional records
-                }
+                txt_records=base_records
             )
             log.debug("mDNS service info updated")
             return True
