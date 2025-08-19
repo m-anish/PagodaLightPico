@@ -458,9 +458,23 @@ class ConfigWebServer:
             html += "<script>"
             html += "function addPinRow(){var table=document.getElementById('pinTable').getElementsByTagName('tbody')[0];"
             html += "var rowCount=table.rows.length;if(rowCount>=5){alert('Maximum 5 PWM pins allowed');return;}"
-            html += "var newRow=table.insertRow();newRow.innerHTML=table.rows[0].innerHTML.replace(/pin_\\d+_/g,'pin_'+rowCount+'_');"
-            html += "var selects=newRow.getElementsByTagName('select');if(selects.length>0)selects[0].selectedIndex=0;}"
-            html += "function removePinRow(btn){var row=btn.closest('tr');if(row.parentNode.children.length>1)row.remove();}"
+            html += "var newRow=table.insertRow();"
+            # Create new row with dropdown for new pins
+            html += "newRow.innerHTML='<td><select name=\"pin_'+rowCount+'_number\"><option value=\"\">Select Pin...</option>"
+            
+            # Add available pins to the JavaScript template
+            try:
+                for pin in available_pins:
+                    html += f"<option value=\"{pin}\">GP{pin}</option>"
+            except:
+                # Fallback pins if gpio_utils not available
+                for pin in [15, 16, 17, 18, 19]:
+                    html += f"<option value=\"{pin}\">GP{pin}</option>"
+            
+            html += "</select></td><td><input type=\"checkbox\" name=\"pin_'+rowCount+'_enabled\"></td>"
+            html += "<td><button type=\"button\" class=\"remove-btn\" onclick=\"removePinRow(this)\">Remove</button></td>';"
+            html += "}"
+            html += "function removePinRow(btn){var row=btn.closest('tr');row.remove();}"
             html += "</script>"
             
             html += "</head><body>"
@@ -506,18 +520,13 @@ class ConfigWebServer:
                     
                     enabled = pin_config.get('enabled', False)
                     gpio_pin = pin_config.get('gpio_pin', 0)
+                    pin_name = pin_config.get('name', f'Pin {gpio_pin}')
                     checked = 'checked' if enabled else ''
                     
-                    html += f"<tr><td><select name='pin_{pin_index}_number'>"
-                    
-                    # Add available pins to dropdown
-                    for pin in available_pins:
-                        # Include current pin even if it's 'used' by this config
-                        if pin == gpio_pin or pin not in used_pins:
-                            selected = 'selected' if pin == gpio_pin else ''
-                            html += f"<option value='{pin}' {selected}>GP{pin}</option>"
-                    
-                    html += f"</select></td><td><input type='checkbox' name='pin_{pin_index}_enabled' {checked}></td>"
+                    # For existing pins, show static text instead of dropdown
+                    html += f"<tr><td>GP{gpio_pin} ({pin_name})"
+                    html += f"<input type='hidden' name='pin_{pin_index}_number' value='{gpio_pin}'>"
+                    html += f"</td><td><input type='checkbox' name='pin_{pin_index}_enabled' {checked}></td>"
                     html += f"<td><button type='button' class='remove-btn' onclick='removePinRow(this)'>Remove</button></td></tr>"
                     pin_index += 1
                 
@@ -655,7 +664,11 @@ class ConfigWebServer:
                                 start_time = window_config.get('start', '00:00')
                                 end_time = window_config.get('end', '00:00')
                                 duty_cycle = window_config.get('duty_cycle', 50)
-                                display_name = window_name.replace('_', ' ').title()
+                                # Safe string formatting for MicroPython
+                                display_name = window_name.replace('_', ' ')
+                                # Manual title case since .title() might not be available
+                                if display_name:
+                                    display_name = display_name[0].upper() + display_name[1:].lower() if len(display_name) > 1 else display_name.upper()
                                 html += f"<tr><td>{display_name}</td><td>{start_time}</td><td>{end_time}</td><td>{duty_cycle}%</td></tr>"
                             
                             html += "</table>"
