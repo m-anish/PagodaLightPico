@@ -915,6 +915,9 @@ class ConfigWebServer:
                 # Parse URL-encoded form data for pins
                 update_data = self._parse_pins_form_data(body)
             
+            # Debug: Log the update data
+            log.debug(f"[WEB] Pin update data: {update_data}")
+            
             # Update pin configuration
             if config_manager.update_config(update_data):
                 log.info("[WEB] Pin configuration updated successfully")
@@ -1250,26 +1253,28 @@ class ConfigWebServer:
                 pin_key = f"pin_{pin_number}"  # Use pin_XX format
                 
                 # Get existing configuration for this pin if it exists
+                time_windows = {
+                    'day': {'duty_cycle': 0},
+                    'evening': {'start': '19:00', 'end': '23:00', 'duty_cycle': 30},
+                    'night': {'start': '23:00', 'end': '06:00', 'duty_cycle': 10}
+                }
+                
                 try:
                     current_config = config_manager.get_config_dict()
                     existing_pin_config = current_config.get('pwm_pins', {}).get(pin_key, {})
                     
                     # Preserve existing settings or use defaults
                     pin_name = existing_pin_config.get('name', f'Pin {pin_number}')
-                    time_windows = existing_pin_config.get('time_windows', {
-                        'day': {'duty_cycle': 0},
-                        'evening': {'start': '19:00', 'end': '23:00', 'duty_cycle': 30},
-                        'night': {'start': '23:00', 'end': '06:00', 'duty_cycle': 10}
-                    })
-                except:
-                    # Default configuration if we can't get existing
+                    
+                    # If the pin already has time windows, preserve them
+                    if 'time_windows' in existing_pin_config:
+                        time_windows = existing_pin_config['time_windows']
+                except Exception as e:
+                    log.error(f"[WEB] Error getting existing pin config: {e}")
+                    # Use defaults if we can't get existing config
                     pin_name = f'Pin {pin_number}'
-                    time_windows = {
-                        'day': {'duty_cycle': 0},
-                        'evening': {'start': '19:00', 'end': '23:00', 'duty_cycle': 30},
-                        'night': {'start': '23:00', 'end': '06:00', 'duty_cycle': 10}
-                    }
                 
+                # Create the pin configuration without any extra fields
                 pin_config['pwm_pins'][pin_key] = {
                     'name': pin_name,
                     'gpio_pin': pin_number,
