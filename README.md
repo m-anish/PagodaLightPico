@@ -36,40 +36,6 @@ A MicroPython-based LED lighting controller for the Dhamma Laddha Vipassana medi
 4. Connect and configure hardware as described.
 5. Boot the Pico W; the system will connect to WiFi, sync time, and start LED control.
 
-## Deploy to Pico W (mpremote)
-
-Use the included deploy script to sync only runtime files (Python + JSON) to the Pico W and soft-reset it.
-
-1. Install mpremote (once):
-   ```bash
-   python3 -m pip install --user mpremote
-   ```
-2. Make the script executable (once):
-   ```bash
-   chmod +x scripts/pico_deploy.sh
-   ```
-3. Deploy changes:
-   ```bash
-   # Auto-detect serial port
-   ./scripts/pico_deploy.sh
-
-   # Or specify the port explicitly
-   PORT=/dev/ttyACM0 ./scripts/pico_deploy.sh
-
-   # Preview without writing to the device
-   DRY_RUN=1 ./scripts/pico_deploy.sh
-
-   # Upload without resetting the board
-   NO_RESET=1 ./scripts/pico_deploy.sh
-   ```
-
-What gets uploaded:
-- Top-level `main.py`, `boot.py` (if present)
-- Top-level `*.json` (e.g., `config.json`, `sun_times.json`)
-- All Python files under `lib/` (`lib/**/*.py`)
-
-After a successful deploy, just refresh the web UI in your browser.
-
 ## Hardware Setup
 
 ### Wiring Diagram
