@@ -323,7 +323,15 @@ class AsyncWebServer:
             .pwm-table tr.active {{ background-color: #d4edda; }}
             .pwm-table tr.inactive {{ background-color: #f8f9fa; }}
             .pwm-table tr.disabled {{ background-color: #ffe0b2; }}
-            .table-responsive {{ width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }}
+            .table-responsive {{ width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; position: relative; }}
+            .table-responsive::after {{
+                content: "";
+                position: absolute;
+                top: 0; right: 0;
+                width: 24px; height: 100%;
+                pointer-events: none;
+                background: linear-gradient(to left, rgba(255,255,255,1), rgba(255,255,255,0));
+            }}
             /* Ensure table can scroll horizontally on small screens */
             .pwm-table {{ min-width: 560px; }}
             .footer {{ text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; }}
@@ -551,7 +559,8 @@ class AsyncWebServer:
                 ".pwm-table tr.active { background-color: #d4edda; }"
                 ".pwm-table tr.inactive { background-color: #f8f9fa; }"
                 ".pwm-table tr.disabled { background-color: #ffe0b2; }"
-                ".table-responsive { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }"
+                ".table-responsive { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; position: relative; }"
+                ".table-responsive::after{content:'';position:absolute;top:0;right:0;width:24px;height:100%;pointer-events:none;background:linear-gradient(to left, rgba(255,255,255,1), rgba(255,255,255,0));}"
                 ".pwm-table { min-width: 560px; }"
                 ".footer { text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; }"
                 ".footer a { color: #007bff; text-decoration: none; }"
