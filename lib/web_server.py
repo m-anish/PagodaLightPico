@@ -163,7 +163,9 @@ class AsyncWebServer:
             
             # Generate response
             if path == '/':
-                response = self.generate_main_page()
+                # Stream the main page directly to the client to minimize memory usage
+                await self.stream_main_page(client_socket)
+                response = None
             elif path == '/status':
                 response = self.generate_status_json()
             elif path == '/download-config':
@@ -192,23 +194,24 @@ class AsyncWebServer:
             
             # Send response (ensure full bytes are sent)
             try:
-                if isinstance(response, str):
-                    response_bytes = response.encode('utf-8')
-                else:
-                    response_bytes = response
-                total_sent = 0
-                while total_sent < len(response_bytes):
-                    try:
-                        sent = client_socket.send(response_bytes[total_sent:])
-                        if sent is None:
-                            sent = 0
-                        if sent <= 0:
-                            break
-                        total_sent += sent
-                    except OSError:
-                        # Briefly yield and retry
-                        await asyncio.sleep(0.01)
-                        continue
+                if response is not None:
+                    if isinstance(response, str):
+                        response_bytes = response.encode('utf-8')
+                    else:
+                        response_bytes = response
+                    total_sent = 0
+                    while total_sent < len(response_bytes):
+                        try:
+                            sent = client_socket.send(response_bytes[total_sent:])
+                            if sent is None:
+                                sent = 0
+                            if sent <= 0:
+                                break
+                            total_sent += sent
+                        except OSError:
+                            # Briefly yield and retry
+                            await asyncio.sleep(0.01)
+                            continue
             except Exception:
                 pass  # Client disconnected or other send error
                 
@@ -455,6 +458,204 @@ class AsyncWebServer:
         except Exception as e:
             log.error(f"[WEB] Error generating main page: {e}")
             return self.generate_500()
+
+    async def _awrite(self, sock, data_bytes):
+        """Asynchronously write all bytes to the socket in small chunks."""
+        try:
+            total_sent = 0
+            ln = len(data_bytes)
+            while total_sent < ln:
+                try:
+                    sent = sock.send(data_bytes[total_sent:])
+                    if sent is None:
+                        sent = 0
+                    if sent <= 0:
+                        # Yield and retry
+                        await asyncio.sleep(0.005)
+                        continue
+                    total_sent += sent
+                except OSError:
+                    await asyncio.sleep(0.005)
+                    continue
+        except Exception:
+            pass
+
+    async def stream_main_page(self, client_socket):
+        """Stream the main page in small chunks without computing Content-Length."""
+        try:
+            current_time = rtc_module.get_current_time()
+            time_str = f"{current_time[3]:02d}:{current_time[4]:02d}:{current_time[5]:02d}"
+            date_str = f"{current_time[2]:02d}/{current_time[1]:02d}/{current_time[0]}"
+
+            status = system_status.get_status_dict()
+            pwm_status = multi_pwm.get_pin_status()
+            config_dict = config.config_manager.get_config_dict()
+            current_config_version = str(config_dict.get('version', '')).strip() or 'unknown'
+
+            mqtt_enabled = config_dict.get('notifications', {}).get('enabled', False)
+            mqtt_connected = status.get('connections', {}).get('mqtt', False)
+            if not mqtt_enabled:
+                mqtt_status = "Disabled"
+                mqtt_class = "disabled"
+            elif mqtt_connected:
+                mqtt_status = "Connected"
+                mqtt_class = "online"
+            else:
+                mqtt_status = "Offline"
+                mqtt_class = "offline"
+
+            # Headers (no Content-Length)
+            headers = (
+                "HTTP/1.1 200 OK\r\n"
+                "Content-Type: text/html; charset=utf-8\r\n"
+                "Connection: close\r\n\r\n"
+            )
+            await self._awrite(client_socket, headers.encode('utf-8'))
+
+            # Head start + styles (small chunks)
+            await self._awrite(client_socket, b"<!DOCTYPE html><html><head>")
+            await self._awrite(client_socket, f"<title>{config.WEB_TITLE}</title>".encode('utf-8'))
+            await self._awrite(client_socket, b"<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">")
+
+            style = (
+                "<style>"
+                "body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, 'Noto Sans', 'Liberation Sans', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji'; margin: 20px; background: #f5f5f5; }"
+                ".container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; }"
+                "h1 { color: #2c3e50; text-align: center; }"
+                "h2 { color: #34495e; margin-top: 30px; }"
+                ".status { padding: 10px; margin: 10px 0; border-radius: 5px; }"
+                ".online { background: #d4edda; border-left: 4px solid #28a745; }"
+                ".offline { background: #f8d7da; border-left: 4px solid #dc3545; }"
+                ".disabled { background: #fff3cd; border-left: 4px solid #ffc107; }"
+                ".time { font-size: 24px; text-align: center; margin: 20px 0; color: #2c3e50; }"
+                ".pwm-table { width: 100%; border-collapse: collapse; margin: 20px 0; }"
+                ".pwm-table th, .pwm-table td { padding: 8px 12px; text-align: left; border-bottom: 1px solid #ddd; }"
+                ".pwm-table th { background-color: #f8f9fa; font-weight: bold; }"
+                ".pwm-table tr.active { background-color: #d4edda; }"
+                ".pwm-table tr.inactive { background-color: #f8f9fa; }"
+                ".pwm-table tr.disabled { background-color: #ffe0b2; }"
+                ".footer { text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; }"
+                ".footer a { color: #007bff; text-decoration: none; }"
+                ".footer a:hover { text-decoration: underline; }"
+                ".refresh-info { font-size: 11px; color: #999; margin-top: 10px; }"
+                ".footer-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px 16px; align-items: start; padding: 0; margin: 8px 0 0 0; }"
+                ".footer-grid .col { display: flex; flex-direction: column; gap: 6px; }"
+                ".footer .col-title { font-size: 12px; color: #555; text-transform: uppercase; letter-spacing: 0.03em; }"
+                ".version { background: #e9ecef; border-left: 4px solid #6c757d; }"
+                "</style>"
+            )
+            await self._awrite(client_socket, style.encode('utf-8'))
+
+            # Script block
+            script = (
+                "<script>let clockInterval;let refreshInterval;let countdownInterval;"
+                "function startClock(h,m,s){const timeEl=document.getElementById('time');function pad(n){return(n<10?'0':'')+n;}"
+                "function tick(){s+=1;if(s>=60){s=0;m+=1;}if(m>=60){m=0;h=(h+1)%24;}timeEl.textContent=pad(h)+':'+pad(m)+':'+pad(s);}"
+                "tick();clockInterval=setInterval(tick,1000);}"
+                "function startPageRefresh(){let secondsLeft=180;const refreshEl=document.getElementById('refresh-countdown');"
+                "function updateCountdown(){secondsLeft--;if(secondsLeft<=0){location.reload();return;}refreshEl.textContent='Next refresh in '+secondsLeft+' seconds';}"
+                "refreshEl.textContent='Next refresh in '+secondsLeft+' seconds';countdownInterval=setInterval(updateCountdown,1000);refreshInterval=setTimeout(()=>{location.reload();},180000);}"
+                "window.addEventListener('beforeunload',function(){if(clockInterval)clearInterval(clockInterval);if(refreshInterval)clearTimeout(refreshInterval);if(countdownInterval)clearInterval(countdownInterval);});"
+                "</script>"
+            )
+            await self._awrite(client_socket, script.encode('utf-8'))
+            await self._awrite(client_socket, b"</head>")
+
+            # Body start
+            await self._awrite(client_socket, f"<body onload=\"startClock({current_time[3]}, {current_time[4]}, {current_time[5]}); startPageRefresh();\"><div class=\"container\">".encode('utf-8'))
+            await self._awrite(client_socket, f"<h1>{config.WEB_TITLE}</h1>".encode('utf-8'))
+            await self._awrite(client_socket, f"<div class=\"time\">🕒 <span id=\"time\">{time_str}</span><br><small>{date_str}</small></div>".encode('utf-8'))
+
+            # Version
+            await self._awrite(client_socket, f"<div class=\"status version\"><strong>🏷️ Config version:</strong> {current_config_version}</div>".encode('utf-8'))
+
+            # WiFi
+            wifi_class = 'online' if status.get('connections', {}).get('wifi', False) else 'offline'
+            wifi_ssid = config_dict.get('wifi', {}).get('ssid', 'Unknown')
+            wifi_ip = status.get('network', {}).get('ip', 'N/A')
+            await self._awrite(client_socket, f"<div class=\"status {wifi_class}\"><strong>📶 WiFi:</strong> {wifi_ssid}, {wifi_ip}</div>".encode('utf-8'))
+
+            # MQTT
+            await self._awrite(client_socket, f"<div class=\"status {mqtt_class}\"><strong>🔌 MQTT:</strong> {mqtt_status}</div>".encode('utf-8'))
+
+            # Controllers table header
+            await self._awrite(client_socket, "<h2>🎛️ Controllers</h2>".encode('utf-8'))
+            await self._awrite(client_socket, (
+                "<table class=\"pwm-table\"><thead><tr>"
+                "<th>Name</th><th>Pin</th><th>Status</th><th>Current Window</th><th>Window Time</th><th>Duty Cycle</th>"
+                "</tr></thead><tbody>"
+            ).encode('utf-8'))
+
+            # Populate rows from config (include disabled)
+            pwm_pins_cfg = config_dict.get('pwm_pins', {})
+            rows_written = 0
+            for pin_key, pin_cfg in pwm_pins_cfg.items():
+                if str(pin_key).startswith('_'):
+                    continue
+                enabled = pin_cfg.get('enabled', False)
+                pin_live = pwm_status.get(pin_key, {
+                    'name': pin_cfg.get('name', pin_key),
+                    'gpio_pin': pin_cfg.get('gpio_pin', 0),
+                    'duty_percent': 0
+                })
+                current_window = "None"
+                window_time = "N/A"
+                status_pins = status.get('pins', {})
+                if pin_key in status_pins:
+                    status_pin = status_pins[pin_key]
+                    current_window = status_pin.get('window_display', 'None')
+                    start_time = status_pin.get('window_start', 'N/A')
+                    end_time = status_pin.get('window_end', 'N/A')
+                    if start_time != 'N/A' and end_time != 'N/A':
+                        window_time = f"{start_time} - {end_time}"
+
+                duty_percent = pin_live.get('duty_percent', 0) if enabled else 0
+                if not enabled:
+                    active_status = "Inactive"
+                    status_class = "disabled"
+                else:
+                    active_status = "Active" if duty_percent > 0 else "Inactive"
+                    status_class = "active" if duty_percent > 0 else "inactive"
+
+                row = (
+                    f"<tr class=\"{status_class}\">"
+                    f"<td>{pin_live.get('name', pin_cfg.get('name', pin_key))}</td>"
+                    f"<td>GPIO {pin_live.get('gpio_pin', pin_cfg.get('gpio_pin', ''))}</td>"
+                    f"<td>{active_status}</td>"
+                    f"<td>{current_window}</td>"
+                    f"<td>{window_time}</td>"
+                    f"<td>{duty_percent}%</td>"
+                    "</tr>"
+                )
+                await self._awrite(client_socket, row.encode('utf-8'))
+                rows_written += 1
+
+            if rows_written == 0:
+                await self._awrite(client_socket, b"<tr><td colspan=\"6\" style=\"text-align: center; color: #666;\">No controllers configured</td></tr>")
+
+            # Close table
+            await self._awrite(client_socket, b"</tbody></table>")
+
+            # Footer
+            footer_top = (
+                "<div class=\"footer\"><div class=\"footer-grid\">"
+                "<div class=\"col\"><a href=\"/status\">{{}} Status (JSON)</a></div>"
+                "<div class=\"col\"><a href=\"/upload-config\">⬆️ Upload Config</a><a href=\"/upload-sun-times\">⬆️ Upload Sun Times</a></div>"
+                "<div class=\"col\"><a href=\"/download-config\">⬇️ Download Config</a><a href=\"/download-sun-times\">⬇️ Download Sun Times</a></div>"
+                "<div class=\"col\"><a href=\"/restart\">🔄 Restart Device</a></div>"
+                "</div>"
+            )
+            await self._awrite(client_socket, footer_top.encode('utf-8'))
+            await self._awrite(client_socket, (
+                "<div style=\"margin-top:8px;font-size:12px;color:#666;\"><small><a href=\"https://github.com/m-anish/PagodaLightPico\" target=\"_blank\" rel=\"noopener\">PagodaLightPico</a></small></div>"
+                "<div class=\"refresh-info\" id=\"refresh-countdown\"></div>"
+                "</div>"
+            ).encode('utf-8'))
+
+            # Close body/html
+            await self._awrite(client_socket, b"</div></body></html>")
+        except Exception as e:
+            log.error(f"[WEB] Error streaming main page: {e}")
 
     def generate_status_json(self):
         """Generate JSON status response."""
