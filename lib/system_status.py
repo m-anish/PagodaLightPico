@@ -7,7 +7,7 @@ and other runtime information for display on web interface and API endpoints.
 
 import time
 import rtc_module
-from lib import sun_times as sun_times_leh
+from lib import sun_times
 from lib.config_manager import config_manager
 from simple_logger import Logger
 
@@ -111,7 +111,7 @@ class SystemStatus:
             day = current_time_tuple[2]
             
             # Get sunrise/sunset times
-            sunrise_h, sunrise_m, sunset_h, sunset_m = sun_times_leh.get_sunrise_sunset(month, day)
+            sunrise_h, sunrise_m, sunset_h, sunset_m = sun_times.get_sunrise_sunset(month, day)
             
             # Format current time
             current_time_str = f"{current_time_tuple[3]:02d}:{current_time_tuple[4]:02d}:{current_time_tuple[5]:02d}"

@@ -84,7 +84,7 @@ main.py (entry point)
 ├── rtc_module.py (DS3231 RTC interface)
 ├── pwm_control.py (LED PWM control)
 ├── mqtt_notifier.py (push notifications)
-├── sun_times_leh.py (sunrise/sunset calculations)
+├── sun_times.py (sunrise/sunset calculations)
 ├── system_status.py (system state management)
 └── simple_logger.py (timestamped logging)
 ```

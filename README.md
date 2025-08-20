@@ -215,7 +215,7 @@ The new Microdot-powered web interface provides:
 - The main script initializes WiFi and RTC, then starts controlling LEDs
 - Logs provide detailed status with timestamped entries
 - LED brightness automatically adjusts based on configured time windows
-- "Day" window is automatically adjusted to sunrise/sunset times for Leh, India
+- "Day" window is automatically adjusted to sunrise/sunset times from configurable location data
 
 ### Configuration Updates
 1. **Via Web Interface** (Current):

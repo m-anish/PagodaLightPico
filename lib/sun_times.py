@@ -8,19 +8,14 @@ Sunrise/Sunset provider with JSON-backed data and weekly fallback.
 
 - get_sunrise_sunset(mm, dd) returns (rise_h, rise_m, set_h, set_m)
 - If an exact day is missing, falls back to the last prior date available (weekly buckets supported).
-- If JSON is missing or invalid, falls back to built-in Leh table (lib.sun_times_leh).
+- If JSON is missing or invalid, returns default fallback times.
 """
 
 import json
 
-try:
-    # MicroPython-compatible import fallback
-    from lib import sun_times_leh as fallback_sun
-except Exception:
-    try:
-        import sun_times_leh as fallback_sun  # type: ignore
-    except Exception:
-        fallback_sun = None  # ultimate fallback
+# Default fallback times (6:30 AM sunrise, 6:30 PM sunset)
+DEFAULT_SUNRISE = (6, 30)
+DEFAULT_SUNSET = (18, 30)
 
 _location = None
 _lat = None
@@ -73,7 +68,7 @@ def _load_json():
                 mm = int(parts[1])
                 rh, rm = _parse_time_str(val.get('rise', '0:0'))
                 sh, sm = _parse_time_str(val.get('set', '0:0'))
-                _entries.append((mm, dd, rh, rm, sh, sm))
+                _entries.append((dd, mm, rh, rm, sh, sm))
 
         elif isinstance(data, dict) and any('->rise' in k for k in data.keys() if isinstance(k, str)):
             # flat key format
@@ -89,37 +84,37 @@ def _load_json():
                         continue
                     dd = int(parts[0])
                     mm = int(parts[1])
-                    entry = tmp.setdefault((mm, dd), {})
+                    entry = tmp.setdefault((dd, mm), {})
                     if 'rise' in k:
                         entry['rise'] = v
                     else:
                         entry['set'] = v
-            for (mm, dd), val in tmp.items():
+            for (dd, mm), val in tmp.items():
                 rh, rm = _parse_time_str(val.get('rise', '0:0'))
                 sh, sm = _parse_time_str(val.get('set', '0:0'))
-                _entries.append((mm, dd, rh, rm, sh, sm))
+                _entries.append((dd, mm, rh, rm, sh, sm))
 
         elif isinstance(data, dict) and 'entries' in data and isinstance(data['entries'], list):
             for e in data['entries']:
-                mm = int(e.get('mm'))
                 dd = int(e.get('dd'))
+                mm = int(e.get('mm'))
                 rh, rm = _parse_time_str(e.get('rise', '0:0'))
                 sh, sm = _parse_time_str(e.get('set', '0:0'))
-                _entries.append((mm, dd, rh, rm, sh, sm))
+                _entries.append((dd, mm, rh, rm, sh, sm))
         elif isinstance(data, list):
             for e in data:
-                mm = int(e.get('mm'))
                 dd = int(e.get('dd'))
+                mm = int(e.get('mm'))
                 rh, rm = _parse_time_str(e.get('rise', '0:0'))
                 sh, sm = _parse_time_str(e.get('set', '0:0'))
-                _entries.append((mm, dd, rh, rm, sh, sm))
+                _entries.append((dd, mm, rh, rm, sh, sm))
         else:
             # Unknown format
             return False
 
-        # Sort keys
-        _entries.sort(key=lambda t: (t[0], t[1]))
-        _sorted_keys = [(mm, dd) for (mm, dd, _, _, _, _) in _entries]
+        # Sort keys by month first, then day (for chronological order)
+        _entries.sort(key=lambda t: (t[1], t[0]))  # Sort by (mm, dd)
+        _sorted_keys = [(dd, mm) for (dd, mm, _, _, _, _) in _entries]
         return len(_entries) > 0
     except Exception:
         return False
@@ -137,30 +132,42 @@ def get_location_info():
 def get_sunrise_sunset(month, day):
     """
     Get sunrise/sunset for given date.
-    Falls back to last available date not after (mm, dd). Wraps to last entry if none before.
-    If JSON not loaded, use fallback table if available.
+    Falls back to last available date not after (dd, mm). Wraps to last entry if none before.
+    If JSON not loaded, returns default fallback times.
     Returns tuple: (rise_h, rise_m, set_h, set_m)
     """
-    if _loaded and _entries:
-        target = (int(month), int(day))
-        # Binary-like search over sorted keys to find last <= target
-        last_idx = -1
-        for i, key in enumerate(_sorted_keys):
-            if key[0] < target[0] or (key[0] == target[0] and key[1] <= target[1]):
-                last_idx = i
-            else:
-                break
-        if last_idx == -1:
-            last_idx = len(_entries) - 1  # wrap to last available (previous year assumption)
-        mm, dd, rh, rm, sh, sm = _entries[last_idx]
-        return rh, rm, sh, sm
+    try:
+        if _loaded and _entries:
+            target = (int(day), int(month))  # Convert to (dd, mm) format
+            # Binary-like search over sorted keys to find last <= target
+            last_idx = -1
+            for i, key in enumerate(_sorted_keys):
+                # Compare by month first, then day for chronological order
+                target_mm, target_dd = target[1], target[0]
+                key_mm, key_dd = key[1], key[0]
+                if key_mm < target_mm or (key_mm == target_mm and key_dd <= target_dd):
+                    last_idx = i
+                else:
+                    break
+            if last_idx == -1:
+                last_idx = len(_entries) - 1  # wrap to last available (previous year assumption)
+            dd, mm, rh, rm, sh, sm = _entries[last_idx]
+            return rh, rm, sh, sm
+    except Exception as e:
+        # Log error but continue with fallback
+        print(f"[SUN_TIMES] Error getting sunrise/sunset: {e}")
 
-    # Fallback: static table
-    if fallback_sun is not None:
-        try:
-            return fallback_sun.get_sunrise_sunset(month, day)
-        except Exception:
-            pass
+    # Ultimate fallback: use default times
+    return DEFAULT_SUNRISE[0], DEFAULT_SUNRISE[1], DEFAULT_SUNSET[0], DEFAULT_SUNSET[1]
 
-    # Ultimate fallback
-    return 7, 0, 18, 0
+
+def get_debug_info():
+    """Get debug information about loaded sun times data."""
+    return {
+        'loaded': _loaded,
+        'entries_count': len(_entries),
+        'location': _location,
+        'lat': _lat,
+        'lon': _lon,
+        'sorted_keys': _sorted_keys[:5]  # First 5 keys for debugging
+    }

@@ -268,7 +268,7 @@ class AsyncWebServer:
                 function tick() {{
                     s += 1;
                     if (s >= 60) {{ s = 0; m += 1; }}
-                    if (m >= 60) {{ m = 0; h = (h + 1) %% 24; }}
+                    if (m >= 60) {{ m = 0; h = (h + 1) % 24; }}
                     timeEl.textContent = pad(h) + ':' + pad(m) + ':' + pad(s);
                 }}
                 

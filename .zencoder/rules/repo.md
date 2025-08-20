@@ -97,7 +97,7 @@ nano config.json
 **Time Management**:
 - NTP synchronization when WiFi available
 - DS3231 RTC for offline timekeeping
-- Dynamic sunrise/sunset calculation for Leh, India
+- Dynamic sunrise/sunset calculation from configurable location data
 - Time window system for scheduled lighting changes
 
 **LED Control**:

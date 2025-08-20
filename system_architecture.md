@@ -34,7 +34,7 @@ graph TD
     F[main.py] --> Z[PWM Controller]
     F --> AA[LED PWM Pin]
 
-    G[sun_times_leh.py] --> AB[Sunrise/Sunset Data]
+    G[sun_times.py] --> AB[Sunrise/Sunset Data]
     G --> AC[Time Window Calculation]
 
     H[simple_logger.py] --> AD[RTC Time]
@@ -84,8 +84,8 @@ graph TD
 - Controls LED intensity via duty cycle percentage
 - Uses machine.PWM and machine.Pin
 
-### 6. Sun Time Calculator (lib/sun_times_leh.py)
-- Contains sunrise and sunset times for Leh, India
+### 6. Sun Time Calculator (lib/sun_times.py)
+- Contains sunrise and sunset times from configurable JSON data
 - Provides lookup function for daily sunrise/sunset times
 - Used to dynamically adjust "day" time window
 
