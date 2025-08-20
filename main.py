@@ -193,8 +193,9 @@ async def update_pwm_pins():
                     'window_end': window_config.get('end')
                 }
         
-        # Send notifications for changes
+        # Update system status with pin information
         if pin_updates:
+            system_status.update_multi_pin_status(pin_updates)
             active_pins = sum(1 for update in pin_updates.values() if update.get('duty_cycle', 0) > 0)
             log.info(f"[PWM_UPDATE] Updated {len(pin_updates)} pins, {active_pins} active")
             
@@ -223,7 +224,7 @@ async def pwm_update_task():
         try:
             current_time = time.time()
             
-            # Check for configuration changes every 10 seconds (less frequent than PWM updates)
+            # Check for update interval changes every 10 seconds (less frequent than PWM updates)
             if current_time - last_config_check >= 10:
                 current_config = config.config_manager.get_config_dict()
                 new_update_interval = current_config.get('system', {}).get('update_interval', 60)
@@ -232,21 +233,6 @@ async def pwm_update_task():
                 if new_update_interval != current_update_interval:
                     log.info(f"[PWM_TASK] Update interval changed from {current_update_interval}s to {new_update_interval}s")
                     current_update_interval = new_update_interval
-                
-                # Check if configuration was updated via web interface
-                if hasattr(config.config_manager, '_last_config_hash'):
-                    import json
-                    current_hash = hash(json.dumps(current_config))
-                    if current_hash != config.config_manager._last_config_hash:
-                        log.info("[PWM_TASK] Configuration change detected, reloading...")
-                        config.config_manager.reload()
-                        # Re-initialize multi-PWM manager with new configuration
-                        multi_pwm.reload_config()
-                        config.config_manager._last_config_hash = current_hash
-                else:
-                    # Initialize hash tracking
-                    import json
-                    config.config_manager._last_config_hash = hash(json.dumps(current_config))
                 
                 last_config_check = current_time
             
