@@ -191,16 +191,16 @@ class AsyncWebServer:
             <h1>PagodaLightPico</h1>
             <div class="time"><span id="time">{time_str}</span><br><small>{date_str}</small></div>
 
-            <div class="status {{"online" if status.get('connections', {{}}).get('wifi', False) else "offline"}}">
-                <strong>WiFi:</strong> {{"Connected" if status.get('connections', {{}}).get('wifi', False) else "Offline"}}
+            <div class="status {'online' if status.get('connections', {}).get('wifi', False) else 'offline'}">
+                <strong>WiFi:</strong> {'Connected' if status.get('connections', {}).get('wifi', False) else 'Offline'}
             </div>
 
-            <div class="status {{"online" if status.get('connections', {{}}).get('web_server', False) else "offline"}}">
-                <strong>Web Server:</strong> {{"Running" if status.get('connections', {{}}).get('web_server', False) else "Stopped"}}
+            <div class="status {'online' if status.get('connections', {}).get('web_server', False) else 'offline'}">
+                <strong>Web Server:</strong> {'Running' if status.get('connections', {}).get('web_server', False) else 'Stopped'}
             </div>
 
-            <div class="status {{"online" if status.get('connections', {{}}).get('mqtt', False) else "offline"}}">
-                <strong>MQTT:</strong> {{"Connected" if status.get('connections', {{}}).get('mqtt', False) else "Offline"}}
+            <div class="status {'online' if status.get('connections', {}).get('mqtt', False) else 'offline'}">
+                <strong>MQTT:</strong> {'Connected' if status.get('connections', {}).get('mqtt', False) else 'Offline'}
             </div>
 
             <p style="text-align: center; margin-top: 30px;">
