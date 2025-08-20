@@ -197,7 +197,7 @@ async def update_pwm_pins():
         if pin_updates:
             system_status.update_multi_pin_status(pin_updates)
             active_pins = sum(1 for update in pin_updates.values() if update.get('duty_cycle', 0) > 0)
-            log.info(f"[PWM_UPDATE] Updated {len(pin_updates)} pins, {active_pins} active")
+            log.debug(f"[PWM_UPDATE] Updated {len(pin_updates)} pins, {active_pins} active")
             
             if mqtt_notifier.connected:
                 mqtt_notifier.notify_multi_pin_changes(pin_updates)
@@ -266,7 +266,7 @@ async def network_monitor_task():
                     else:
                         # Check MQTT connection health
                         if mqtt_notifier.notifications_enabled and not mqtt_notifier.connected:
-                            log.info("[NETWORK] MQTT disconnected, attempting reconnection...")
+                            log.debug("[NETWORK] MQTT disconnected, attempting reconnection...")
                             if mqtt_notifier.connect():
                                 system_status.set_connection_status(mqtt=True)
                                 log.info("[NETWORK] MQTT reconnected successfully")

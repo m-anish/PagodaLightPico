@@ -44,26 +44,25 @@ def connect_wifi(timeout=10, max_attempts=3):
     hostname = config_manager.get_config_dict().get('hostname', 'PagodaLightPico')
     try:
         network.hostname(hostname)
-        log.info(f"[WIFI] Set network hostname to: {hostname}")
+        log.debug(f"[WIFI] Set network hostname to: {hostname}")
     except Exception as e:
         log.warn(f"[WIFI] Failed to set hostname: {e}")
     
     # Check if already connected
     if wlan.isconnected():
         ip_info = wlan.ifconfig()
-        log.info("[WIFI] Already connected")
-        log.info(f"[WIFI] Network Details:")
-        log.info(f"[WIFI]   IP Address: {ip_info[0]}")
-        log.info(f"[WIFI]   Subnet Mask: {ip_info[1]}")
-        log.info(f"[WIFI]   Gateway: {ip_info[2]}")
-        log.info(f"[WIFI]   DNS Server: {ip_info[3]}")
-        log.info(f"[WIFI] Web interface available at: http://{ip_info[0]}/")
+        log.info(f"[WIFI] Already connected, IP: {ip_info[0]}")
+        log.debug(f"[WIFI] Network Details:")
+        log.debug(f"[WIFI]   Subnet Mask: {ip_info[1]}")
+        log.debug(f"[WIFI]   Gateway: {ip_info[2]}")
+        log.debug(f"[WIFI]   DNS Server: {ip_info[3]}")
+        log.info(f"[WIFI] Web interface: http://{ip_info[0]}/")
         led.value(1)  # LED ON when connected
         return True
     
     # Attempt to connect with retries
     for attempt in range(1, max_attempts + 1):
-        log.info(f"[WIFI] Connection attempt {attempt}/{max_attempts}")
+        log.debug(f"[WIFI] Connection attempt {attempt}/{max_attempts}")
         
         try:
             wlan.connect(WIFI_SSID, WIFI_PASSWORD)
@@ -79,13 +78,12 @@ def connect_wifi(timeout=10, max_attempts=3):
             # Check if connection was successful
             if wlan.isconnected():
                 ip_info = wlan.ifconfig()
-                log.info(f"[WIFI] Connected successfully on attempt {attempt}")
-                log.info(f"[WIFI] Network Details:")
-                log.info(f"[WIFI]   IP Address: {ip_info[0]}")
-                log.info(f"[WIFI]   Subnet Mask: {ip_info[1]}")
-                log.info(f"[WIFI]   Gateway: {ip_info[2]}")
-                log.info(f"[WIFI]   DNS Server: {ip_info[3]}")
-                log.info(f"[WIFI] Web interface will be available at: http://{ip_info[0]}/")
+                log.info(f"[WIFI] Connected (attempt {attempt}), IP: {ip_info[0]}")
+                log.debug(f"[WIFI] Network Details:")
+                log.debug(f"[WIFI]   Subnet Mask: {ip_info[1]}")
+                log.debug(f"[WIFI]   Gateway: {ip_info[2]}")
+                log.debug(f"[WIFI]   DNS Server: {ip_info[3]}")
+                log.info(f"[WIFI] Web interface: http://{ip_info[0]}/")
                 led.value(1)  # LED ON when connected
                 return True
             
@@ -94,7 +92,7 @@ def connect_wifi(timeout=10, max_attempts=3):
         
         # Wait before retry (except on last attempt) - relaxed backoff
         if attempt < max_attempts:
-            log.info(f"[WIFI] Waiting 4 seconds before retry...")
+            log.debug(f"[WIFI] Waiting 4 seconds before retry...")
             time.sleep(4)
     
     # All attempts failed
@@ -173,7 +171,7 @@ def sync_time_ntp():
     
     for server in ntp_servers:
         try:
-            log.info(f"[NTP] Trying time synchronization with {server}")
+            log.debug(f"[NTP] Trying time synchronization with {server}")
             ntptime.host = server
             ntptime.timeout = 5  # 5 second timeout
             ntptime.settime()  # syncs to UTC time

@@ -126,7 +126,7 @@ class MQTTNotifier:
         }
         
         self._send_notification("error", notification_data)
-        log.info(f"[MQTT] Sent error notification: {error_message}")
+        log.debug(f"[MQTT] Sent error notification: {error_message}")
     
     def notify_multi_pin_changes(self, pin_updates):
         """
@@ -187,7 +187,7 @@ class MQTTNotifier:
             }
             
             self._send_notification("pin_change", notification_data)
-            log.info(f"[MQTT] Sent pin change notification: {message}")
+            log.debug(f"[MQTT] Sent pin change notification: {message}")
         
         # Also send a summary notification if multiple pins changed
         if len(changed_pins) > 1:
@@ -202,7 +202,7 @@ class MQTTNotifier:
             }
             
             self._send_notification("summary", summary_data)
-            log.info(f"[MQTT] Sent multi-pin summary: {summary_message}")
+            log.debug(f"[MQTT] Sent multi-pin summary: {summary_message}")
     
     def notify_config_change(self):
         """Send notification when configuration is updated."""
@@ -217,7 +217,7 @@ class MQTTNotifier:
         }
         
         self._send_notification("config", notification_data)
-        log.info("[MQTT] Sent configuration change notification")
+        log.debug("[MQTT] Sent configuration change notification")
     
     def _send_notification(self, category, data):
         """
