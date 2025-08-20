@@ -20,7 +20,8 @@
     "client_read_sleep_ms": 50,
     "network_check_interval": 120,
     "ram_telemetry_enabled": false,
-    "ram_telemetry_interval": 300
+    "ram_telemetry_interval": 300,
+    "web_title": "PagodaLightPico"
   },
   "notifications": {
     "enabled": false,

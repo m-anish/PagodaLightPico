@@ -285,7 +285,7 @@ class AsyncWebServer:
             html = f"""<!DOCTYPE html>
     <html>
     <head>
-        <title>PagodaLightPico</title>
+        <title>{config.WEB_TITLE}</title>
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <style>
             body {{ font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }}
@@ -366,7 +366,7 @@ class AsyncWebServer:
     </head>
     <body onload="startClock({current_time[3]}, {current_time[4]}, {current_time[5]}); startPageRefresh();">
         <div class="container">
-            <h1>PagodaLightPico</h1>
+            <h1>{config.WEB_TITLE}</h1>
             <div class="time"><span id="time">{time_str}</span><br><small>{date_str}</small></div>
 
             <div class="status {'online' if status.get('connections', {}).get('wifi', False) else 'offline'}">
@@ -401,6 +401,11 @@ class AsyncWebServer:
                 <a href="/upload-config">Upload Config</a>
                 <a href="/upload-sun-times">Upload Sun Times</a>
                 <a href="/restart">Restart Device</a>
+                <div style="margin-top:8px;font-size:12px;color:#666;">
+                    <small>
+                        <a href="https://github.com/m-anish/PagodaLightPico" target="_blank" rel="noopener">PagodaLightPico</a>
+                    </small>
+                </div>
                 <div class="refresh-info" id="refresh-countdown"></div>
             </div>
         </div>
@@ -488,27 +493,27 @@ class AsyncWebServer:
             # Schedule the hard reset with a short delay so the response can flush
             asyncio.create_task(self.soft_reboot_delayed())
 
-            html = """<!DOCTYPE html>
+            html = f"""<!DOCTYPE html>
 <html>
 <head>
-    <title>Restarting - PagodaLightPico</title>
+    <title>Restarting - {config.WEB_TITLE}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta http-equiv="refresh" content="8;url=/">
     <style>
-        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
-        .container { max-width: 600px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; text-align: center; }
-        .info { background: #d1ecf1; border: 1px solid #bee5eb; padding: 15px; border-radius: 4px; margin: 20px 0; color: #0c5460; }
+        body {{ font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }}
+        .container {{ max-width: 600px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; text-align: center; }}
+        .info {{ background: #d1ecf1; border: 1px solid #bee5eb; padding: 15px; border-radius: 4px; margin: 20px 0; color: #0c5460; }}
     </style>
     <script>
         // Simple countdown display
         let seconds = 5;
-        function tick() {
+        function tick() {{
             const el = document.getElementById('count');
             if (!el) return;
             el.textContent = seconds;
             seconds--;
             if (seconds >= 0) setTimeout(tick, 1000);
-        }
+        }}
         window.onload = tick;
     </script>
 </head>
@@ -570,24 +575,24 @@ class AsyncWebServer:
     def generate_upload_page(self):
         """Generate config upload page."""
         try:
-            html = """<!DOCTYPE html>
+            html = f"""<!DOCTYPE html>
 <html>
 <head>
-    <title>Upload Config - PagodaLightPico</title>
+    <title>Upload Config - {config.WEB_TITLE}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
-        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
-        .container { max-width: 600px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; }
-        h1 { color: #2c3e50; text-align: center; }
-        .form-group { margin: 20px 0; }
-        label { display: block; margin-bottom: 5px; font-weight: bold; }
-        input[type="file"] { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; }
-        .btn { background: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; }
-        .btn:hover { background: #0056b3; }
-        .btn-secondary { background: #6c757d; }
-        .btn-secondary:hover { background: #545b62; }
-        .warning { background: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 4px; margin: 20px 0; }
-        .footer { text-align: center; margin-top: 30px; }
+        body {{ font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }}
+        .container {{ max-width: 600px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; }}
+        h1 {{ color: #2c3e50; text-align: center; }}
+        .form-group {{ margin: 20px 0; }}
+        label {{ display: block; margin-bottom: 5px; font-weight: bold; }}
+        input[type="file"] {{ width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; }}
+        .btn {{ background: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; }}
+        .btn:hover {{ background: #0056b3; }}
+        .btn-secondary {{ background: #6c757d; }}
+        .btn-secondary:hover {{ background: #545b62; }}
+        .warning {{ background: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 4px; margin: 20px 0; }}
+        .footer {{ text-align: center; margin-top: 30px; }}
     </style>
 </head>
 <body>
@@ -686,16 +691,16 @@ class AsyncWebServer:
                 log.info("[WEB] New configuration uploaded and validated successfully")
                 
                 # Generate success response with auto-reboot
-                html = """<!DOCTYPE html>
+                html = f"""<!DOCTYPE html>
 <html>
 <head>
-    <title>Upload Success - PagodaLightPico</title>
+    <title>Upload Success - {config.WEB_TITLE}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta http-equiv="refresh" content="8;url=/">
     <style>
-        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
-        .container { max-width: 600px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; text-align: center; }
-        .success { background: #d4edda; border: 1px solid #c3e6cb; padding: 15px; border-radius: 4px; margin: 20px 0; color: #155724; }
+        body {{ font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }}
+        .container {{ max-width: 600px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; text-align: center; }}
+        .success {{ background: #d4edda; border: 1px solid #c3e6cb; padding: 15px; border-radius: 4px; margin: 20px 0; color: #155724; }}
     </style>
 </head>
 <body>
@@ -733,7 +738,7 @@ class AsyncWebServer:
         html = f"""<!DOCTYPE html>
 <html>
 <head>
-    <title>Upload Error - PagodaLightPico</title>
+    <title>Upload Error - {config.WEB_TITLE}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
         body {{ font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }}
@@ -758,25 +763,25 @@ class AsyncWebServer:
     def generate_sun_times_upload_page(self):
         """Generate sun_times.json upload page."""
         try:
-            html = """<!DOCTYPE html>
+            html = f"""<!DOCTYPE html>
 <html>
 <head>
-    <title>Upload Sun Times - PagodaLightPico</title>
+    <title>Upload Sun Times - {config.WEB_TITLE}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
-        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
-        .container { max-width: 600px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; }
-        h1 { color: #2c3e50; text-align: center; }
-        .form-group { margin: 20px 0; }
-        label { display: block; margin-bottom: 5px; font-weight: bold; }
-        input[type="file"] { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; }
-        .btn { background: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; }
-        .btn:hover { background: #0056b3; }
-        .btn-secondary { background: #6c757d; }
-        .btn-secondary:hover { background: #545b62; }
-        .warning { background: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 4px; margin: 20px 0; }
-        .info { background: #d1ecf1; border: 1px solid #bee5eb; padding: 15px; border-radius: 4px; margin: 20px 0; }
-        .footer { text-align: center; margin-top: 30px; }
+        body {{ font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }}
+        .container {{ max-width: 600px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; }}
+        h1 {{ color: #2c3e50; text-align: center; }}
+        .form-group {{ margin: 20px 0; }}
+        label {{ display: block; margin-bottom: 5px; font-weight: bold; }}
+        input[type="file"] {{ width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; }}
+        .btn {{ background: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; }}
+        .btn:hover {{ background: #0056b3; }}
+        .btn-secondary {{ background: #6c757d; }}
+        .btn-secondary:hover {{ background: #545b62; }}
+        .warning {{ background: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 4px; margin: 20px 0; }}
+        .info {{ background: #d1ecf1; border: 1px solid #bee5eb; padding: 15px; border-radius: 4px; margin: 20px 0; }}
+        .footer {{ text-align: center; margin-top: 30px; }}
     </style>
 </head>
 <body>
@@ -877,16 +882,16 @@ class AsyncWebServer:
                 log.info("[WEB] New sun_times.json uploaded successfully")
                 
                 # Generate success response with auto-reboot
-                html = """<!DOCTYPE html>
+                html = f"""<!DOCTYPE html>
 <html>
 <head>
-    <title>Sun Times Upload Success - PagodaLightPico</title>
+    <title>Sun Times Upload Success - {config.WEB_TITLE}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta http-equiv="refresh" content="8;url=/">
     <style>
-        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
-        .container { max-width: 600px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; text-align: center; }
-        .success { background: #d4edda; border: 1px solid #c3e6cb; padding: 15px; border-radius: 4px; margin: 20px 0; color: #155724; }
+        body {{ font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }}
+        .container {{ max-width: 600px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; text-align: center; }}
+        .success {{ background: #d4edda; border: 1px solid #c3e6cb; padding: 15px; border-radius: 4px; margin: 20px 0; color: #155724; }}
     </style>
 </head>
 <body>
@@ -960,7 +965,7 @@ class AsyncWebServer:
         html = f"""<!DOCTYPE html>
 <html>
 <head>
-    <title>Sun Times Upload Error - PagodaLightPico</title>
+    <title>Sun Times Upload Error - {config.WEB_TITLE}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
         body {{ font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }}
