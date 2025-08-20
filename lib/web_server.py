@@ -246,23 +246,65 @@ class AsyncWebServer:
             .footer {{ text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; }}
             .footer a {{ color: #007bff; text-decoration: none; margin: 0 10px; }}
             .footer a:hover {{ text-decoration: underline; }}
+            .refresh-info {{ font-size: 11px; color: #999; margin-top: 10px; }}
         </style>
         <script>
-            // Lightweight client-side clock updating every second without server calls
+            let clockInterval;
+            let refreshInterval;
+            let countdownInterval;
+            
+            // Clock updating every second
             function startClock(h, m, s) {{
                 const timeEl = document.getElementById('time');
                 function pad(n) {{ return (n < 10 ? '0' : '') + n; }}
+                
                 function tick() {{
                     s += 1;
                     if (s >= 60) {{ s = 0; m += 1; }}
                     if (m >= 60) {{ m = 0; h = (h + 1) %% 24; }}
                     timeEl.textContent = pad(h) + ':' + pad(m) + ':' + pad(s);
                 }}
-                setInterval(tick, 1000);
+                
+                // Start the clock immediately and then every second
+                tick();
+                clockInterval = setInterval(tick, 1000);
             }}
+            
+            // Page refresh functionality
+            function startPageRefresh() {{
+                let secondsLeft = 60;
+                const refreshEl = document.getElementById('refresh-countdown');
+                
+                function updateCountdown() {{
+                    secondsLeft--;
+                    if (secondsLeft <= 0) {{
+                        location.reload();
+                        return;
+                    }}
+                    refreshEl.textContent = `Next refresh in ${{secondsLeft}} seconds`;
+                }}
+                
+                // Initial countdown display
+                refreshEl.textContent = `Next refresh in ${{secondsLeft}} seconds`;
+                
+                // Update countdown every second
+                countdownInterval = setInterval(updateCountdown, 1000);
+                
+                // Set page refresh for 60 seconds
+                refreshInterval = setTimeout(() => {{
+                    location.reload();
+                }}, 60000);
+            }}
+            
+            // Cleanup intervals on page unload
+            window.addEventListener('beforeunload', function() {{
+                if (clockInterval) clearInterval(clockInterval);
+                if (refreshInterval) clearTimeout(refreshInterval);
+                if (countdownInterval) clearInterval(countdownInterval);
+            }});
         </script>
     </head>
-    <body onload="startClock({current_time[3]}, {current_time[4]}, {current_time[5]})">
+    <body onload="startClock({current_time[3]}, {current_time[4]}, {current_time[5]}); startPageRefresh();">
         <div class="container">
             <h1>PagodaLightPico</h1>
             <div class="time"><span id="time">{time_str}</span><br><small>{date_str}</small></div>
@@ -300,6 +342,7 @@ class AsyncWebServer:
                 <a href="/status">View JSON Status</a>
                 <a href="/download-config">Download Config</a>
                 <a href="/upload-config">Upload Config</a>
+                <div class="refresh-info" id="refresh-countdown"></div>
             </div>
         </div>
     </body>

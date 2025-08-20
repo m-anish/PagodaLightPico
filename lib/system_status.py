@@ -201,18 +201,45 @@ class SystemStatus:
         
         # Format pin status for display
         pins_display = {}
-        for pin_key, pin_info in self.pin_status.items():
-            pins_display[pin_key] = {
-                'name': pin_info.get('name', pin_key),
-                'gpio_pin': pin_info.get('gpio_pin'),
-                'duty_cycle': pin_info.get('duty_cycle', 0),
-                'duty_cycle_display': f"{pin_info.get('duty_cycle', 0)}%",
-                'status': "ON" if pin_info.get('duty_cycle', 0) > 0 else "OFF",
-                'window': pin_info.get('window'),
-                'window_display': self._safe_format_window_name(pin_info.get('window')),
-                'window_start': pin_info.get('window_start'),
-                'window_end': pin_info.get('window_end')
-            }
+        
+        # If pin_status is empty, get current status from PWM manager
+        if not self.pin_status:
+            try:
+                from lib.pwm_control import multi_pwm
+                pwm_status = multi_pwm.get_pin_status()
+                config_dict = config_manager.get_config_dict()
+                
+                for pin_key, pin_info in pwm_status.items():
+                    pin_config = config_dict.get('pwm_pins', {}).get(pin_key, {})
+                    duty_percent = pin_info.get('duty_percent', 0)
+                    
+                    pins_display[pin_key] = {
+                        'name': pin_info.get('name', pin_key),
+                        'gpio_pin': pin_info.get('gpio_pin'),
+                        'duty_cycle': duty_percent,
+                        'duty_cycle_display': f"{duty_percent}%",
+                        'status': "ON" if duty_percent > 0 else "OFF",
+                        'window': None,
+                        'window_display': "Unknown",
+                        'window_start': None,
+                        'window_end': None
+                    }
+            except Exception as e:
+                log.error(f"[STATUS] Error getting PWM status: {e}")
+        else:
+            # Use existing pin_status data
+            for pin_key, pin_info in self.pin_status.items():
+                pins_display[pin_key] = {
+                    'name': pin_info.get('name', pin_key),
+                    'gpio_pin': pin_info.get('gpio_pin'),
+                    'duty_cycle': pin_info.get('duty_cycle', 0),
+                    'duty_cycle_display': f"{pin_info.get('duty_cycle', 0)}%",
+                    'status': "ON" if pin_info.get('duty_cycle', 0) > 0 else "OFF",
+                    'window': pin_info.get('window'),
+                    'window_display': self._safe_format_window_name(pin_info.get('window')),
+                    'window_start': pin_info.get('window_start'),
+                    'window_end': pin_info.get('window_end')
+                }
         
         return {
             "system": {
