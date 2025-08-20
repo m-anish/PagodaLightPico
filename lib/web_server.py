@@ -17,7 +17,6 @@ import time
 import machine
 
 log = Logger()
-PROJECT_VERSION = "0.2.0"  # Bump when making breaking config changes
 
 class AsyncWebServer:
     """
@@ -674,13 +673,14 @@ class AsyncWebServer:
             except json.JSONDecodeError as e:
                 return self.generate_upload_error(f"Invalid JSON format: {e}")
             
-            # Version compatibility check (require matching major.minor)
+            # Version compatibility check (require matching major.minor against current running config)
             try:
                 uploaded_ver = str(config_data.get('version', '')).strip()
                 if not uploaded_ver:
                     return self.generate_upload_error("Missing 'version' in config.json. Please use sample config for your release.")
-                if not self._version_compatible(uploaded_ver):
-                    return self.generate_upload_error(f"Incompatible config version '{uploaded_ver}'. Expected {self._major_minor(PROJECT_VERSION)}.x")
+                expected_prefix = self._expected_version_prefix()
+                if expected_prefix and not self._version_compatible(uploaded_ver, expected_prefix):
+                    return self.generate_upload_error(f"Incompatible config version '{uploaded_ver}'. Expected {expected_prefix}.x (to match device config)")
             except Exception as e:
                 return self.generate_upload_error(f"Version check failed: {e}")
             
@@ -879,13 +879,14 @@ class AsyncWebServer:
             if not self.validate_sun_times_structure(sun_times_data):
                 return self.generate_sun_times_upload_error("Invalid sun_times.json structure. Expected format with 'location', 'lat', 'lon', and 'days' fields.")
             
-            # Version compatibility check (require matching major.minor)
+            # Version compatibility check (require matching major.minor against current running config)
             try:
                 uploaded_ver = str(sun_times_data.get('version', '')).strip()
                 if not uploaded_ver:
                     return self.generate_sun_times_upload_error("Missing 'version' in sun_times.json. Please use sample file for your release.")
-                if not self._version_compatible(uploaded_ver):
-                    return self.generate_sun_times_upload_error(f"Incompatible sun_times version '{uploaded_ver}'. Expected {self._major_minor(PROJECT_VERSION)}.x")
+                expected_prefix = self._expected_version_prefix()
+                if expected_prefix and not self._version_compatible(uploaded_ver, expected_prefix):
+                    return self.generate_sun_times_upload_error(f"Incompatible sun_times version '{uploaded_ver}'. Expected {expected_prefix}.x (to match device config)")
             except Exception as e:
                 return self.generate_sun_times_upload_error(f"Version check failed: {e}")
             
@@ -955,9 +956,24 @@ class AsyncWebServer:
         except Exception:
             return ver_str
 
-    def _version_compatible(self, uploaded_ver):
-        """Check if uploaded version matches current major.minor."""
-        return self._major_minor(uploaded_ver) == self._major_minor(PROJECT_VERSION)
+    def _version_compatible(self, uploaded_ver, expected_prefix):
+        """Check if uploaded version matches expected major.minor prefix."""
+        return self._major_minor(uploaded_ver) == expected_prefix
+
+    def _expected_version_prefix(self):
+        """Return major.minor from current running config.json's version.
+        If not present, return empty string to skip strict checking.
+        """
+        try:
+            current_ver = str(config.config_manager.get_config_dict().get('version', '')).strip()
+            mm = self._major_minor(current_ver)
+            # If mm is empty or same as full string but without a dot, treat as missing
+            if not current_ver:
+                return ""
+            # Ensure it contains a dot to be major.minor
+            return mm if "." in mm else ""
+        except Exception:
+            return ""
     
     def validate_sun_times_structure(self, data):
         """Validate basic structure of sun_times.json data."""
