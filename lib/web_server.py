@@ -542,6 +542,7 @@ class AsyncWebServer:
                 ".footer-grid .col { display: flex; flex-direction: column; gap: 6px; }"
                 ".footer .col-title { font-size: 12px; color: #555; text-transform: uppercase; letter-spacing: 0.03em; }"
                 ".version { background: #e9ecef; border-left: 4px solid #6c757d; }"
+                ".icon { width: 1em; height: 1em; vertical-align: -0.15em; fill: currentColor; margin-right: 6px; }"
                 "</style>"
             )
             await self._awrite(client_socket, style.encode('utf-8'))
@@ -559,27 +560,65 @@ class AsyncWebServer:
                 "</script>"
             )
             await self._awrite(client_socket, script.encode('utf-8'))
+            
+            # Inline SVG sprite (lightweight shapes)
+            sprite = (
+                "<svg xmlns=\"http://www.w3.org/2000/svg\" style=\"display:none\">"
+                "<symbol id=\"i-clock\" viewBox=\"0 0 24 24\"><circle cx=\"12\" cy=\"12\" r=\"9\" stroke=\"currentColor\" stroke-width=\"2\" fill=\"none\"/><line x1=\"12\" y1=\"12\" x2=\"12\" y2=\"7\" stroke=\"currentColor\" stroke-width=\"2\"/><line x1=\"12\" y1=\"12\" x2=\"16\" y2=\"12\" stroke=\"currentColor\" stroke-width=\"2\"/></symbol>"
+                "<symbol id=\"i-tag\" viewBox=\"0 0 24 24\"><path d=\"M3 12l9-9h6v6l-9 9L3 12z\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"/></symbol>"
+                "<symbol id=\"i-wifi\" viewBox=\"0 0 24 24\"><path d=\"M2 8c5-4 15-4 20 0\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"/><path d=\"M5 11c3.5-3 10.5-3 14 0\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"/><path d=\"M8 14c2-2 6-2 8 0\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"/><circle cx=\"12\" cy=\"18\" r=\"1.5\" fill=\"currentColor\"/></symbol>"
+                "<symbol id=\"i-plug\" viewBox=\"0 0 24 24\"><rect x=\"8\" y=\"8\" width=\"8\" height=\"6\" rx=\"1\" ry=\"1\" stroke=\"currentColor\" fill=\"none\" stroke-width=\"2\"/><line x1=\"10\" y1=\"6\" x2=\"10\" y2=\"8\" stroke=\"currentColor\" stroke-width=\"2\"/><line x1=\"14\" y1=\"6\" x2=\"14\" y2=\"8\" stroke=\"currentColor\" stroke-width=\"2\"/></symbol>"
+                "<symbol id=\"i-sliders\" viewBox=\"0 0 24 24\"><line x1=\"4\" y1=\"6\" x2=\"20\" y2=\"6\" stroke=\"currentColor\" stroke-width=\"2\"/><circle cx=\"10\" cy=\"6\" r=\"2\" fill=\"currentColor\"/><line x1=\"4\" y1=\"12\" x2=\"20\" y2=\"12\" stroke=\"currentColor\" stroke-width=\"2\"/><circle cx=\"14\" cy=\"12\" r=\"2\" fill=\"currentColor\"/><line x1=\"4\" y1=\"18\" x2=\"20\" y2=\"18\" stroke=\"currentColor\" stroke-width=\"2\"/><circle cx=\"8\" cy=\"18\" r=\"2\" fill=\"currentColor\"/></symbol>"
+                "<symbol id=\"i-upload\" viewBox=\"0 0 24 24\"><path d=\"M12 16V8\" stroke=\"currentColor\" stroke-width=\"2\"/><path d=\"M8 12l4-4 4 4\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"/><path d=\"M4 18h16\" stroke=\"currentColor\" stroke-width=\"2\"/></symbol>"
+                "<symbol id=\"i-download\" viewBox=\"0 0 24 24\"><path d=\"M12 8v8\" stroke=\"currentColor\" stroke-width=\"2\"/><path d=\"M8 12l4 4 4-4\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"/><path d=\"M4 18h16\" stroke=\"currentColor\" stroke-width=\"2\"/></symbol>"
+                "<symbol id=\"i-rotate\" viewBox=\"0 0 24 24\"><path d=\"M12 6a6 6 0 1 1-4.24 10.24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"/><polyline points=\"12,2 12,6 8,6\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"/></symbol>"
+                "<symbol id=\"i-code\" viewBox=\"0 0 24 24\"><polyline points=\"8,5 3,12 8,19\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"/><polyline points=\"16,5 21,12 16,19\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"/></symbol>"
+                "</svg>"
+            )
+            await self._awrite(client_socket, sprite.encode('utf-8'))
+            
             await self._awrite(client_socket, b"</head>")
 
             # Body start
             await self._awrite(client_socket, f"<body onload=\"startClock({current_time[3]}, {current_time[4]}, {current_time[5]}); startPageRefresh();\"><div class=\"container\">".encode('utf-8'))
             await self._awrite(client_socket, f"<h1>{config.WEB_TITLE}</h1>".encode('utf-8'))
-            await self._awrite(client_socket, f"<div class=\"time\">🕒 <span id=\"time\">{time_str}</span><br><small>{date_str}</small></div>".encode('utf-8'))
+            await self._awrite(client_socket, (
+                "<div class=\"time\">"
+                "<svg class=\"icon\" aria-hidden=\"true\"><use href=\"#i-clock\"/></svg>"
+                f"<span id=\"time\">{time_str}</span><br><small>{date_str}</small>"
+                "</div>"
+            ).encode('utf-8'))
 
             # Version
-            await self._awrite(client_socket, f"<div class=\"status version\"><strong>🏷️ Config version:</strong> {current_config_version}</div>".encode('utf-8'))
+            await self._awrite(client_socket, (
+                "<div class=\"status version\"><strong>"
+                "<svg class=\"icon\" aria-hidden=\"true\"><use href=\"#i-tag\"/></svg>Config version:" 
+                f"</strong> {current_config_version}</div>"
+            ).encode('utf-8'))
 
             # WiFi
             wifi_class = 'online' if status.get('connections', {}).get('wifi', False) else 'offline'
             wifi_ssid = config_dict.get('wifi', {}).get('ssid', 'Unknown')
             wifi_ip = status.get('network', {}).get('ip', 'N/A')
-            await self._awrite(client_socket, f"<div class=\"status {wifi_class}\"><strong>📶 WiFi:</strong> {wifi_ssid}, {wifi_ip}</div>".encode('utf-8'))
+            await self._awrite(client_socket, (
+                f"<div class=\"status {wifi_class}\"><strong>"
+                "<svg class=\"icon\" aria-hidden=\"true\"><use href=\"#i-wifi\"/></svg>WiFi:"
+                f"</strong> {wifi_ssid}, {wifi_ip}</div>"
+            ).encode('utf-8'))
 
             # MQTT
-            await self._awrite(client_socket, f"<div class=\"status {mqtt_class}\"><strong>🔌 MQTT:</strong> {mqtt_status}</div>".encode('utf-8'))
+            await self._awrite(client_socket, (
+                f"<div class=\"status {mqtt_class}\"><strong>"
+                "<svg class=\"icon\" aria-hidden=\"true\"><use href=\"#i-plug\"/></svg>MQTT:"
+                f"</strong> {mqtt_status}</div>"
+            ).encode('utf-8'))
 
             # Controllers table header
-            await self._awrite(client_socket, "<h2>🎛️ Controllers</h2>".encode('utf-8'))
+            await self._awrite(client_socket, (
+                "<h2>"
+                "<svg class=\"icon\" aria-hidden=\"true\"><use href=\"#i-sliders\"/></svg>Controllers"
+                "</h2>"
+            ).encode('utf-8'))
             await self._awrite(client_socket, (
                 "<table class=\"pwm-table\"><thead><tr>"
                 "<th>Name</th><th>Pin</th><th>Status</th><th>Current Window</th><th>Window Time</th><th>Duty Cycle</th>"
@@ -639,10 +678,10 @@ class AsyncWebServer:
             # Footer
             footer_top = (
                 "<div class=\"footer\"><div class=\"footer-grid\">"
-                "<div class=\"col\"><a href=\"/status\">{{}} Status (JSON)</a></div>"
-                "<div class=\"col\"><a href=\"/upload-config\">⬆️ Upload Config</a><a href=\"/upload-sun-times\">⬆️ Upload Sun Times</a></div>"
-                "<div class=\"col\"><a href=\"/download-config\">⬇️ Download Config</a><a href=\"/download-sun-times\">⬇️ Download Sun Times</a></div>"
-                "<div class=\"col\"><a href=\"/restart\">🔄 Restart Device</a></div>"
+                "<div class=\"col\"><a href=\"/status\"><svg class=\"icon\" aria-hidden=\"true\"><use href=\"#i-code\"/></svg>Status (JSON)</a></div>"
+                "<div class=\"col\"><a href=\"/upload-config\"><svg class=\"icon\" aria-hidden=\"true\"><use href=\"#i-upload\"/></svg>Upload Config</a><a href=\"/upload-sun-times\"><svg class=\"icon\" aria-hidden=\"true\"><use href=\"#i-upload\"/></svg>Upload Sun Times</a></div>"
+                "<div class=\"col\"><a href=\"/download-config\"><svg class=\"icon\" aria-hidden=\"true\"><use href=\"#i-download\"/></svg>Download Config</a><a href=\"/download-sun-times\"><svg class=\"icon\" aria-hidden=\"true\"><use href=\"#i-download\"/></svg>Download Sun Times</a></div>"
+                "<div class=\"col\"><a href=\"/restart\"><svg class=\"icon\" aria-hidden=\"true\"><use href=\"#i-rotate\"/></svg>Restart Device</a></div>"
                 "</div>"
             )
             await self._awrite(client_socket, footer_top.encode('utf-8'))
