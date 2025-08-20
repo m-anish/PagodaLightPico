@@ -6,6 +6,18 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 
 ## [Unreleased]
 
+## [0.2.1] - 2025-08-21
+
+### Added
+- Homepage: lightweight Unicode symbols for key labels (time, config version, WiFi, MQTT, controllers, footer actions).
+
+### Changed
+- Homepage: broadened font stack to include emoji-capable system fonts for reliable symbol rendering, without adding external assets.
+- Reverted previous inline SVG sprite approach to avoid memory pressure on Pico W during page generation.
+
+### Notes
+- Medium-term improvement tracked in `TODO.md`: implement streamed response writer for "/" to further reduce RAM usage during page generation.
+
 ## [0.2.0] - 2025-08-21
 
 ### Added

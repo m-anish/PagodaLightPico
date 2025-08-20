@@ -305,7 +305,7 @@ class AsyncWebServer:
         <title>{config.WEB_TITLE}</title>
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <style>
-            body {{ font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }}
+            body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, 'Noto Sans', 'Liberation Sans', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji'; margin: 20px; background: #f5f5f5; }}
             .container {{ max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; }}
             h1 {{ color: #2c3e50; text-align: center; }}
             h2 {{ color: #34495e; margin-top: 30px; }}
@@ -388,21 +388,21 @@ class AsyncWebServer:
     <body onload="startClock({current_time[3]}, {current_time[4]}, {current_time[5]}); startPageRefresh();">
         <div class="container">
             <h1>{config.WEB_TITLE}</h1>
-            <div class="time"><span id="time">{time_str}</span><br><small>{date_str}</small></div>
+            <div class="time">🕒 <span id="time">{time_str}</span><br><small>{date_str}</small></div>
 
             <div class="status version">
-                <strong>Config version:</strong> {current_config_version}
+                <strong>🏷️ Config version:</strong> {current_config_version}
             </div>
 
             <div class="status {'online' if status.get('connections', {}).get('wifi', False) else 'offline'}">
-                <strong>WiFi:</strong> {config_dict.get('wifi', {}).get('ssid', 'Unknown')}, {status.get('network', {}).get('ip', 'N/A')}
+                <strong>📶 WiFi:</strong> {config_dict.get('wifi', {}).get('ssid', 'Unknown')}, {status.get('network', {}).get('ip', 'N/A')}
             </div>
 
             <div class="status {mqtt_class}">
-                <strong>MQTT:</strong> {mqtt_status}
+                <strong>🔌 MQTT:</strong> {mqtt_status}
             </div>
 
-            <h2>Controllers</h2>
+            <h2>🎛️ Controllers</h2>
             <table class="pwm-table">
                 <thead>
                     <tr>
@@ -422,18 +422,18 @@ class AsyncWebServer:
             <div class="footer">
                 <div class="footer-grid">
                     <div class="col">
-                        <a href="/status">Status (JSON)</a>
+                        <a href="/status">{{}} Status (JSON)</a>
                     </div>
                     <div class="col">
-                        <a href="/upload-config">Upload Config</a>
-                        <a href="/upload-sun-times">Upload Sun Times</a>
+                        <a href="/upload-config">⬆️ Upload Config</a>
+                        <a href="/upload-sun-times">⬆️ Upload Sun Times</a>
                     </div>
                     <div class="col">
-                        <a href="/download-config">Download Config</a>
-                        <a href="/download-sun-times">Download Sun Times</a>
+                        <a href="/download-config">⬇️ Download Config</a>
+                        <a href="/download-sun-times">⬇️ Download Sun Times</a>
                     </div>
                     <div class="col">
-                        <a href="/restart">Restart Device</a>
+                        <a href="/restart">🔄 Restart Device</a>
                     </div>
                 </div>
                 <div style="margin-top:8px;font-size:12px;color:#666;">
