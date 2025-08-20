@@ -332,7 +332,7 @@ class AsyncWebServer:
             
             // Page refresh functionality
             function startPageRefresh() {{
-                let secondsLeft = 60;
+                let secondsLeft = 180;
                 const refreshEl = document.getElementById('refresh-countdown');
                 
                 function updateCountdown() {{
@@ -350,10 +350,10 @@ class AsyncWebServer:
                 // Update countdown every second
                 countdownInterval = setInterval(updateCountdown, 1000);
                 
-                // Set page refresh for 60 seconds
+                // Set page refresh for 180 seconds
                 refreshInterval = setTimeout(() => {{
                     location.reload();
-                }}, 60000);
+                }}, 180000);
             }}
             
             // Cleanup intervals on page unload
