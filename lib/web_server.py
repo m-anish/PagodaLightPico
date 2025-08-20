@@ -518,7 +518,7 @@ class AsyncWebServer:
         <h1>Upload Configuration</h1>
         
         <div class="warning">
-            <strong>Warning:</strong> Uploading a new configuration will replace the current settings and trigger a soft reboot. 
+            <strong>Warning:</strong> Uploading a new configuration will replace the current settings and trigger a restart. 
             Make sure your configuration is valid to avoid system issues.
         </div>
         
@@ -625,7 +625,7 @@ class AsyncWebServer:
     <div class="container">
         <h1>Configuration Updated Successfully</h1>
         <div class="success">
-            <p>The new configuration has been uploaded and validated. The system will perform a soft reboot in a few seconds.</p>
+            <p>The new configuration has been uploaded and validated. The system will restart in a few seconds.</p>
             <p>You will be redirected to the home page automatically.</p>
         </div>
         <p><a href="/">Return to Home</a></p>
@@ -712,7 +712,7 @@ class AsyncWebServer:
         </div>
         
         <div class="warning">
-            <strong>Warning:</strong> Uploading new sun times data will replace the current data and trigger a soft reboot.
+            <strong>Warning:</strong> Uploading new sun times data will replace the current data and trigger a restart.
             Make sure your JSON file is properly formatted.
         </div>
         
@@ -816,7 +816,7 @@ class AsyncWebServer:
     <div class="container">
         <h1>Sun Times Data Updated Successfully</h1>
         <div class="success">
-            <p>The new sun times data has been uploaded successfully. The system will perform a soft reboot in a few seconds.</p>
+            <p>The new sun times data has been uploaded successfully. The system will restart in a few seconds.</p>
             <p>You will be redirected to the home page automatically.</p>
         </div>
         <p><a href="/">Return to Home</a></p>
