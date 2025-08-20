@@ -217,6 +217,8 @@ class AsyncWebServer:
             # Get PWM controller status and full config for including disabled controllers
             pwm_status = multi_pwm.get_pin_status()
             config_dict = config.config_manager.get_config_dict()
+            # Determine current config version for display
+            current_config_version = str(config_dict.get('version', '')).strip() or 'unknown'
 
             # Build Controllers table HTML (include disabled pins too)
             pwm_table_rows = ""
@@ -307,6 +309,7 @@ class AsyncWebServer:
             .footer a {{ color: #007bff; text-decoration: none; margin: 0 10px; }}
             .footer a:hover {{ text-decoration: underline; }}
             .refresh-info {{ font-size: 11px; color: #999; margin-top: 10px; }}
+            .version {{ background: #e9ecef; border-left: 4px solid #6c757d; }}
         </style>
         <script>
             let clockInterval;
@@ -368,6 +371,10 @@ class AsyncWebServer:
         <div class="container">
             <h1>{config.WEB_TITLE}</h1>
             <div class="time"><span id="time">{time_str}</span><br><small>{date_str}</small></div>
+
+            <div class="status version">
+                <strong>Config version:</strong> {current_config_version}
+            </div>
 
             <div class="status {'online' if status.get('connections', {}).get('wifi', False) else 'offline'}">
                 <strong>WiFi:</strong> {config_dict.get('wifi', {}).get('ssid', 'Unknown')}, {status.get('network', {}).get('ip', 'N/A')}
@@ -679,7 +686,7 @@ class AsyncWebServer:
                 if not uploaded_ver:
                     return self.generate_upload_error("Missing 'version' in config.json. Please use sample config for your release.")
                 expected_prefix = self._expected_version_prefix()
-                if expected_prefix and not self._version_compatible(uploaded_ver, expected_prefix):
+                if not self._version_compatible(uploaded_ver, expected_prefix):
                     return self.generate_upload_error(f"Incompatible config version '{uploaded_ver}'. Expected {expected_prefix}.x (to match device config)")
             except Exception as e:
                 return self.generate_upload_error(f"Version check failed: {e}")
@@ -885,7 +892,7 @@ class AsyncWebServer:
                 if not uploaded_ver:
                     return self.generate_sun_times_upload_error("Missing 'version' in sun_times.json. Please use sample file for your release.")
                 expected_prefix = self._expected_version_prefix()
-                if expected_prefix and not self._version_compatible(uploaded_ver, expected_prefix):
+                if not self._version_compatible(uploaded_ver, expected_prefix):
                     return self.generate_sun_times_upload_error(f"Incompatible sun_times version '{uploaded_ver}'. Expected {expected_prefix}.x (to match device config)")
             except Exception as e:
                 return self.generate_sun_times_upload_error(f"Version check failed: {e}")
@@ -961,19 +968,20 @@ class AsyncWebServer:
         return self._major_minor(uploaded_ver) == expected_prefix
 
     def _expected_version_prefix(self):
-        """Return major.minor from current running config.json's version.
-        If not present, return empty string to skip strict checking.
+        """Return required major.minor from current running config.json's version.
+        Raises ValueError if the running config has no valid major.minor version.
         """
         try:
             current_ver = str(config.config_manager.get_config_dict().get('version', '')).strip()
-            mm = self._major_minor(current_ver)
-            # If mm is empty or same as full string but without a dot, treat as missing
             if not current_ver:
-                return ""
-            # Ensure it contains a dot to be major.minor
-            return mm if "." in mm else ""
-        except Exception:
-            return ""
+                raise ValueError("Running config has no 'version'.")
+            mm = self._major_minor(current_ver)
+            if "." not in mm:
+                raise ValueError(f"Running config version '{current_ver}' is invalid; expected major.minor.patch like '0.2.0'.")
+            return mm
+        except Exception as e:
+            # Re-raise to force callers to handle as hard error
+            raise e
     
     def validate_sun_times_structure(self, data):
         """Validate basic structure of sun_times.json data."""

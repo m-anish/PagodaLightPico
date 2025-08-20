@@ -36,7 +36,10 @@ The system now uses JSON-based configuration for easy runtime updates:
 - **Timezone**: Name and UTC offset in hours
 - **Hardware**: GPIO pins for RTC I2C and LED PWM, PWM frequency
 - **System**: Log level and intervals/tunables
-- **Version**: Set `version` (e.g., `0.2.0`). When uploading via the web UI, the file's major.minor (e.g., `0.2`) must match the device firmware to be accepted.
+- **Version**: Set `version` (e.g., `0.2.0`).
+  - The web UI enforces that the uploaded file's major.minor (e.g., `0.2`) must match the device's running config version's major.minor.
+  - If the running config has no valid semantic version (missing or not like `X.Y.Z`), uploads are rejected with a hard error until `config.json` is fixed.
+  - Both `config.json` and `sun_times.json` must include a `version` field and follow the same major.minor matching rule.
   - `update_interval` (seconds): PWM update cadence. Default: 120
   - `network_check_interval` (seconds): Network monitor cadence. Default: 120
   - `server_idle_sleep_ms` (milliseconds): Web server accept-loop idle backoff. Default: 300
@@ -54,6 +57,7 @@ The new Microdot-powered web interface provides:
 #### Main Dashboard (`/`)
 - 🏛️ **System status overview** with real-time information
 - ⏰ **Current time and date** display
+- 🧾 **Config version display** (shows current `config.json` version)
 - 📡 **Connection status** (WiFi, MQTT, Web Server)
 - 💡 **Active PWM pins** summary with configuration details
 - 🧭 **Navigation** to configuration and status pages
