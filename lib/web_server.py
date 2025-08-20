@@ -906,13 +906,15 @@ class AsyncWebServer:
         return response
 
     async def soft_reboot_delayed(self):
-        """Perform soft reboot after a short delay."""
+        """Perform hard reset after a short delay."""
         try:
-            await asyncio.sleep(3)  # Wait 3 seconds
-            log.info("[WEB] Performing soft reboot after file update")
-            machine.soft_reset()
+            # Wait a bit longer to ensure the HTTP response is flushed to client
+            await asyncio.sleep(5)
+            log.info("[WEB] Performing hard reset after file update")
+            # Hard reset is more reliable to clear all state (sockets, tasks)
+            machine.reset()
         except Exception as e:
-            log.error(f"[WEB] Error during soft reboot: {e}")
+            log.error(f"[WEB] Error during hard reset: {e}")
 
 # Global web server instance
 web_server = AsyncWebServer()
