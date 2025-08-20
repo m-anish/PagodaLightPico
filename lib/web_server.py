@@ -185,6 +185,9 @@ class AsyncWebServer:
                     response = await self.handle_sun_times_upload(request_str)
                 else:
                     response = self.generate_404()
+            elif path == '/restart':
+                # Show restart page and schedule hard reset
+                response = self.generate_restart_page()
             else:
                 response = self.generate_404()
             
@@ -386,6 +389,7 @@ class AsyncWebServer:
                 <a href="/download-sun-times">Download Sun Times</a>
                 <a href="/upload-config">Upload Config</a>
                 <a href="/upload-sun-times">Upload Sun Times</a>
+                <a href="/restart">Restart Device</a>
                 <div class="refresh-info" id="refresh-countdown"></div>
             </div>
         </div>
@@ -452,6 +456,54 @@ class AsyncWebServer:
 </html>"""
         response = f"HTTP/1.1 500 Internal Server Error\r\nContent-Type: text/html\r\nContent-Length: {len(html)}\r\nConnection: close\r\n\r\n{html}"
         return response
+
+    def generate_restart_page(self):
+        """Generate a page that informs the user of an imminent restart and triggers it."""
+        try:
+            # Schedule the hard reset with a short delay so the response can flush
+            asyncio.create_task(self.soft_reboot_delayed())
+
+            html = """<!DOCTYPE html>
+<html>
+<head>
+    <title>Restarting - PagodaLightPico</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta http-equiv="refresh" content="8;url=/">
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+        .container { max-width: 600px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; text-align: center; }
+        .info { background: #d1ecf1; border: 1px solid #bee5eb; padding: 15px; border-radius: 4px; margin: 20px 0; color: #0c5460; }
+    </style>
+    <script>
+        // Simple countdown display
+        let seconds = 5;
+        function tick() {
+            const el = document.getElementById('count');
+            if (!el) return;
+            el.textContent = seconds;
+            seconds--;
+            if (seconds >= 0) setTimeout(tick, 1000);
+        }
+        window.onload = tick;
+    </script>
+</head>
+<body>
+    <div class="container">
+        <h1>Restarting Device</h1>
+        <div class="info">
+            <p>The device will restart in <strong id="count">5</strong> seconds.</p>
+            <p>You will be redirected to the home page automatically after restart.</p>
+        </div>
+        <p><a href="/">Return to Home</a></p>
+    </div>
+</body>
+</html>"""
+
+            response = f"HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: {len(html)}\r\nConnection: close\r\n\r\n{html}"
+            return response
+        except Exception as e:
+            log.error(f"[WEB] Error generating restart page: {e}")
+            return self.generate_500()
     
     def generate_config_download(self):
         """Generate config.json download response."""
