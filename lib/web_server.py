@@ -94,6 +94,8 @@ class AsyncWebServer:
             request_data = b""
             start_time = time.time()
             
+            # First read until headers are complete (\r\n\r\n)
+            headers_end = -1
             while time.time() - start_time < 5:  # 5 second timeout
                 try:
                     chunk = client_socket.recv(1024)
@@ -101,6 +103,7 @@ class AsyncWebServer:
                         break
                     request_data += chunk
                     if b'\r\n\r\n' in request_data:
+                        headers_end = request_data.find(b'\r\n\r\n')
                         break
                 except OSError:
                     await asyncio.sleep(0.01)
@@ -109,7 +112,37 @@ class AsyncWebServer:
             if not request_data:
                 return
             
-            # Parse request
+            # If we have headers, check for Content-Length and read the body fully
+            if headers_end != -1:
+                headers_bytes = request_data[:headers_end]
+                # Decode headers permissively
+                try:
+                    headers_text = headers_bytes.decode('utf-8')
+                except:
+                    headers_text = headers_bytes.decode('latin-1')
+
+                content_length = 0
+                for hline in headers_text.split('\r\n'):
+                    if hline.lower().startswith('content-length:'):
+                        try:
+                            content_length = int(hline.split(':', 1)[1].strip())
+                        except:
+                            content_length = 0
+                        break
+
+                total_expected = headers_end + 4 + content_length
+                # Read remaining body if any
+                while len(request_data) < total_expected and (time.time() - start_time) < 5:
+                    try:
+                        chunk = client_socket.recv(1024)
+                        if not chunk:
+                            break
+                        request_data += chunk
+                    except OSError:
+                        await asyncio.sleep(0.01)
+                        continue
+
+            # Parse request (headers + body)
             try:
                 request_str = request_data.decode('utf-8')
             except:
@@ -518,39 +551,37 @@ class AsyncWebServer:
     async def handle_config_upload(self, request_str):
         """Handle config file upload and validation."""
         try:
-            # Parse multipart form data (simplified for MicroPython)
+            # Parse multipart form data (simplified and robust)
             lines = request_str.split('\r\n')
-            
-            # Find the boundary
+
+            # Find boundary from headers
             boundary = None
             for line in lines:
                 if line.startswith('Content-Type: multipart/form-data'):
-                    boundary_part = line.split('boundary=')
-                    if len(boundary_part) > 1:
-                        boundary = '--' + boundary_part[1]
+                    parts = line.split('boundary=')
+                    if len(parts) > 1:
+                        boundary = '--' + parts[1].strip()
                         break
-            
+
             if not boundary:
                 return self.generate_upload_error("Invalid multipart data")
-            
-            # Find the file content
+
+            # Split parts by boundary and extract the part with a filename
             file_content = None
-            in_file_data = False
-            content_lines = []
-            
-            for line in lines:
-                if in_file_data:
-                    if line.startswith(boundary):
+            parts = request_str.split(boundary)
+            for part in parts:
+                if 'Content-Disposition: form-data' in part and 'filename=' in part:
+                    # Separate headers and body of this part
+                    if '\r\n\r\n' in part:
+                        body = part.split('\r\n\r\n', 1)[1]
+                        # Trim the trailing CRLF and any ending markers
+                        body = body.strip('\r\n')
+                        # Exclude potential closing boundary markers that may be concatenated
+                        if body.endswith('--'):
+                            body = body[:-2]
+                        file_content = body.strip()
                         break
-                    content_lines.append(line)
-                elif 'Content-Disposition: form-data' in line and 'filename=' in line:
-                    # Skip the next line (Content-Type) and empty line
-                    in_file_data = True
-                    continue
-            
-            if content_lines:
-                file_content = '\r\n'.join(content_lines).strip()
-            
+
             if not file_content:
                 return self.generate_upload_error("No file content found")
             
@@ -714,39 +745,34 @@ class AsyncWebServer:
     async def handle_sun_times_upload(self, request_str):
         """Handle sun_times.json file upload and validation."""
         try:
-            # Parse multipart form data (simplified for MicroPython)
+            # Parse multipart form data (simplified and robust)
             lines = request_str.split('\r\n')
-            
-            # Find the boundary
+
+            # Find boundary from headers
             boundary = None
             for line in lines:
                 if line.startswith('Content-Type: multipart/form-data'):
-                    boundary_part = line.split('boundary=')
-                    if len(boundary_part) > 1:
-                        boundary = '--' + boundary_part[1]
+                    parts = line.split('boundary=')
+                    if len(parts) > 1:
+                        boundary = '--' + parts[1].strip()
                         break
-            
+
             if not boundary:
                 return self.generate_sun_times_upload_error("Invalid multipart data")
-            
-            # Find the file content
+
+            # Split parts by boundary and extract the part with a filename
             file_content = None
-            in_file_data = False
-            content_lines = []
-            
-            for line in lines:
-                if in_file_data:
-                    if line.startswith(boundary):
+            parts = request_str.split(boundary)
+            for part in parts:
+                if 'Content-Disposition: form-data' in part and 'filename=' in part:
+                    if '\r\n\r\n' in part:
+                        body = part.split('\r\n\r\n', 1)[1]
+                        body = body.strip('\r\n')
+                        if body.endswith('--'):
+                            body = body[:-2]
+                        file_content = body.strip()
                         break
-                    content_lines.append(line)
-                elif 'Content-Disposition: form-data' in line and 'filename=' in line:
-                    # Skip the next line (Content-Type) and empty line
-                    in_file_data = True
-                    continue
-            
-            if content_lines:
-                file_content = '\r\n'.join(content_lines).strip()
-            
+
             if not file_content:
                 return self.generate_sun_times_upload_error("No file content found")
             
