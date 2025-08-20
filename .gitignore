@@ -20,6 +20,7 @@ __pycache__/
 # Local config files with sensitive data
 config.py
 config.json
+sun_times.json
 
 # Log files
 *.log
