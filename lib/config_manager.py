@@ -131,7 +131,7 @@ class ConfigManager:
         # System settings
         system = self.config.get("system", {})
         self.LOG_LEVEL = system.get("log_level", "INFO")
-        self.UPDATE_INTERVAL = system.get("update_interval", 60)
+        self.UPDATE_INTERVAL = system.get("update_interval", 120)
         
         # Notification settings  
         notifications = self.config.get("notifications", {})
