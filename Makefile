@@ -4,7 +4,7 @@ PORT ?=
 NO_RESET ?=
 DRY_RUN ?=
 
-.PHONY: deploy deploy-dry deploy-nr logs reboot
+.PHONY: deploy deploy-dry deploy-nr logs reboot clean-device backup-device
 
 ## deploy: Upload Python + JSON files to Pico W and soft-reset
 deploy:
@@ -44,3 +44,27 @@ reboot:
 	  mpremote connect "$$PORT_DET" exec 'import machine; machine.reset()' >/dev/null 2>&1 || true; \
 	  echo "[make] Reset command sent."; \
 	fi
+
+## clean-device: Remove non-runtime files from the Pico, keeping main.py/boot.py/*.json and lib/**/*.py
+clean-device:
+	@PORT_DET=$${PORT:-$$(ls /dev/ttyACM* /dev/ttyUSB* 2>/dev/null | head -n1)}; \
+	if [ -z "$$PORT_DET" ]; then \
+	  echo "[make] ERROR: No serial device found. Set PORT=/dev/ttyACM0"; \
+	  exit 1; \
+	fi; \
+	echo "[make] Running cleanup on $$PORT_DET..."; \
+	mpremote connect "$$PORT_DET" run scripts/device_clean.py
+
+## backup-device: Copy entire device filesystem into backups/<timestamp>/ (read-only operation)
+backup-device:
+	@PORT_DET=$${PORT:-$$(ls /dev/ttyACM* /dev/ttyUSB* 2>/dev/null | head -n1)}; \
+	if [ -z "$$PORT_DET" ]; then \
+	  echo "[make] ERROR: No serial device found. Set PORT=/dev/ttyACM0"; \
+	  exit 1; \
+	fi; \
+	TS=$$(date +%Y%m%d-%H%M%S); \
+	DEST=backups/device-$$TS; \
+	echo "[make] Backing up device filesystem from $$PORT_DET to $$DEST ..."; \
+	mkdir -p "$$DEST"; \
+	# Attempt recursive copy of all files/dirs from device root
+	mpremote connect "$$PORT_DET" cp -r :/ "$$DEST" || { echo "[make] WARN: Recursive copy may not be fully supported by your mpremote; consider manual pulls."; exit 1; }
