@@ -238,9 +238,10 @@ async def network_monitor_task():
     while True:
         try:
             current_time = time.time()
+            elapsed = current_time - last_network_check
             
             # Periodic network health check
-            if current_time - last_network_check >= network_check_interval:
+            if elapsed >= network_check_interval:
                 try:
                     import network
                     wlan = network.WLAN(network.STA_IF)
@@ -275,8 +276,12 @@ async def network_monitor_task():
                     log.error(f"[NETWORK] Network health check error: {e}")
                     last_network_check = current_time
             
-            # Yield control to other tasks
-            await asyncio.sleep(1)
+            # Sleep until the next check window (clamped to avoid very long sleeps)
+            now = time.time()
+            remaining = network_check_interval - (now - last_network_check)
+            # Clamp between 0.5s and 5s to remain responsive to cancellations/errors
+            sleep_time = 5.0 if remaining > 5.0 else (0.5 if remaining < 0.5 else remaining)
+            await asyncio.sleep(sleep_time)
             
         except Exception as e:
             log.error(f"Error in network monitor task: {e}")
