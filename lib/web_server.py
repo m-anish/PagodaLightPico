@@ -323,6 +323,9 @@ class AsyncWebServer:
             .pwm-table tr.active {{ background-color: #d4edda; }}
             .pwm-table tr.inactive {{ background-color: #f8f9fa; }}
             .pwm-table tr.disabled {{ background-color: #ffe0b2; }}
+            .table-responsive {{ width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }}
+            /* Ensure table can scroll horizontally on small screens */
+            .pwm-table {{ min-width: 560px; }}
             .footer {{ text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; }}
             .footer a {{ color: #007bff; text-decoration: none; }}
             .footer a:hover {{ text-decoration: underline; }}
@@ -331,6 +334,18 @@ class AsyncWebServer:
             .footer-grid .col {{ display: flex; flex-direction: column; gap: 6px; }}
             .footer .col-title {{ font-size: 12px; color: #555; text-transform: uppercase; letter-spacing: 0.03em; }}
             .version {{ background: #e9ecef; border-left: 4px solid #6c757d; }}
+            /* Mobile tweaks */
+            @media (max-width: 480px) {{
+                .container {{ padding: 12px; }}
+                .pwm-table th, .pwm-table td {{ padding: 6px 8px; font-size: 12px; }}
+            }}
+            /* Very small screens: hide Pin and Window Time columns */
+            @media (max-width: 420px) {{
+                .pwm-table th:nth-child(2), .pwm-table td:nth-child(2),
+                .pwm-table th:nth-child(5), .pwm-table td:nth-child(5) {{
+                    display: none;
+                }}
+            }}
         </style>
         <script>
             let clockInterval;
@@ -406,6 +421,7 @@ class AsyncWebServer:
             </div>
 
             <h2>🎛️ Controllers</h2>
+            <div class="table-responsive">
             <table class="pwm-table">
                 <thead>
                     <tr>
@@ -421,11 +437,12 @@ class AsyncWebServer:
                     {pwm_table_rows}
                 </tbody>
             </table>
+            </div>
 
             <div class="footer">
                 <div class="footer-grid">
                     <div class="col">
-                        <a href="/status">{{}} Status (JSON)</a>
+                        <a href="/status">📄 Status (JSON)</a>
                     </div>
                     <div class="col">
                         <a href="/upload-config">⬆️ Upload Config</a>
@@ -534,6 +551,8 @@ class AsyncWebServer:
                 ".pwm-table tr.active { background-color: #d4edda; }"
                 ".pwm-table tr.inactive { background-color: #f8f9fa; }"
                 ".pwm-table tr.disabled { background-color: #ffe0b2; }"
+                ".table-responsive { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }"
+                ".pwm-table { min-width: 560px; }"
                 ".footer { text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; }"
                 ".footer a { color: #007bff; text-decoration: none; }"
                 ".footer a:hover { text-decoration: underline; }"
@@ -542,6 +561,8 @@ class AsyncWebServer:
                 ".footer-grid .col { display: flex; flex-direction: column; gap: 6px; }"
                 ".footer .col-title { font-size: 12px; color: #555; text-transform: uppercase; letter-spacing: 0.03em; }"
                 ".version { background: #e9ecef; border-left: 4px solid #6c757d; }"
+                "@media (max-width: 480px){.container{padding:12px;}.pwm-table th,.pwm-table td{padding:6px 8px;font-size:12px;}}"
+                "@media (max-width: 420px){.pwm-table th:nth-child(2),.pwm-table td:nth-child(2),.pwm-table th:nth-child(5),.pwm-table td:nth-child(5){display:none;}}"
                 "</style>"
             )
             await self._awrite(client_socket, style.encode('utf-8'))
@@ -580,6 +601,7 @@ class AsyncWebServer:
 
             # Controllers table header
             await self._awrite(client_socket, "<h2>🎛️ Controllers</h2>".encode('utf-8'))
+            await self._awrite(client_socket, "<div class=\"table-responsive\">".encode('utf-8'))
             await self._awrite(client_socket, (
                 "<table class=\"pwm-table\"><thead><tr>"
                 "<th>Name</th><th>Pin</th><th>Status</th><th>Current Window</th><th>Window Time</th><th>Duty Cycle</th>"
@@ -635,14 +657,15 @@ class AsyncWebServer:
 
             # Close table
             await self._awrite(client_socket, b"</tbody></table>")
+            await self._awrite(client_socket, b"</div>")
 
             # Footer
             footer_top = (
-                "<div class=\\"footer\\"><div class=\\"footer-grid\\">"
-                "<div class=\\"col\\"><a href=\\"/status\\">{} Status (JSON)</a></div>"
-                "<div class=\\"col\\"><a href=\\"/upload-config\\">⬆️ Upload Config</a><a href=\\"/upload-sun-times\\">⬆️ Upload Sun Times</a></div>"
-                "<div class=\\"col\\"><a href=\\"/download-config\\">⬇️ Download Config</a><a href=\\"/download-sun-times\\">⬇️ Download Sun Times</a></div>"
-                "<div class=\\"col\\"><a href=\\"/restart\\">🔄 Restart Device</a></div>"
+                "<div class=\"footer\"><div class=\"footer-grid\">"
+                "<div class=\"col\"><a href=\"/status\">📄 Status (JSON)</a></div>"
+                "<div class=\"col\"><a href=\"/upload-config\">⬆️ Upload Config</a><a href=\"/upload-sun-times\">⬆️ Upload Sun Times</a></div>"
+                "<div class=\"col\"><a href=\"/download-config\">⬇️ Download Config</a><a href=\"/download-sun-times\">⬇️ Download Sun Times</a></div>"
+                "<div class=\"col\"><a href=\"/restart\">🔄 Restart Device</a></div>"
                 "</div>"
             )
             await self._awrite(client_socket, footer_top.encode('utf-8'))
