@@ -155,7 +155,7 @@ class AsyncWebServer:
             time_str = f"{current_time[3]:02d}:{current_time[4]:02d}:{current_time[5]:02d}"
             date_str = f"{current_time[2]:02d}/{current_time[1]:02d}/{current_time[0]}"
             
-            status = system_status.get_status()
+            status = system_status.get_status_dict()
             
             html = f"""<!DOCTYPE html>
 <html>
@@ -177,16 +177,16 @@ class AsyncWebServer:
         <h1>🏛️ PagodaLightPico</h1>
         <div class="time">{time_str}<br><small>{date_str}</small></div>
         
-        <div class="status {'online' if status.get('wifi', False) else 'offline'}">
-            <strong>WiFi:</strong> {'Connected' if status.get('wifi', False) else 'Offline'}
+        <div class="status {'online' if status.get('connections', {}).get('wifi', False) else 'offline'}">
+            <strong>WiFi:</strong> {'Connected' if status.get('connections', {}).get('wifi', False) else 'Offline'}
         </div>
         
-        <div class="status {'online' if status.get('web_server', False) else 'offline'}">
-            <strong>Web Server:</strong> {'Running' if status.get('web_server', False) else 'Stopped'}
+        <div class="status {'online' if status.get('connections', {}).get('web_server', False) else 'offline'}">
+            <strong>Web Server:</strong> {'Running' if status.get('connections', {}).get('web_server', False) else 'Stopped'}
         </div>
         
-        <div class="status {'online' if status.get('mqtt', False) else 'offline'}">
-            <strong>MQTT:</strong> {'Connected' if status.get('mqtt', False) else 'Offline'}
+        <div class="status {'online' if status.get('connections', {}).get('mqtt', False) else 'offline'}">
+            <strong>MQTT:</strong> {'Connected' if status.get('connections', {}).get('mqtt', False) else 'Offline'}
         </div>
         
         <p style="text-align: center; margin-top: 30px;">
@@ -207,7 +207,7 @@ class AsyncWebServer:
         """Generate JSON status response."""
         try:
             current_time = rtc_module.get_current_time()
-            status = system_status.get_status()
+            status = system_status.get_status_dict()
             
             data = {
                 'timestamp': time.time(),
@@ -218,9 +218,10 @@ class AsyncWebServer:
                     'day': current_time[2],
                     'month': current_time[1],
                     'year': current_time[0]
-                },
-                'status': status
+                }
             }
+            # Merge the status dictionary into data
+            data.update(status)
             
             json_str = json.dumps(data)
             response = f"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {len(json_str)}\r\nConnection: close\r\n\r\n{json_str}"
