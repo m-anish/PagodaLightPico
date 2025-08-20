@@ -23,8 +23,9 @@ A MicroPython-based LED lighting controller for the Dhamma Laddha Vipassana medi
 
 1. Clone this repository to your local machine.
 2. **Copy `config.json.sample` to `config.json`** and update it with your WiFi credentials, timezone offset/name, I2C pins, and other settings.
-3. Copy all files to your Raspberry Pi Pico W.
-4. Boot the Pico W; the system will connect to WiFi, sync time, and start LED control.
+3. **Copy `sun_times.json.sample` to `sun_times.json`** and adjust for your location (latitude/longitude) and local sunrise/sunset times.
+4. Copy all files to your Raspberry Pi Pico W.
+5. Boot the Pico W; the system will connect to WiFi, sync time, and start LED control.
 
 ## Configuration
 
@@ -164,7 +165,7 @@ The device can publish JSON events (window changes, errors, system events) to an
 - Copy sample config: `cp config.json.sample config.json`
 - Deploy files to Pico W (choose one tool):
   - rshell: `rshell -p /dev/ttyACM0 cp -r . /pyboard/`
-  - ampy: `ampy -p /dev/ttyACM0 put lib/ && ampy -p /dev/ttyACM0 put main.py && ampy -p /dev/ttyACM0 put config.json`
+  - ampy: `ampy -p /dev/ttyACM0 put lib/ && ampy -p /dev/ttyACM0 put main.py && ampy -p /dev/ttyACM0 put config.json && ampy -p /dev/ttyACM0 put sun_times.json`
 - REPL/debug: `rshell -p /dev/ttyACM0 repl` or `screen /dev/ttyACM0 115200`
 - After edits: Ctrl+D in REPL for soft reset
 - Check memory in REPL: `import gc; gc.collect(); print(gc.mem_free())`
