@@ -6,6 +6,22 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 
 ## [Unreleased]
 
+## [0.4.0] - 2025-08-21
+
+### Added
+- PWM config: allow using dynamic placeholders `"sunrise"` and `"sunset"` for any time window `start`/`end` in `pwm_pins.*.time_windows`.
+- Daily caching of resolved sunrise/sunset in runtime to avoid repeated lookups; automatically refreshes after midnight based on RTC date.
+
+### Changed
+- Runtime resolution generalized in `main.py:get_current_window_for_pin()` to replace placeholders across all windows (not only a `day` window). Resolution operates on a copy without mutating the loaded config.
+- Hardened time parsing to skip any window whose start/end are not valid `HH:MM` strings after resolution (prevents ValueError logs).
+
+### Validation
+- `lib/config_manager.py`: `_is_valid_time_format()` now accepts `"sunrise"`/`"sunset"` in addition to `HH:MM`.
+
+### Samples
+- `config.json.sample`: demonstrate using `"sunrise"`/`"sunset"` in `day`, `evening`, and `night` windows.
+
 ## [0.3.0] - 2025-08-21
 
 ### Changed

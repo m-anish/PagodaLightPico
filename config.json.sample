@@ -1,5 +1,5 @@
 {
-  "version": "0.3.0",
+  "version": "0.4.0",
   "wifi": {
     "ssid": "your_wifi_ssid_here",
     "password": "your_wifi_password_here"
@@ -40,18 +40,18 @@
       "enabled": true,
       "time_windows": {
         "day": {
-          "start": "06:00",
-          "end": "18:00",
+          "start": "sunrise",
+          "end": "sunset",
           "duty_cycle": 0
         },
         "evening": {
-          "start": "18:00",
+          "start": "sunset",
           "end": "22:00",
           "duty_cycle": 60
         },
         "night": {
           "start": "22:00",
-          "end": "06:00",
+          "end": "sunrise",
           "duty_cycle": 20
         }
       }
@@ -62,13 +62,13 @@
       "enabled": false,
       "time_windows": {
         "day": {
-          "start": "06:00",
-          "end": "18:00",
+          "start": "sunrise",
+          "end": "sunset",
           "duty_cycle": 0
         },
         "night": {
-          "start": "18:00",
-          "end": "06:00",
+          "start": "sunset",
+          "end": "sunrise",
           "duty_cycle": 30
         }
       }

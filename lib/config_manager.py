@@ -311,7 +311,12 @@ class ConfigManager:
         """Validate time format HH:MM."""
         if not isinstance(time_str, str):
             return False
-        
+
+        # Allow dynamic placeholders
+        lower = time_str.strip().lower()
+        if lower in ("sunrise", "sunset"):
+            return True
+
         try:
             parts = time_str.split(":")
             if len(parts) != 2:

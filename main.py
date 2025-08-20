@@ -76,6 +76,29 @@ else:
 # Initialize PWM controller (already initialized in constructor)
 # multi_pwm is ready to use
 
+# Cached sunrise/sunset resolved strings per day to avoid recomputation
+_last_rise_set_date = None  # (year, month, day)
+_rise_str = None
+_set_str = None
+
+def _get_today_rise_set(current_time_tuple):
+    """
+    Return (rise_str, set_str) for the provided RTC date, recomputing only when the date changes.
+    """
+    global _last_rise_set_date, _rise_str, _set_str
+    try:
+        y, m, d = current_time_tuple[0], current_time_tuple[1], current_time_tuple[2]
+        cur_date = (y, m, d)
+        if _last_rise_set_date != cur_date or _rise_str is None or _set_str is None:
+            rh, rm, sh, sm = sun_times.get_sunrise_sunset(m, d)
+            _rise_str = f"{rh:02d}:{rm:02d}"
+            _set_str = f"{sh:02d}:{sm:02d}"
+            _last_rise_set_date = cur_date
+        return _rise_str, _set_str
+    except Exception as e:
+        log.error(f"Error caching sunrise/sunset: {e}")
+        return None, None
+
 def get_current_window_for_pin(pin_config):
     """
     Determine which time window is currently active for a specific pin.
@@ -93,28 +116,30 @@ def get_current_window_for_pin(pin_config):
         current_minutes_since_midnight = current_hour * 60 + current_minute
         
         time_windows = pin_config.get('time_windows', {})
-        
-        # Handle dynamic day window with sunrise/sunset
-        if 'day' in time_windows:
-            day_window = time_windows['day'].copy()
-            try:
-                # Get current month and day for sunrise/sunset lookup
-                current_month = current_time[1]  # Month from RTC time tuple
-                current_day = current_time[2]    # Day from RTC time tuple
-                sunrise_sunset_data = sun_times.get_sunrise_sunset(current_month, current_day)
-                
-                # Extract sunrise and sunset times (format: (sunrise_hour, sunrise_min, sunset_hour, sunset_min))
-                sunrise_time = (sunrise_sunset_data[0], sunrise_sunset_data[1])
-                sunset_time = (sunrise_sunset_data[2], sunrise_sunset_data[3])
-                
-                day_window['start'] = f"{sunrise_time[0]:02d}:{sunrise_time[1]:02d}"
-                day_window['end'] = f"{sunset_time[0]:02d}:{sunset_time[1]:02d}"
-                time_windows['day'] = day_window
-            except Exception as e:
-                log.error(f"Error getting sunrise/sunset times: {e}")
+
+        # Build a resolved copy of windows replacing placeholders with today's times
+        resolved_windows = {}
+        rise_str, set_str = _get_today_rise_set(current_time)
+
+        for window_name, window_cfg in time_windows.items():
+            if not isinstance(window_cfg, dict):
+                continue
+            # shallow copy
+            wc = dict(window_cfg)
+            s = wc.get('start')
+            e = wc.get('end')
+            if isinstance(s, str) and rise_str is not None and s.strip().lower() == 'sunrise':
+                wc['start'] = rise_str
+            if isinstance(s, str) and set_str is not None and s.strip().lower() == 'sunset':
+                wc['start'] = set_str
+            if isinstance(e, str) and rise_str is not None and e.strip().lower() == 'sunrise':
+                wc['end'] = rise_str
+            if isinstance(e, str) and set_str is not None and e.strip().lower() == 'sunset':
+                wc['end'] = set_str
+            resolved_windows[window_name] = wc
         
         # Check each time window to see if current time falls within it
-        for window_name, window_config in time_windows.items():
+        for window_name, window_config in resolved_windows.items():
             if not isinstance(window_config, dict):
                 continue
                 
@@ -125,6 +150,11 @@ def get_current_window_for_pin(pin_config):
                 continue
             
             try:
+                # Ensure strings are in HH:MM format after resolution
+                if not (isinstance(start_str, str) and isinstance(end_str, str)):
+                    continue
+                if ':' not in start_str or ':' not in end_str:
+                    continue
                 start_parts = start_str.split(':')
                 end_parts = end_str.split(':')
                 start_minutes = int(start_parts[0]) * 60 + int(start_parts[1])
