@@ -135,6 +135,8 @@ class ConfigManager:
         # New: backoff/sleep tunables (milliseconds)
         self.SERVER_IDLE_SLEEP_MS = system.get("server_idle_sleep_ms", 300)
         self.CLIENT_READ_SLEEP_MS = system.get("client_read_sleep_ms", 50)
+        # New: network monitor interval (seconds)
+        self.NETWORK_CHECK_INTERVAL = system.get("network_check_interval", 120)
         
         # Notification settings  
         notifications = self.config.get("notifications", {})
@@ -188,6 +190,10 @@ class ConfigManager:
         update_interval = system.get("update_interval", 60)
         if not isinstance(update_interval, int) or update_interval < 1:
             errors.append("Update interval must be a positive integer")
+        # Validate network check interval (s)
+        network_check_interval = system.get("network_check_interval", 120)
+        if not isinstance(network_check_interval, int) or network_check_interval < 10 or network_check_interval > 3600:
+            errors.append("system.network_check_interval must be int 10..3600 seconds")
         # Validate server/client sleeps (ms)
         server_idle_ms = system.get("server_idle_sleep_ms", 300)
         client_read_ms = system.get("client_read_sleep_ms", 50)
@@ -327,4 +333,5 @@ LOG_LEVEL = config_manager.LOG_LEVEL
 UPDATE_INTERVAL = config_manager.UPDATE_INTERVAL
 SERVER_IDLE_SLEEP_MS = config_manager.SERVER_IDLE_SLEEP_MS
 CLIENT_READ_SLEEP_MS = config_manager.CLIENT_READ_SLEEP_MS
+NETWORK_CHECK_INTERVAL = config_manager.NETWORK_CHECK_INTERVAL
 PWM_PINS = config_manager.PWM_PINS
