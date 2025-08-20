@@ -33,7 +33,6 @@ class AsyncWebServer:
         """Start the web server."""
         try:
             log.info(f"[WEB] Starting async web server on port {self.port}")
-            
             # Create server socket
             self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -233,6 +232,8 @@ class AsyncWebServer:
             # Get PWM controller status and full config for including disabled controllers
             pwm_status = multi_pwm.get_pin_status()
             config_dict = config.config_manager.get_config_dict()
+            # Current config version for display
+            current_config_version = str(config_dict.get('version', '')).strip() or 'unknown'
 
             # Build Controllers table HTML (include disabled pins too)
             pwm_table_rows = ""
@@ -323,6 +324,7 @@ class AsyncWebServer:
             .footer a {{ color: #007bff; text-decoration: none; margin: 0 10px; }}
             .footer a:hover {{ text-decoration: underline; }}
             .refresh-info {{ font-size: 11px; color: #999; margin-top: 10px; }}
+            .version {{ background: #e9ecef; border-left: 4px solid #6c757d; }}
         </style>
         <script>
             let clockInterval;
@@ -385,7 +387,9 @@ class AsyncWebServer:
             <h1>{config.WEB_TITLE}</h1>
             <div class="time"><span id="time">{time_str}</span><br><small>{date_str}</small></div>
 
-            
+            <div class="status version">
+                <strong>Config version:</strong> {current_config_version}
+            </div>
 
             <div class="status {'online' if status.get('connections', {}).get('wifi', False) else 'offline'}">
                 <strong>WiFi:</strong> {config_dict.get('wifi', {}).get('ssid', 'Unknown')}, {status.get('network', {}).get('ip', 'N/A')}
