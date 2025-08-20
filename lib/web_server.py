@@ -214,20 +214,29 @@ class AsyncWebServer:
 
             status = system_status.get_status_dict()
             
-            # Get PWM controller status
+            # Get PWM controller status and full config for including disabled controllers
             pwm_status = multi_pwm.get_pin_status()
             config_dict = config.config_manager.get_config_dict()
-            
-            # Build PWM table HTML
+
+            # Build Controllers table HTML (include disabled pins too)
             pwm_table_rows = ""
-            for pin_key, pin_info in pwm_status.items():
-                pin_config = config_dict.get('pwm_pins', {}).get(pin_key, {})
-                
+            pwm_pins_cfg = config_dict.get('pwm_pins', {})
+            for pin_key, pin_cfg in pwm_pins_cfg.items():
+                if str(pin_key).startswith('_'):
+                    continue
+
+                enabled = pin_cfg.get('enabled', False)
+                # Use live status if available; otherwise, default values
+                pin_live = pwm_status.get(pin_key, {
+                    'name': pin_cfg.get('name', pin_key),
+                    'gpio_pin': pin_cfg.get('gpio_pin', 0),
+                    'duty_percent': 0
+                })
+
                 # Get current window info from system status
                 current_window = "None"
                 window_time = "N/A"
-                
-                # Check if we have current window info in system status
+
                 status_pins = status.get('pins', {})
                 if pin_key in status_pins:
                     status_pin = status_pins[pin_key]
@@ -236,23 +245,28 @@ class AsyncWebServer:
                     end_time = status_pin.get('window_end', 'N/A')
                     if start_time != 'N/A' and end_time != 'N/A':
                         window_time = f"{start_time} - {end_time}"
-                
-                duty_percent = pin_info.get('duty_percent', 0)
-                active_status = "Active" if duty_percent > 0 else "Inactive"
-                status_class = "active" if duty_percent > 0 else "inactive"
-                
+
+                duty_percent = pin_live.get('duty_percent', 0) if enabled else 0
+
+                if not enabled:
+                    active_status = "Inactive"
+                    status_class = "disabled"
+                else:
+                    active_status = "Active" if duty_percent > 0 else "Inactive"
+                    status_class = "active" if duty_percent > 0 else "inactive"
+
                 pwm_table_rows += f"""
                 <tr class="{status_class}">
-                    <td>{pin_info['name']}</td>
-                    <td>GPIO {pin_info['gpio_pin']}</td>
+                    <td>{pin_live.get('name', pin_cfg.get('name', pin_key))}</td>
+                    <td>GPIO {pin_live.get('gpio_pin', pin_cfg.get('gpio_pin', ''))}</td>
                     <td>{active_status}</td>
                     <td>{current_window}</td>
                     <td>{window_time}</td>
                     <td>{duty_percent}%</td>
                 </tr>"""
-            
+
             if not pwm_table_rows:
-                pwm_table_rows = '<tr><td colspan="6" style="text-align: center; color: #666;">No PWM controllers configured</td></tr>'
+                pwm_table_rows = '<tr><td colspan="6" style="text-align: center; color: #666;">No controllers configured</td></tr>'
             
             # Determine MQTT status and styling
             mqtt_enabled = config_dict.get('notifications', {}).get('enabled', False)
@@ -288,6 +302,7 @@ class AsyncWebServer:
             .pwm-table th {{ background-color: #f8f9fa; font-weight: bold; }}
             .pwm-table tr.active {{ background-color: #d4edda; }}
             .pwm-table tr.inactive {{ background-color: #f8f9fa; }}
+            .pwm-table tr.disabled {{ background-color: #ffe0b2; }}
             .footer {{ text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; }}
             .footer a {{ color: #007bff; text-decoration: none; margin: 0 10px; }}
             .footer a:hover {{ text-decoration: underline; }}
@@ -355,18 +370,14 @@ class AsyncWebServer:
             <div class="time"><span id="time">{time_str}</span><br><small>{date_str}</small></div>
 
             <div class="status {'online' if status.get('connections', {}).get('wifi', False) else 'offline'}">
-                <strong>WiFi:</strong> {'Connected' if status.get('connections', {}).get('wifi', False) else 'Offline'}
-            </div>
-
-            <div class="status {'online' if status.get('connections', {}).get('web_server', False) else 'offline'}">
-                <strong>Web Server:</strong> {'Running' if status.get('connections', {}).get('web_server', False) else 'Stopped'}
+                <strong>WiFi:</strong> {config_dict.get('wifi', {{}}).get('ssid', 'Unknown')}, {status.get('network', {{}}).get('ip', 'N/A')}
             </div>
 
             <div class="status {mqtt_class}">
                 <strong>MQTT:</strong> {mqtt_status}
             </div>
 
-            <h2>PWM Controllers</h2>
+            <h2>Controllers</h2>
             <table class="pwm-table">
                 <thead>
                     <tr>

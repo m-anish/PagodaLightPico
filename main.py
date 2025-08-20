@@ -252,7 +252,7 @@ async def network_monitor_task():
     Async task that monitors network connectivity and handles reconnections.
     """
     last_network_check = 0
-    network_check_interval = 30  # Check network health every 30 seconds
+    network_check_interval = 120  # Check network health every 120 seconds
     
     log.info(f"[NETWORK_TASK] Starting network monitor task with {network_check_interval}s interval")
     
