@@ -40,14 +40,13 @@ Edit your `config.json` file to include network timeout settings:
 - `memory_warning_threshold`: Memory threshold for warnings in bytes (default: 10000)
 
 ### 3. Monitor System Health
-The system now includes automatic diagnostics that log every 5 minutes:
-- WiFi disconnection count
-- MQTT disconnection count
-- Web server timeout count
-- Memory warnings
-- Current free memory
+Monitor your logs periodically for signs of instability, such as:
+- WiFi disconnections/reconnect attempts
+- MQTT disconnects or publish failures
+- Web server request timeouts
+- Low-memory warnings and current free memory
 
-Check your logs for patterns in these metrics.
+Look for patterns in these messages to identify problem areas.
 
 ## Advanced Troubleshooting
 
@@ -81,11 +80,10 @@ If web interface is slow or timing out:
 
 ## Monitoring Commands
 
-To check system health, look for these log messages:
-- `[DIAG] Network Summary:` - Shows connection statistics
-- `[MAIN] Low memory warning:` - Indicates memory pressure
-- `[WEB] Request timeout (ETIMEDOUT):` - Web server timeout events
-- `[MQTT] Publish timeout (ETIMEDOUT):` - MQTT timeout events
+To check system health, look for these kinds of log messages:
+- `Low memory warning` - Indicates memory pressure
+- `Request timeout (ETIMEDOUT)` - Web server timeout events
+- `MQTT ... (ETIMEDOUT)` - MQTT publish/connect timeout events
 
 ## Configuration Examples
 

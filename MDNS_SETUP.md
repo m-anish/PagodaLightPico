@@ -83,34 +83,10 @@ If another device on your network has the same hostname, the device will automat
 mDNS typically works within the same network segment. If you're on a different VLAN or subnet, you may not be able to discover the device.
 
 ## 🧪 Testing mDNS Functionality
-
-A standalone test script is provided to verify mDNS functionality independently:
-
-```bash
-# On your Pico W, run:
-python test_mdns.py
-```
-
-The test script will:
-1. **Connect to WiFi** using settings from `config.json`
-2. **Show network diagnostics** (IP address, signal strength, etc.)
-3. **Start a test mDNS service** as `test-lighthouse.local`
-4. **Run for 30 seconds** to allow discovery testing
-5. **Update service info** midway through the test
-6. **Clean up and report results**
-
-### Expected Output:
-```
-INFO: 🚀 Starting comprehensive mDNS test...
-INFO: 🌐 Step 1: Connecting to WiFi...
-INFO: ✅ WiFi connected successfully with IP: 192.168.1.100
-INFO: 📊 Step 2: Network diagnostics...
-INFO:    IP Address: 192.168.1.100
-INFO: 🏮 Step 3: Testing mDNS service...
-INFO: ✅ mDNS service started successfully
-INFO: 🔗 Test URL: http://test-lighthouse.local/
-INFO: 🎉 mDNS test PASSED
-```
+You can manually verify mDNS functionality by:
+1. Ensuring the device is connected to WiFi (check serial logs for IP)
+2. Visiting `http://lighthouse.local/` from a device on the same network
+3. Using a network discovery tool (e.g., Discovery DNS-SD Browser, Fing) to confirm services `_http._tcp` and `_pagoda._tcp`
 
 ## 🔄 Making Changes
 
