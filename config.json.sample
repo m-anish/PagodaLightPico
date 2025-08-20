@@ -15,7 +15,10 @@
   },
   "system": {
     "log_level": "INFO",
-    "update_interval": 60
+    "update_interval": 120,
+    "server_idle_sleep_ms": 300,
+    "client_read_sleep_ms": 50,
+    "network_check_interval": 120
   },
   "notifications": {
     "enabled": false,

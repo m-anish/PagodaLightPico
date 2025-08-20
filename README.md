@@ -176,10 +176,14 @@ The system now uses JSON-based configuration for easy runtime updates:
 - **WiFi Settings**: Network SSID and password
 - **Timezone**: Name and UTC offset in hours
 - **Hardware**: GPIO pins for RTC I2C and LED PWM, PWM frequency
-- **System**: Log level and update interval
+- **System**: Log level and intervals/tunables
+  - `update_interval` (seconds): PWM update cadence. Default: 120
+  - `network_check_interval` (seconds): Network monitor cadence. Default: 120
+  - `server_idle_sleep_ms` (milliseconds): Web server accept-loop idle backoff. Default: 300
+  - `client_read_sleep_ms` (milliseconds): Web server client recv backoff. Default: 50
 - **Time Windows**: LED brightness schedules for different times of day
 
-### Web Interface (Microdot Framework)
+### Web Interface (Async server)
 When WiFi is connected, access the web interface at:
 ```
 http://[pico-w-ip-address]/
@@ -244,3 +248,83 @@ Feel free to fork the repository and submit pull requests.
 
 This project is licensed under the **GNU General Public License v3.0 (GPLv3)**.  
 See the [LICENSE](LICENSE) file for details.
+
+## Networking (mDNS)
+mDNS lets you access the device by hostname (e.g., `http://lighthouse.local/`) instead of IP.
+
+- If `import mdns` fails, install via MicroPython mip on device:
+  ```python
+  import mip
+  mip.install("mdns")
+  ```
+- Verify:
+  ```python
+  try:
+      import mdns; print("mDNS OK")
+  except ImportError:
+      print("mDNS missing")
+  ```
+- Change hostname in `lib/mdns_service.py` (if present). Access via `http://<hostname>.local/`.
+- If mDNS isn’t available, use the device IP (shown in logs) or set a DHCP reservation.
+
+## Notifications (MQTT)
+The device can publish JSON events (window changes, errors, system events) to an MQTT broker.
+
+- Public brokers for testing: `broker.hivemq.com`, `test.mosquitto.org`
+- Managed free tier (recommended for reliability): EMQX Cloud
+- Minimal `config.json` example:
+  ```json
+  {
+    "notifications": {
+      "enabled": true,
+      "mqtt_broker": "broker.hivemq.com",
+      "mqtt_port": 1883,
+      "mqtt_topic": "PagodaLightPico/notifications",
+      "mqtt_client_id": "PagodaLightPico"
+    }
+  }
+  ```
+- Simple bridge (Pushover via Python):
+  ```python
+  import paho.mqtt.client as mqtt, requests, json
+  TOKEN="your_api_token"; USER="your_user_key"
+  def on_message(c,u,m):
+      try:
+          d=json.loads(m.payload.decode());
+          requests.post("https://api.pushover.net/1/messages.json",
+                      data={"token":TOKEN,"user":USER,
+                            "title":"🏯 PagodaLight","message":d.get("message","")})
+      except Exception as e:
+          print(e)
+  cl=mqtt.Client(); cl.on_message=on_message
+  cl.connect("broker.hivemq.com",1883,60)
+  cl.subscribe("PagodaLightPico/notifications/+")
+  cl.loop_forever()
+  ```
+
+## Troubleshooting
+- **WiFi signal**: Place device near router; avoid interference.
+- **Timeouts (ETIMEDOUT)**: Tune network settings in `config.json`:
+  Tunable fields (in `system`):
+  ```json
+  {
+    "system": {
+      "update_interval": 120,
+      "network_check_interval": 120,
+      "server_idle_sleep_ms": 300,
+      "client_read_sleep_ms": 50
+    }
+  }
+  ```
+- **MQTT**: Increase `mqtt_keepalive`/`mqtt_timeout`, prefer stable broker.
+- **Memory**: Reduce features (disable notifications), lower web response size, restart if needed.
+- **mDNS**: If discovery fails, use IP or ensure multicast is allowed on your network.
+
+## Developer Quickstart
+- Copy sample config: `cp config.json.sample config.json`
+- Deploy files to Pico W (choose one tool):
+  - rshell: `rshell -p /dev/ttyACM0 cp -r . /pyboard/`
+  - ampy: `ampy -p /dev/ttyACM0 put lib/ && ampy -p /dev/ttyACM0 put main.py && ampy -p /dev/ttyACM0 put config.json`
+- REPL/debug: `rshell -p /dev/ttyACM0 repl` or `screen /dev/ttyACM0 115200`
+- After edits: Ctrl+D in REPL for soft reset
+- Check memory in REPL: `import gc; gc.collect(); print(gc.mem_free())`
