@@ -400,27 +400,24 @@ class AsyncWebServer:
             // Page refresh functionality
             function startPageRefresh() {{
                 let secondsLeft = 180;
-                const refreshEl = document.getElementById('refresh-countdown');
-                
+                function setText() {{
+                    const el = document.getElementById('refresh-countdown');
+                    if (el) {{ el.textContent = `Next refresh in ${secondsLeft} seconds`; return true; }}
+                    return false;
+                }}
+                // Initial text; if element isn't in DOM yet (streaming), retry until it appears
+                if (!setText()) {{
+                    const waitId = setInterval(function() {{
+                        if (setText()) clearInterval(waitId);
+                    }}, 200);
+                }}
                 function updateCountdown() {{
                     secondsLeft--;
-                    if (secondsLeft <= 0) {{
-                        location.reload();
-                        return;
-                    }}
-                    refreshEl.textContent = `Next refresh in ${{secondsLeft}} seconds`;
+                    if (secondsLeft <= 0) {{ location.reload(); return; }}
+                    setText();
                 }}
-                
-                // Initial countdown display
-                refreshEl.textContent = `Next refresh in ${{secondsLeft}} seconds`;
-                
-                // Update countdown every second
                 countdownInterval = setInterval(updateCountdown, 1000);
-                
-                // Set page refresh for 180 seconds
-                refreshInterval = setTimeout(() => {{
-                    location.reload();
-                }}, 180000);
+                refreshInterval = setTimeout(function(){{ location.reload(); }}, 180000);
             }}
             
             // Cleanup intervals on page unload
@@ -576,6 +573,13 @@ class AsyncWebServer:
             pwm_status = multi_pwm.get_pin_status()
             config_dict = config.config_manager.get_config_dict()
             current_config_version = str(config_dict.get('version', '')).strip() or 'unknown'
+            # UI location from sun_times.json
+            try:
+                with open('sun_times.json', 'r') as f:
+                    _st = json.loads(f.read())
+                ui_location = str(_st.get('location', 'Unknown')).strip() or 'Unknown'
+            except Exception:
+                ui_location = 'Unknown'
 
             mqtt_enabled = config_dict.get('notifications', {}).get('enabled', False)
             mqtt_connected = status.get('connections', {}).get('mqtt', False)
@@ -646,9 +650,9 @@ class AsyncWebServer:
                 "function startClock(h,m,s){const timeEl=document.getElementById('time');function pad(n){return(n<10?'0':'')+n;}"
                 "function tick(){s+=1;if(s>=60){s=0;m+=1;}if(m>=60){m=0;h=(h+1)%24;}timeEl.textContent=pad(h)+':'+pad(m)+':'+pad(s);}" 
                 "tick();clockInterval=setInterval(tick,1000);}" 
-                "function startPageRefresh(){let secondsLeft=180;const refreshEl=document.getElementById('refresh-countdown');" 
-                "function updateCountdown(){secondsLeft--;if(secondsLeft<=0){location.reload();return;}refreshEl.textContent='Next refresh in '+secondsLeft+' seconds';}" 
-                "refreshEl.textContent='Next refresh in '+secondsLeft+' seconds';countdownInterval=setInterval(updateCountdown,1000);refreshInterval=setTimeout(()=>{location.reload();},180000);}" 
+                "function startPageRefresh(){let s=180;function setT(){const e=document.getElementById('refresh-countdown');if(e){e.textContent='Next refresh in '+s+' seconds';return true}return false}" 
+                "if(!setT()){const w=setInterval(function(){if(setT())clearInterval(w)},200)}function upd(){s--;if(s<=0){location.reload();return}setT()}" 
+                "countdownInterval=setInterval(upd,1000);refreshInterval=setTimeout(function(){location.reload()},180000);}" 
                 "window.addEventListener('beforeunload',function(){if(clockInterval)clearInterval(clockInterval);if(refreshInterval)clearTimeout(refreshInterval);if(countdownInterval)clearInterval(countdownInterval);});" 
                 "function initTableFades(){const wrap=document.querySelector('.table-responsive');if(!wrap)return;const scroller=wrap.querySelector('.table-scroll')||wrap;function upd(){const max=scroller.scrollWidth-scroller.clientWidth;if(max<=0){wrap.classList.remove('has-left','has-right');return;}wrap.classList.toggle('has-left',scroller.scrollLeft>0);wrap.classList.toggle('has-right',scroller.scrollLeft<max-1);}scroller.addEventListener('scroll',upd,{passive:true});setTimeout(upd,0);}" 
                 "</script>"
