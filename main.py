@@ -4,7 +4,7 @@ main.py
 Main application script for PagodaLightPico with async architecture.
 
 Controls multiple LED lighting PWM outputs based on individual configurable time windows
-and dynamically calculated sunrise and sunset times from sun_times_leh module.
+and dynamically calculated sunrise and sunset times from sun_times module (JSON-backed with fallback).
 
 The "day" time window start and end times are set dynamically each check
 based on the current date's sunrise and sunset times.
@@ -31,7 +31,7 @@ Async Architecture:
 
 import asyncio
 from lib import config_manager as config
-from lib import sun_times_leh
+from lib import sun_times as sun_times_leh
 import rtc_module
 from simple_logger import Logger
 from lib.wifi_connect import connect_wifi, sync_time_ntp

@@ -7,7 +7,7 @@ and other runtime information for display on web interface and API endpoints.
 
 import time
 import rtc_module
-import sun_times_leh
+from lib import sun_times as sun_times_leh
 from lib.config_manager import config_manager
 from simple_logger import Logger
 

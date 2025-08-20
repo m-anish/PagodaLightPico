@@ -154,55 +154,69 @@ class AsyncWebServer:
             current_time = rtc_module.get_current_time()
             time_str = f"{current_time[3]:02d}:{current_time[4]:02d}:{current_time[5]:02d}"
             date_str = f"{current_time[2]:02d}/{current_time[1]:02d}/{current_time[0]}"
-            
+
             status = system_status.get_status_dict()
-            
+
             html = f"""<!DOCTYPE html>
-<html>
-<head>
-    <title>PagodaLightPico</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <style>
-        body {{ font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }}
-        .container {{ max-width: 600px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; }}
-        h1 {{ color: #2c3e50; text-align: center; }}
-        .status {{ padding: 10px; margin: 10px 0; border-radius: 5px; }}
-        .online {{ background: #d4edda; border-left: 4px solid #28a745; }}
-        .offline {{ background: #f8d7da; border-left: 4px solid #dc3545; }}
-        .time {{ font-size: 24px; text-align: center; margin: 20px 0; color: #2c3e50; }}
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>PagodaLightPico</h1>
-        <div class="time">{time_str}<br><small>{date_str}</small></div>
-        
-        <div class="status {'online' if status.get('connections', {}).get('wifi', False) else 'offline'}">
-            <strong>WiFi:</strong> {'Connected' if status.get('connections', {}).get('wifi', False) else 'Offline'}
+    <html>
+    <head>
+        <title>PagodaLightPico</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <style>
+            body {{ font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }}
+            .container {{ max-width: 600px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; }}
+            h1 {{ color: #2c3e50; text-align: center; }}
+            .status {{ padding: 10px; margin: 10px 0; border-radius: 5px; }}
+            .online {{ background: #d4edda; border-left: 4px solid #28a745; }}
+            .offline {{ background: #f8d7da; border-left: 4px solid #dc3545; }}
+            .time {{ font-size: 24px; text-align: center; margin: 20px 0; color: #2c3e50; }}
+        </style>
+        <script>
+            // Lightweight client-side clock updating every second without server calls
+            function startClock(h, m, s) {{
+                const timeEl = document.getElementById('time');
+                function pad(n) {{ return (n < 10 ? '0' : '') + n; }}
+                function tick() {{
+                    s += 1;
+                    if (s >= 60) {{ s = 0; m += 1; }}
+                    if (m >= 60) {{ m = 0; h = (h + 1) %% 24; }}
+                    timeEl.textContent = pad(h) + ':' + pad(m) + ':' + pad(s);
+                }}
+                setInterval(tick, 1000);
+            }}
+        </script>
+    </head>
+    <body onload="startClock({current_time[3]}, {current_time[4]}, {current_time[5]})">
+        <div class="container">
+            <h1>PagodaLightPico</h1>
+            <div class="time"><span id="time">{time_str}</span><br><small>{date_str}</small></div>
+
+            <div class="status {{"online" if status.get('connections', {{}}).get('wifi', False) else "offline"}}">
+                <strong>WiFi:</strong> {{"Connected" if status.get('connections', {{}}).get('wifi', False) else "Offline"}}
+            </div>
+
+            <div class="status {{"online" if status.get('connections', {{}}).get('web_server', False) else "offline"}}">
+                <strong>Web Server:</strong> {{"Running" if status.get('connections', {{}}).get('web_server', False) else "Stopped"}}
+            </div>
+
+            <div class="status {{"online" if status.get('connections', {{}}).get('mqtt', False) else "offline"}}">
+                <strong>MQTT:</strong> {{"Connected" if status.get('connections', {{}}).get('mqtt', False) else "Offline"}}
+            </div>
+
+            <p style="text-align: center; margin-top: 30px;">
+                <a href="/status" style="color: #007bff;">View JSON Status</a>
+            </p>
         </div>
-        
-        <div class="status {'online' if status.get('connections', {}).get('web_server', False) else 'offline'}">
-            <strong>Web Server:</strong> {'Running' if status.get('connections', {}).get('web_server', False) else 'Stopped'}
-        </div>
-        
-        <div class="status {'online' if status.get('connections', {}).get('mqtt', False) else 'offline'}">
-            <strong>MQTT:</strong> {'Connected' if status.get('connections', {}).get('mqtt', False) else 'Offline'}
-        </div>
-        
-        <p style="text-align: center; margin-top: 30px;">
-            <a href="/status" style="color: #007bff;">View JSON Status</a>
-        </p>
-    </div>
-</body>
-</html>"""
-            
+    </body>
+    </html>"""
+
             response = f"HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: {len(html)}\r\nConnection: close\r\n\r\n{html}"
             return response
-            
+
         except Exception as e:
             log.error(f"[WEB] Error generating main page: {e}")
             return self.generate_500()
-    
+
     def generate_status_json(self):
         """Generate JSON status response."""
         try:
