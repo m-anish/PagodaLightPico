@@ -18,7 +18,9 @@
     "update_interval": 120,
     "server_idle_sleep_ms": 300,
     "client_read_sleep_ms": 50,
-    "network_check_interval": 120
+    "network_check_interval": 120,
+    "ram_telemetry_enabled": false,
+    "ram_telemetry_interval": 300
   },
   "notifications": {
     "enabled": false,

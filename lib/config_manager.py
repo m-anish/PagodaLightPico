@@ -137,6 +137,9 @@ class ConfigManager:
         self.CLIENT_READ_SLEEP_MS = system.get("client_read_sleep_ms", 50)
         # New: network monitor interval (seconds)
         self.NETWORK_CHECK_INTERVAL = system.get("network_check_interval", 120)
+        # New: RAM telemetry settings
+        self.RAM_TELEMETRY_ENABLED = system.get("ram_telemetry_enabled", False)
+        self.RAM_TELEMETRY_INTERVAL = system.get("ram_telemetry_interval", 300)
         
         # Notification settings  
         notifications = self.config.get("notifications", {})
@@ -201,6 +204,13 @@ class ConfigManager:
             errors.append("system.server_idle_sleep_ms must be int 50..5000 ms")
         if not isinstance(client_read_ms, int) or client_read_ms < 10 or client_read_ms > 2000:
             errors.append("system.client_read_sleep_ms must be int 10..2000 ms")
+        # Validate RAM telemetry
+        ram_enabled = system.get("ram_telemetry_enabled", False)
+        if not isinstance(ram_enabled, bool):
+            errors.append("system.ram_telemetry_enabled must be boolean")
+        ram_interval = system.get("ram_telemetry_interval", 300)
+        if not isinstance(ram_interval, int) or ram_interval < 10 or ram_interval > 86400:
+            errors.append("system.ram_telemetry_interval must be int 10..86400 seconds")
         
         # Validate PWM pins configuration
         pwm_pins = self.config.get("pwm_pins", {})
@@ -334,4 +344,6 @@ UPDATE_INTERVAL = config_manager.UPDATE_INTERVAL
 SERVER_IDLE_SLEEP_MS = config_manager.SERVER_IDLE_SLEEP_MS
 CLIENT_READ_SLEEP_MS = config_manager.CLIENT_READ_SLEEP_MS
 NETWORK_CHECK_INTERVAL = config_manager.NETWORK_CHECK_INTERVAL
+RAM_TELEMETRY_ENABLED = config_manager.RAM_TELEMETRY_ENABLED
+RAM_TELEMETRY_INTERVAL = config_manager.RAM_TELEMETRY_INTERVAL
 PWM_PINS = config_manager.PWM_PINS

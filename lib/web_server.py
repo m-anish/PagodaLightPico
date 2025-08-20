@@ -417,9 +417,19 @@ class AsyncWebServer:
     def generate_status_json(self):
         """Generate JSON status response."""
         try:
+            import gc
             current_time = rtc_module.get_current_time()
             status = system_status.get_status_dict()
             
+            # Sample memory
+            try:
+                gc.collect()
+                mem_free = gc.mem_free()
+                mem_alloc = gc.mem_alloc() if hasattr(gc, 'mem_alloc') else None
+            except Exception:
+                mem_free = None
+                mem_alloc = None
+
             data = {
                 'timestamp': time.time(),
                 'current_time': {
@@ -429,6 +439,10 @@ class AsyncWebServer:
                     'day': current_time[2],
                     'month': current_time[1],
                     'year': current_time[0]
+                },
+                'memory': {
+                    'free': mem_free,
+                    'alloc': mem_alloc
                 }
             }
             # Merge the status dictionary into data

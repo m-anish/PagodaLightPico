@@ -30,6 +30,7 @@ Async Architecture:
 """
 
 import asyncio
+import gc
 from lib import config_manager as config
 from lib import sun_times
 import rtc_module
@@ -287,6 +288,25 @@ async def network_monitor_task():
             log.error(f"Error in network monitor task: {e}")
             await asyncio.sleep(5)  # Wait before retrying
 
+async def ram_telemetry_task():
+    """
+    Periodically log RAM usage if enabled in config.
+    """
+    interval = config.RAM_TELEMETRY_INTERVAL
+    log.info(f"[RAM] Telemetry task started with {interval}s interval")
+    while True:
+        try:
+            gc.collect()
+            free = gc.mem_free()
+            alloc = gc.mem_alloc() if hasattr(gc, 'mem_alloc') else None
+            if alloc is not None:
+                log.info(f"[RAM] free={free} bytes, alloc={alloc} bytes")
+            else:
+                log.info(f"[RAM] free={free} bytes")
+        except Exception as e:
+            log.error(f"[RAM] Telemetry error: {e}")
+        await asyncio.sleep(interval)
+
 async def main():
     """
     Main async function that starts all tasks.
@@ -317,6 +337,10 @@ async def main():
     if wifi_connected and web_server.running:
         log.info("[MAIN] Adding web server task to async loop")
         tasks.append(asyncio.create_task(web_server.serve_forever()))
+    
+    # Optional RAM telemetry task
+    if config.RAM_TELEMETRY_ENABLED:
+        tasks.append(asyncio.create_task(ram_telemetry_task()))
     
     log.info(f"Started {len(tasks)} async tasks")
     
