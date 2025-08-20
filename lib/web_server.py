@@ -237,6 +237,13 @@ class AsyncWebServer:
             config_dict = config.config_manager.get_config_dict()
             # Current config version for display
             current_config_version = str(config_dict.get('version', '')).strip() or 'unknown'
+            # Read location from sun_times.json (if available)
+            try:
+                with open('sun_times.json', 'r') as f:
+                    _st = json.loads(f.read())
+                ui_location = str(_st.get('location', 'Unknown')).strip() or 'Unknown'
+            except Exception:
+                ui_location = 'Unknown'
 
             # Build Controllers table HTML (include disabled pins too)
             pwm_table_rows = ""
@@ -446,6 +453,9 @@ class AsyncWebServer:
             <div class="status version">
                 <strong>🏷️ Config version:</strong> {current_config_version}
             </div>
+            <div class="status location">
+                <strong>📍 Location:</strong> {ui_location}
+            </div>
 
             <div class="status {'online' if status.get('connections', {}).get('wifi', False) else 'offline'}">
                 <strong>📶 WiFi:</strong> {config_dict.get('wifi', {}).get('ssid', 'Unknown')}, {status.get('network', {}).get('ip', 'N/A')}
@@ -653,6 +663,8 @@ class AsyncWebServer:
 
             # Version
             await self._awrite(client_socket, f"<div class=\"status version\"><strong>🏷️ Config version:</strong> {current_config_version}</div>".encode('utf-8'))
+            # Location
+            await self._awrite(client_socket, f"<div class=\"status location\"><strong>📍 Location:</strong> {ui_location}</div>".encode('utf-8'))
 
             # WiFi
             wifi_class = 'online' if status.get('connections', {}).get('wifi', False) else 'offline'
