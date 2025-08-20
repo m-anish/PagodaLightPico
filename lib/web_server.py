@@ -192,8 +192,9 @@ class AsyncWebServer:
                     if start_time != 'N/A' and end_time != 'N/A':
                         window_time = f"{start_time} - {end_time}"
                 
-                active_status = "Active" if pin_info['duty_cycle'] > 0 else "Inactive"
-                status_class = "active" if pin_info['duty_cycle'] > 0 else "inactive"
+                duty_percent = pin_info.get('duty_percent', 0)
+                active_status = "Active" if duty_percent > 0 else "Inactive"
+                status_class = "active" if duty_percent > 0 else "inactive"
                 
                 pwm_table_rows += f"""
                 <tr class="{status_class}">
@@ -202,7 +203,7 @@ class AsyncWebServer:
                     <td>{active_status}</td>
                     <td>{current_window}</td>
                     <td>{window_time}</td>
-                    <td>{pin_info['duty_cycle']}%</td>
+                    <td>{duty_percent}%</td>
                 </tr>"""
             
             if not pwm_table_rows:
