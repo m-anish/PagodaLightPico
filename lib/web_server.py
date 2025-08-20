@@ -174,7 +174,7 @@ class AsyncWebServer:
 </head>
 <body>
     <div class="container">
-        <h1>🏛️ PagodaLightPico</h1>
+        <h1>PagodaLightPico</h1>
         <div class="time">{time_str}<br><small>{date_str}</small></div>
         
         <div class="status {'online' if status.get('connections', {}).get('wifi', False) else 'offline'}">

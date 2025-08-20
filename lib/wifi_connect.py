@@ -18,7 +18,11 @@ import urtc
 from simple_logger import Logger
 from lib.rtc_shared import rtc
 
-led = Pin(25, Pin.OUT)
+# For Pico W, the onboard LED is on "LED" pin, not GPIO 25
+try:
+    led = Pin("LED", Pin.OUT)  # Pico W onboard LED
+except:
+    led = Pin(25, Pin.OUT)  # Fallback for regular Pico
 log = Logger()
 
 
@@ -159,10 +163,29 @@ def sync_time_ntp():
     Returns:
         bool: True if successful, False otherwise.
     """
+    # List of NTP servers to try
+    ntp_servers = [
+        "pool.ntp.org",
+        "time.nist.gov", 
+        "time.google.com",
+        "0.pool.ntp.org"
+    ]
+    
+    for server in ntp_servers:
+        try:
+            log.info(f"[NTP] Trying time synchronization with {server}")
+            ntptime.host = server
+            ntptime.timeout = 5  # 5 second timeout
+            ntptime.settime()  # syncs to UTC time
+            log.info(f"[NTP] Successfully synchronized with {server}")
+            break
+        except Exception as e:
+            log.warn(f"[NTP] Failed to sync with {server}: {e}")
+            if server == ntp_servers[-1]:  # Last server
+                raise e
+            continue
+    
     try:
-        log.info("[NTP] Starting time synchronization")
-        ntptime.settime()  # syncs to UTC time
-        log.debug("[NTP] settime() completed successfully")
 
         # Get current UTC timestamp in seconds
         utc_sec = time.time()
