@@ -1,4 +1,5 @@
 {
+  "version": "0.2.0",
   "location": "Demo Location",
   "lat": 34.15,
   "lon": 77.58,

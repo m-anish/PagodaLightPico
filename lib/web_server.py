@@ -17,6 +17,7 @@ import time
 import machine
 
 log = Logger()
+PROJECT_VERSION = "0.2.0"  # Bump when making breaking config changes
 
 class AsyncWebServer:
     """
@@ -673,6 +674,16 @@ class AsyncWebServer:
             except json.JSONDecodeError as e:
                 return self.generate_upload_error(f"Invalid JSON format: {e}")
             
+            # Version compatibility check (require matching major.minor)
+            try:
+                uploaded_ver = str(config_data.get('version', '')).strip()
+                if not uploaded_ver:
+                    return self.generate_upload_error("Missing 'version' in config.json. Please use sample config for your release.")
+                if not self._version_compatible(uploaded_ver):
+                    return self.generate_upload_error(f"Incompatible config version '{uploaded_ver}'. Expected {self._major_minor(PROJECT_VERSION)}.x")
+            except Exception as e:
+                return self.generate_upload_error(f"Version check failed: {e}")
+            
             # Backup current config
             try:
                 os.rename('config.json', 'config.json.backup')
@@ -868,6 +879,16 @@ class AsyncWebServer:
             if not self.validate_sun_times_structure(sun_times_data):
                 return self.generate_sun_times_upload_error("Invalid sun_times.json structure. Expected format with 'location', 'lat', 'lon', and 'days' fields.")
             
+            # Version compatibility check (require matching major.minor)
+            try:
+                uploaded_ver = str(sun_times_data.get('version', '')).strip()
+                if not uploaded_ver:
+                    return self.generate_sun_times_upload_error("Missing 'version' in sun_times.json. Please use sample file for your release.")
+                if not self._version_compatible(uploaded_ver):
+                    return self.generate_sun_times_upload_error(f"Incompatible sun_times version '{uploaded_ver}'. Expected {self._major_minor(PROJECT_VERSION)}.x")
+            except Exception as e:
+                return self.generate_sun_times_upload_error(f"Version check failed: {e}")
+            
             # Backup current sun_times
             try:
                 os.rename('sun_times.json', 'sun_times.json.backup')
@@ -923,6 +944,20 @@ class AsyncWebServer:
         except Exception as e:
             log.error(f"[WEB] Error handling sun times upload: {e}")
             return self.generate_sun_times_upload_error(f"Upload processing failed: {e}")
+
+    def _major_minor(self, ver_str):
+        """Return 'major.minor' part of a semantic version string like '0.2.0' -> '0.2'."""
+        try:
+            parts = str(ver_str).split('.')
+            if len(parts) < 2:
+                return ver_str
+            return parts[0] + '.' + parts[1]
+        except Exception:
+            return ver_str
+
+    def _version_compatible(self, uploaded_ver):
+        """Check if uploaded version matches current major.minor."""
+        return self._major_minor(uploaded_ver) == self._major_minor(PROJECT_VERSION)
     
     def validate_sun_times_structure(self, data):
         """Validate basic structure of sun_times.json data."""

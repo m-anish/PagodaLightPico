@@ -36,6 +36,7 @@ The system now uses JSON-based configuration for easy runtime updates:
 - **Timezone**: Name and UTC offset in hours
 - **Hardware**: GPIO pins for RTC I2C and LED PWM, PWM frequency
 - **System**: Log level and intervals/tunables
+- **Version**: Set `version` (e.g., `0.2.0`). When uploading via the web UI, the file's major.minor (e.g., `0.2`) must match the device firmware to be accepted.
   - `update_interval` (seconds): PWM update cadence. Default: 120
   - `network_check_interval` (seconds): Network monitor cadence. Default: 120
   - `server_idle_sleep_ms` (milliseconds): Web server accept-loop idle backoff. Default: 300
@@ -163,6 +164,7 @@ The device can publish JSON events (window changes, errors, system events) to an
 
 ## Developer Quickstart
 - Copy sample config: `cp config.json.sample config.json`
+- Copy sample sun times: `cp sun_times.json.sample sun_times.json`
 - Deploy files to Pico W (choose one tool):
   - rshell: `rshell -p /dev/ttyACM0 cp -r . /pyboard/`
   - ampy: `ampy -p /dev/ttyACM0 put lib/ && ampy -p /dev/ttyACM0 put main.py && ampy -p /dev/ttyACM0 put config.json && ampy -p /dev/ttyACM0 put sun_times.json`
