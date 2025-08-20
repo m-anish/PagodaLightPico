@@ -6,6 +6,15 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 
 ## [Unreleased]
 
+## [0.2.2] - 2025-08-21
+
+### Changed
+- Homepage ("/"): implement streamed response writer to significantly reduce RAM usage during page generation. Response is sent in small chunks without `Content-Length` and closes the connection when finished.
+- Added async `_awrite()` helper and `stream_main_page()`; request handler updated to use streaming for the root path.
+
+### Notes
+- Other endpoints keep the previous buffered responses for now.
+
 ## [0.2.1] - 2025-08-21
 
 ### Added
