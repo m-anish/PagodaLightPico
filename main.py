@@ -215,35 +215,22 @@ async def pwm_update_task():
     Async task that periodically updates PWM pins based on configured update_interval.
     """
     last_pwm_update = 0
-    last_config_check = 0
-    current_update_interval = config.UPDATE_INTERVAL
+    update_interval = config.UPDATE_INTERVAL
     
-    log.info(f"[PWM_TASK] Starting PWM update task with {current_update_interval}s interval")
+    log.info(f"[PWM_TASK] Starting PWM update task with {update_interval}s interval")
     
     while True:
         try:
             current_time = time.time()
             
-            # Check for update interval changes every 10 seconds (less frequent than PWM updates)
-            if current_time - last_config_check >= 10:
-                current_config = config.config_manager.get_config_dict()
-                new_update_interval = current_config.get('system', {}).get('update_interval', 60)
-                
-                # Check if update interval changed
-                if new_update_interval != current_update_interval:
-                    log.info(f"[PWM_TASK] Update interval changed from {current_update_interval}s to {new_update_interval}s")
-                    current_update_interval = new_update_interval
-                
-                last_config_check = current_time
-            
             # Update PWM pins based on configured interval
-            if current_time - last_pwm_update >= current_update_interval:
-                log.debug(f"[PWM_TASK] Performing PWM update (interval: {current_update_interval}s)")
+            if current_time - last_pwm_update >= update_interval:
+                log.debug(f"[PWM_TASK] Performing PWM update (interval: {update_interval}s)")
                 await update_pwm_pins()
                 last_pwm_update = current_time
             
             # Calculate optimal sleep time - check more frequently as we approach update time
-            time_until_next_update = current_update_interval - (current_time - last_pwm_update)
+            time_until_next_update = update_interval - (current_time - last_pwm_update)
             if time_until_next_update > 10:
                 # If more than 10 seconds until next update, sleep for 5 seconds
                 sleep_time = 5.0
