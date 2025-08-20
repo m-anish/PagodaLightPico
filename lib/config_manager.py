@@ -140,6 +140,8 @@ class ConfigManager:
         # New: RAM telemetry settings
         self.RAM_TELEMETRY_ENABLED = system.get("ram_telemetry_enabled", False)
         self.RAM_TELEMETRY_INTERVAL = system.get("ram_telemetry_interval", 300)
+        # New: Web UI title
+        self.WEB_TITLE = system.get("web_title", "PagodaLightPico")
         
         # Notification settings  
         notifications = self.config.get("notifications", {})
@@ -211,6 +213,9 @@ class ConfigManager:
         ram_interval = system.get("ram_telemetry_interval", 300)
         if not isinstance(ram_interval, int) or ram_interval < 10 or ram_interval > 86400:
             errors.append("system.ram_telemetry_interval must be int 10..86400 seconds")
+        # Validate web title if provided
+        if "web_title" in system and not isinstance(system.get("web_title"), str):
+            errors.append("system.web_title must be a string")
         
         # Validate PWM pins configuration
         pwm_pins = self.config.get("pwm_pins", {})
@@ -347,3 +352,4 @@ NETWORK_CHECK_INTERVAL = config_manager.NETWORK_CHECK_INTERVAL
 RAM_TELEMETRY_ENABLED = config_manager.RAM_TELEMETRY_ENABLED
 RAM_TELEMETRY_INTERVAL = config_manager.RAM_TELEMETRY_INTERVAL
 PWM_PINS = config_manager.PWM_PINS
+WEB_TITLE = config_manager.WEB_TITLE
