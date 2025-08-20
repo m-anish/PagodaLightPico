@@ -80,7 +80,7 @@ class AsyncWebServer:
                     
                 except OSError:
                     # No connection available, yield control
-                    await asyncio.sleep(0.1)
+                    await asyncio.sleep(0.3)
                     continue
                     
             except Exception as e:
@@ -106,7 +106,7 @@ class AsyncWebServer:
                         headers_end = request_data.find(b'\r\n\r\n')
                         break
                 except OSError:
-                    await asyncio.sleep(0.01)
+                    await asyncio.sleep(0.05)
                     continue
             
             if not request_data:
@@ -139,7 +139,7 @@ class AsyncWebServer:
                             break
                         request_data += chunk
                     except OSError:
-                        await asyncio.sleep(0.01)
+                        await asyncio.sleep(0.05)
                         continue
 
             # Parse request (headers + body)
@@ -370,7 +370,7 @@ class AsyncWebServer:
             <div class="time"><span id="time">{time_str}</span><br><small>{date_str}</small></div>
 
             <div class="status {'online' if status.get('connections', {}).get('wifi', False) else 'offline'}">
-                <strong>WiFi:</strong> {config_dict.get('wifi', {{}}).get('ssid', 'Unknown')}, {status.get('network', {{}}).get('ip', 'N/A')}
+                <strong>WiFi:</strong> {config_dict.get('wifi', {}).get('ssid', 'Unknown')}, {status.get('network', {}).get('ip', 'N/A')}
             </div>
 
             <div class="status {mqtt_class}">
