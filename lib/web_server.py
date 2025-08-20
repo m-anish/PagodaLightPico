@@ -136,6 +136,8 @@ class AsyncWebServer:
                 response = self.generate_status_json()
             elif path == '/download-config':
                 response = self.generate_config_download()
+            elif path == '/download-sun-times':
+                response = self.generate_sun_times_download()
             elif path == '/upload-config':
                 if method == 'GET':
                     response = self.generate_upload_page()
@@ -348,6 +350,7 @@ class AsyncWebServer:
             <div class="footer">
                 <a href="/status">View JSON Status</a>
                 <a href="/download-config">Download Config</a>
+                <a href="/download-sun-times">Download Sun Times</a>
                 <a href="/upload-config">Upload Config</a>
                 <a href="/upload-sun-times">Upload Sun Times</a>
                 <div class="refresh-info" id="refresh-countdown"></div>
@@ -430,6 +433,28 @@ class AsyncWebServer:
             
         except Exception as e:
             log.error(f"[WEB] Error generating config download: {e}")
+            return self.generate_500()
+
+    def generate_sun_times_download(self):
+        """Generate sun_times.json download response."""
+        try:
+            # Read current sun_times file
+            with open('sun_times.json', 'r') as f:
+                sun_times_content = f.read()
+
+            # Generate download response with proper headers
+            response = (
+                "HTTP/1.1 200 OK\r\n"
+                "Content-Type: application/json\r\n"
+                "Content-Disposition: attachment; filename=\"sun_times.json\"\r\n"
+                f"Content-Length: {len(sun_times_content)}\r\n"
+                "Connection: close\r\n\r\n"
+                f"{sun_times_content}"
+            )
+            return response
+
+        except Exception as e:
+            log.error(f"[WEB] Error generating sun_times download: {e}")
             return self.generate_500()
     
     def generate_upload_page(self):
