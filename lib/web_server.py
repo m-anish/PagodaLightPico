@@ -321,9 +321,12 @@ class AsyncWebServer:
             .pwm-table tr.inactive {{ background-color: #f8f9fa; }}
             .pwm-table tr.disabled {{ background-color: #ffe0b2; }}
             .footer {{ text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; }}
-            .footer a {{ color: #007bff; text-decoration: none; margin: 0 10px; }}
+            .footer a {{ color: #007bff; text-decoration: none; }}
             .footer a:hover {{ text-decoration: underline; }}
             .refresh-info {{ font-size: 11px; color: #999; margin-top: 10px; }}
+            .footer-grid {{ display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px 16px; align-items: start; padding: 0; margin: 8px 0 0 0; }}
+            .footer-grid .col {{ display: flex; flex-direction: column; gap: 6px; }}
+            .footer .col-title {{ font-size: 12px; color: #555; text-transform: uppercase; letter-spacing: 0.03em; }}
             .version {{ background: #e9ecef; border-left: 4px solid #6c757d; }}
         </style>
         <script>
@@ -417,12 +420,24 @@ class AsyncWebServer:
             </table>
 
             <div class="footer">
-                <a href="/status">View JSON Status</a>
-                <a href="/download-config">Download Config</a>
-                <a href="/download-sun-times">Download Sun Times</a>
-                <a href="/upload-config">Upload Config</a>
-                <a href="/upload-sun-times">Upload Sun Times</a>
-                <a href="/restart">Restart Device</a>
+                <div class="footer-grid">
+                    <div class="col">
+                        <a href="/status">Status (JSON)</a>
+                    </div>
+                    <div class="col">
+                        <div class="col-title">Upload</div>
+                        <a href="/upload-config">Upload Config</a>
+                        <a href="/upload-sun-times">Upload Sun Times</a>
+                    </div>
+                    <div class="col">
+                        <div class="col-title">Download</div>
+                        <a href="/download-config">Download Config</a>
+                        <a href="/download-sun-times">Download Sun Times</a>
+                    </div>
+                    <div class="col">
+                        <a href="/restart">Restart Device</a>
+                    </div>
+                </div>
                 <div style="margin-top:8px;font-size:12px;color:#666;">
                     <small>
                         <a href="https://github.com/m-anish/PagodaLightPico" target="_blank" rel="noopener">PagodaLightPico</a>
