@@ -425,12 +425,10 @@ class AsyncWebServer:
                         <a href="/status">Status (JSON)</a>
                     </div>
                     <div class="col">
-                        <div class="col-title">Upload</div>
                         <a href="/upload-config">Upload Config</a>
                         <a href="/upload-sun-times">Upload Sun Times</a>
                     </div>
                     <div class="col">
-                        <div class="col-title">Download</div>
                         <a href="/download-config">Download Config</a>
                         <a href="/download-sun-times">Download Sun Times</a>
                     </div>
