@@ -107,24 +107,6 @@ Feel free to fork the repository and submit pull requests.
 This project is licensed under the **GNU General Public License v3.0 (GPLv3)**.  
 See the [LICENSE](LICENSE) file for details.
 
-## Networking (mDNS)
-mDNS lets you access the device by hostname (e.g., `http://lighthouse.local/`) instead of IP.
-
-- If `import mdns` fails, install via MicroPython mip on device:
-  ```python
-  import mip
-  mip.install("mdns")
-  ```
-- Verify:
-  ```python
-  try:
-      import mdns; print("mDNS OK")
-  except ImportError:
-      print("mDNS missing")
-  ```
-- Change hostname in `lib/mdns_service.py` (if present). Access via `http://<hostname>.local/`.
-- If mDNS isn’t available, use the device IP (shown in logs) or set a DHCP reservation.
-
 ## Notifications (MQTT)
 The device can publish JSON events (window changes, errors, system events) to an MQTT broker.
 
