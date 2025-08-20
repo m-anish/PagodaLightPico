@@ -69,12 +69,12 @@ def connect_wifi(timeout=10, max_attempts=3):
             wlan.connect(WIFI_SSID, WIFI_PASSWORD)
             start = time.time()
             
-            # Wait for connection or timeout
+            # Wait for connection or timeout (reduced polling frequency)
             while not wlan.isconnected():
                 if time.time() - start > timeout:
                     log.warn(f"[WIFI] Attempt {attempt} timed out after {timeout} seconds")
                     break
-                time.sleep(0.1)
+                time.sleep(0.25)
             
             # Check if connection was successful
             if wlan.isconnected():
@@ -92,10 +92,10 @@ def connect_wifi(timeout=10, max_attempts=3):
         except Exception as e:
             log.error(f"[WIFI] Connection attempt {attempt} failed with error: {e}")
         
-        # Wait before retry (except on last attempt)
+        # Wait before retry (except on last attempt) - relaxed backoff
         if attempt < max_attempts:
-            log.info(f"[WIFI] Waiting 2 seconds before retry...")
-            time.sleep(2)
+            log.info(f"[WIFI] Waiting 4 seconds before retry...")
+            time.sleep(4)
     
     # All attempts failed
     log.error(f"[WIFI] Failed to connect after {max_attempts} attempts")
