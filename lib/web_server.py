@@ -362,6 +362,7 @@ class AsyncWebServer:
             .footer-grid .col {{ display: flex; flex-direction: column; gap: 6px; }}
             .footer .col-title {{ font-size: 12px; color: #555; text-transform: uppercase; letter-spacing: 0.03em; }}
             .version {{ background: #e9ecef; border-left: 4px solid #6c757d; }}
+            .location {{ background: #e7f3ff; border-left: 4px solid #0d6efd; }}
             /* Mobile tweaks */
             @media (max-width: 480px) {{
                 .container {{ padding: 12px; }}
@@ -638,6 +639,7 @@ class AsyncWebServer:
                 ".footer-grid .col { display: flex; flex-direction: column; gap: 6px; }"
                 ".footer .col-title { font-size: 12px; color: #555; text-transform: uppercase; letter-spacing: 0.03em; }"
                 ".version { background: #e9ecef; border-left: 4px solid #6c757d; }"
+                ".location { background: #e7f3ff; border-left: 4px solid #0d6efd; }"
                 "@media (max-width: 480px){.container{padding:12px;}.pwm-table th,.pwm-table td{padding:6px 8px;font-size:12px;}}"
                 "@media (max-width: 420px){.pwm-table th:nth-child(2),.pwm-table td:nth-child(2),.pwm-table th:nth-child(5),.pwm-table td:nth-child(5){display:none;}}"
                 "</style>"
