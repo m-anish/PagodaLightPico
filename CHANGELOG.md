@@ -6,6 +6,25 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 
 ## [Unreleased]
 
+## [0.2.0] - 2025-08-21
+
+### Added
+- Main page: display the running configuration version.
+- Footer: reorganized into a 4-column layout (Status | Upload | Download | Restart) with stacked links for Upload/Download.
+
+### Changed
+- Web server responses now set Content-Length based on UTF-8 encoded byte length and include charset in headers for all endpoints.
+- Response sending logic updated to write the entire response in a loop to avoid partial socket sends.
+
+### Fixed
+- Eliminated browser `net::ERR_CONTENT_LENGTH_MISMATCH` that caused clocks and countdown timers to stop updating on the main page.
+
+### Validation/Security
+- Enforce strict major.minor version prefix validation for uploaded `config.json` and `sun_times.json` files, based on the currently running config version. Uploads without a semantic version or with an incompatible major.minor are rejected.
+
+### Documentation
+- Updated `README.md` to document strict version enforcement and the displayed config version on the main page.
+
 ## [0.1.4] - 2025-08-20
 
 ### Added
