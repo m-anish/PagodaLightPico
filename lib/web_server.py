@@ -323,7 +323,8 @@ class AsyncWebServer:
             .pwm-table tr.active {{ background-color: #d4edda; }}
             .pwm-table tr.inactive {{ background-color: #f8f9fa; }}
             .pwm-table tr.disabled {{ background-color: #ffe0b2; }}
-            .table-responsive {{ width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; position: relative; }}
+            .table-responsive {{ width: 100%; position: relative; }}
+            .table-scroll {{ width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }}
             .table-responsive::after {{
                 content: "";
                 position: absolute;
@@ -331,7 +332,19 @@ class AsyncWebServer:
                 width: 24px; height: 100%;
                 pointer-events: none;
                 background: linear-gradient(to left, rgba(255,255,255,1), rgba(255,255,255,0));
+                opacity: 0; transition: opacity 0.15s linear; z-index: 1;
             }}
+            .table-responsive::before {{
+                content: "";
+                position: absolute;
+                top: 0; left: 0;
+                width: 24px; height: 100%;
+                pointer-events: none;
+                background: linear-gradient(to right, rgba(255,255,255,1), rgba(255,255,255,0));
+                opacity: 0; transition: opacity 0.15s linear; z-index: 1;
+            }}
+            .table-responsive.has-right::after {{ opacity: 1; }}
+            .table-responsive.has-left::before {{ opacity: 1; }}
             /* Ensure table can scroll horizontally on small screens */
             .pwm-table {{ min-width: 560px; }}
             .footer {{ text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; }}
@@ -409,9 +422,23 @@ class AsyncWebServer:
                 if (refreshInterval) clearTimeout(refreshInterval);
                 if (countdownInterval) clearInterval(countdownInterval);
             }});
+            // Horizontal scroll fades
+            function initTableFades() {{
+                const wrap = document.querySelector('.table-responsive');
+                if (!wrap) return;
+                const scroller = wrap.querySelector('.table-scroll') || wrap;
+                function update() {{
+                    const maxScroll = scroller.scrollWidth - scroller.clientWidth;
+                    if (maxScroll <= 0) {{ wrap.classList.remove('has-left','has-right'); return; }}
+                    wrap.classList.toggle('has-left', scroller.scrollLeft > 0);
+                    wrap.classList.toggle('has-right', scroller.scrollLeft < maxScroll - 1);
+                }}
+                scroller.addEventListener('scroll', update, {{ passive: true }});
+                setTimeout(update, 0);
+            }}
         </script>
     </head>
-    <body onload="startClock({current_time[3]}, {current_time[4]}, {current_time[5]}); startPageRefresh();">
+    <body onload="startClock({current_time[3]}, {current_time[4]}, {current_time[5]}); startPageRefresh(); initTableFades();">
         <div class="container">
             <h1>{config.WEB_TITLE}</h1>
             <div class="time">🕒 <span id="time">{time_str}</span><br><small>{date_str}</small></div>
@@ -430,6 +457,7 @@ class AsyncWebServer:
 
             <h2>🎛️ Controllers</h2>
             <div class="table-responsive">
+            <div class="table-scroll">
             <table class="pwm-table">
                 <thead>
                     <tr>
@@ -446,11 +474,33 @@ class AsyncWebServer:
                 </tbody>
             </table>
             </div>
+            <div class="table-scroll">
+                <div class="table-responsive">
+                    <table class="pwm-table">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Pin</th>
+                                <th>Status</th>
+                                <th>Current Window</th>
+                                <th>Window Time</th>
+                                <th>Duty Cycle</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {pwm_table_rows}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
 
             <div class="footer">
                 <div class="footer-grid">
                     <div class="col">
                         <a href="/status">📄 Status (JSON)</a>
+{{ ... }}
+```
                     </div>
                     <div class="col">
                         <a href="/upload-config">⬆️ Upload Config</a>
@@ -559,8 +609,12 @@ class AsyncWebServer:
                 ".pwm-table tr.active { background-color: #d4edda; }"
                 ".pwm-table tr.inactive { background-color: #f8f9fa; }"
                 ".pwm-table tr.disabled { background-color: #ffe0b2; }"
-                ".table-responsive { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; position: relative; }"
-                ".table-responsive::after{content:'';position:absolute;top:0;right:0;width:24px;height:100%;pointer-events:none;background:linear-gradient(to left, rgba(255,255,255,1), rgba(255,255,255,0));}"
+                ".table-responsive { width: 100%; position: relative; }"
+                ".table-scroll { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }"
+                ".table-responsive::after{content:'';position:absolute;top:0;right:0;width:36px;height:100%;pointer-events:none;background:linear-gradient(to left, rgba(255,255,255,1), rgba(255,255,255,0));opacity:0;transition:opacity 0.15s linear;z-index:1;}"
+                ".table-responsive::before{content:'';position:absolute;top:0;left:0;width:36px;height:100%;pointer-events:none;background:linear-gradient(to right, rgba(255,255,255,1), rgba(255,255,255,0));opacity:0;transition:opacity 0.15s linear;z-index:1;}"
+                ".table-responsive.has-right::after{opacity:1;}"
+                ".table-responsive.has-left::before{opacity:1;}"
                 ".pwm-table { min-width: 560px; }"
                 ".footer { text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; }"
                 ".footer a { color: #007bff; text-decoration: none; }"
@@ -580,19 +634,20 @@ class AsyncWebServer:
             script = (
                 "<script>let clockInterval;let refreshInterval;let countdownInterval;"
                 "function startClock(h,m,s){const timeEl=document.getElementById('time');function pad(n){return(n<10?'0':'')+n;}"
-                "function tick(){s+=1;if(s>=60){s=0;m+=1;}if(m>=60){m=0;h=(h+1)%24;}timeEl.textContent=pad(h)+':'+pad(m)+':'+pad(s);}"
-                "tick();clockInterval=setInterval(tick,1000);}"
-                "function startPageRefresh(){let secondsLeft=180;const refreshEl=document.getElementById('refresh-countdown');"
-                "function updateCountdown(){secondsLeft--;if(secondsLeft<=0){location.reload();return;}refreshEl.textContent='Next refresh in '+secondsLeft+' seconds';}"
-                "refreshEl.textContent='Next refresh in '+secondsLeft+' seconds';countdownInterval=setInterval(updateCountdown,1000);refreshInterval=setTimeout(()=>{location.reload();},180000);}"
-                "window.addEventListener('beforeunload',function(){if(clockInterval)clearInterval(clockInterval);if(refreshInterval)clearTimeout(refreshInterval);if(countdownInterval)clearInterval(countdownInterval);});"
+                "function tick(){s+=1;if(s>=60){s=0;m+=1;}if(m>=60){m=0;h=(h+1)%24;}timeEl.textContent=pad(h)+':'+pad(m)+':'+pad(s);}" 
+                "tick();clockInterval=setInterval(tick,1000);}" 
+                "function startPageRefresh(){let secondsLeft=180;const refreshEl=document.getElementById('refresh-countdown');" 
+                "function updateCountdown(){secondsLeft--;if(secondsLeft<=0){location.reload();return;}refreshEl.textContent='Next refresh in '+secondsLeft+' seconds';}" 
+                "refreshEl.textContent='Next refresh in '+secondsLeft+' seconds';countdownInterval=setInterval(updateCountdown,1000);refreshInterval=setTimeout(()=>{location.reload();},180000);}" 
+                "window.addEventListener('beforeunload',function(){if(clockInterval)clearInterval(clockInterval);if(refreshInterval)clearTimeout(refreshInterval);if(countdownInterval)clearInterval(countdownInterval);});" 
+                "function initTableFades(){const wrap=document.querySelector('.table-responsive');if(!wrap)return;const scroller=wrap.querySelector('.table-scroll')||wrap;function upd(){const max=scroller.scrollWidth-scroller.clientWidth;if(max<=0){wrap.classList.remove('has-left','has-right');return;}wrap.classList.toggle('has-left',scroller.scrollLeft>0);wrap.classList.toggle('has-right',scroller.scrollLeft<max-1);}scroller.addEventListener('scroll',upd,{passive:true});setTimeout(upd,0);}" 
                 "</script>"
             )
             await self._awrite(client_socket, script.encode('utf-8'))
             await self._awrite(client_socket, b"</head>")
 
             # Body start
-            await self._awrite(client_socket, f"<body onload=\"startClock({current_time[3]}, {current_time[4]}, {current_time[5]}); startPageRefresh();\"><div class=\"container\">".encode('utf-8'))
+            await self._awrite(client_socket, f"<body onload=\"startClock({current_time[3]}, {current_time[4]}, {current_time[5]}); startPageRefresh(); initTableFades();\"><div class=\"container\">".encode('utf-8'))
             await self._awrite(client_socket, f"<h1>{config.WEB_TITLE}</h1>".encode('utf-8'))
             await self._awrite(client_socket, f"<div class=\"time\">🕒 <span id=\"time\">{time_str}</span><br><small>{date_str}</small></div>".encode('utf-8'))
 
@@ -610,7 +665,7 @@ class AsyncWebServer:
 
             # Controllers table header
             await self._awrite(client_socket, "<h2>🎛️ Controllers</h2>".encode('utf-8'))
-            await self._awrite(client_socket, "<div class=\"table-responsive\">".encode('utf-8'))
+            await self._awrite(client_socket, "<div class=\"table-responsive\"><div class=\"table-scroll\">".encode('utf-8'))
             await self._awrite(client_socket, (
                 "<table class=\"pwm-table\"><thead><tr>"
                 "<th>Name</th><th>Pin</th><th>Status</th><th>Current Window</th><th>Window Time</th><th>Duty Cycle</th>"
@@ -666,6 +721,7 @@ class AsyncWebServer:
 
             # Close table
             await self._awrite(client_socket, b"</tbody></table>")
+            await self._awrite(client_socket, b"</div>")
             await self._awrite(client_socket, b"</div>")
 
             # Footer

@@ -6,6 +6,15 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 
 ## [Unreleased]
 
+## [0.3.0] - 2025-08-21
+
+### Changed
+- UI (Homepage Controllers table): increase horizontal scroll fade width by ~50% (24px -> 36px) on both left and right edges for clearer scroll affordance on small screens.
+- Keep fades pinned to container edges during horizontal scrolling by using an inner `.table-scroll` element and toggling visibility classes (`.has-left`, `.has-right`) on the outer `.table-responsive` wrapper.
+
+### Notes
+- No changes to backend logic or APIs. Pure UX refinement for mobile usability.
+
 ## [0.2.2] - 2025-08-21
 
 ### Changed
