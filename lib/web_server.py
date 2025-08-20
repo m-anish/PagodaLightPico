@@ -191,11 +191,27 @@ class AsyncWebServer:
             else:
                 response = self.generate_404()
             
-            # Send response
+            # Send response (ensure full bytes are sent)
             try:
-                client_socket.send(response.encode('utf-8'))
-            except OSError:
-                pass  # Client disconnected
+                if isinstance(response, str):
+                    response_bytes = response.encode('utf-8')
+                else:
+                    response_bytes = response
+                total_sent = 0
+                while total_sent < len(response_bytes):
+                    try:
+                        sent = client_socket.send(response_bytes[total_sent:])
+                        if sent is None:
+                            sent = 0
+                        if sent <= 0:
+                            break
+                        total_sent += sent
+                    except OSError:
+                        # Briefly yield and retry
+                        await asyncio.sleep(0.01)
+                        continue
+            except Exception:
+                pass  # Client disconnected or other send error
                 
         except Exception as e:
             log.error(f"[WEB] Client handling error: {e}")
@@ -217,8 +233,6 @@ class AsyncWebServer:
             # Get PWM controller status and full config for including disabled controllers
             pwm_status = multi_pwm.get_pin_status()
             config_dict = config.config_manager.get_config_dict()
-            # Determine current config version for display
-            current_config_version = str(config_dict.get('version', '')).strip() or 'unknown'
 
             # Build Controllers table HTML (include disabled pins too)
             pwm_table_rows = ""
@@ -309,7 +323,6 @@ class AsyncWebServer:
             .footer a {{ color: #007bff; text-decoration: none; margin: 0 10px; }}
             .footer a:hover {{ text-decoration: underline; }}
             .refresh-info {{ font-size: 11px; color: #999; margin-top: 10px; }}
-            .version {{ background: #e9ecef; border-left: 4px solid #6c757d; }}
         </style>
         <script>
             let clockInterval;
@@ -372,9 +385,7 @@ class AsyncWebServer:
             <h1>{config.WEB_TITLE}</h1>
             <div class="time"><span id="time">{time_str}</span><br><small>{date_str}</small></div>
 
-            <div class="status version">
-                <strong>Config version:</strong> {current_config_version}
-            </div>
+            
 
             <div class="status {'online' if status.get('connections', {}).get('wifi', False) else 'offline'}">
                 <strong>WiFi:</strong> {config_dict.get('wifi', {}).get('ssid', 'Unknown')}, {status.get('network', {}).get('ip', 'N/A')}
@@ -419,8 +430,10 @@ class AsyncWebServer:
     </body>
     </html>"""
 
-            response = f"HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: {len(html)}\r\nConnection: close\r\n\r\n{html}"
-            return response
+            # Ensure Content-Length matches bytes actually sent
+            body_bytes = html.encode('utf-8')
+            headers = f"HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {len(body_bytes)}\r\nConnection: close\r\n\r\n"
+            return headers + html
 
         except Exception as e:
             log.error(f"[WEB] Error generating main page: {e}")
@@ -461,7 +474,13 @@ class AsyncWebServer:
             data.update(status)
             
             json_str = json.dumps(data)
-            response = f"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {len(json_str)}\r\nConnection: close\r\n\r\n{json_str}"
+            body = json_str.encode('utf-8')
+            response = (
+                "HTTP/1.1 200 OK\r\n"
+                "Content-Type: application/json; charset=utf-8\r\n"
+                f"Content-Length: {len(body)}\r\n"
+                "Connection: close\r\n\r\n"
+            ) + json_str
             return response
             
         except Exception as e:
@@ -478,7 +497,13 @@ class AsyncWebServer:
     <p><a href="/">Back to Home</a></p>
 </body>
 </html>"""
-        response = f"HTTP/1.1 404 Not Found\r\nContent-Type: text/html\r\nContent-Length: {len(html)}\r\nConnection: close\r\n\r\n{html}"
+        body = html.encode('utf-8')
+        response = (
+            "HTTP/1.1 404 Not Found\r\n"
+            "Content-Type: text/html; charset=utf-8\r\n"
+            f"Content-Length: {len(body)}\r\n"
+            "Connection: close\r\n\r\n"
+        ) + html
         return response
     
     def generate_500(self):
@@ -491,7 +516,13 @@ class AsyncWebServer:
     <p><a href="/">Back to Home</a></p>
 </body>
 </html>"""
-        response = f"HTTP/1.1 500 Internal Server Error\r\nContent-Type: text/html\r\nContent-Length: {len(html)}\r\nConnection: close\r\n\r\n{html}"
+        body = html.encode('utf-8')
+        response = (
+            "HTTP/1.1 500 Internal Server Error\r\n"
+            "Content-Type: text/html; charset=utf-8\r\n"
+            f"Content-Length: {len(body)}\r\n"
+            "Connection: close\r\n\r\n"
+        ) + html
         return response
 
     def generate_restart_page(self):
@@ -509,6 +540,7 @@ class AsyncWebServer:
     <style>
         body {{ font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }}
         .container {{ max-width: 600px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; text-align: center; }}
+        h1 {{ color: #2c3e50; text-align: center; }}
         .info {{ background: #d1ecf1; border: 1px solid #bee5eb; padding: 15px; border-radius: 4px; margin: 20px 0; color: #0c5460; }}
     </style>
     <script>
@@ -536,7 +568,13 @@ class AsyncWebServer:
 </body>
 </html>"""
 
-            response = f"HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: {len(html)}\r\nConnection: close\r\n\r\n{html}"
+            body = html.encode('utf-8')
+            response = (
+                "HTTP/1.1 200 OK\r\n"
+                "Content-Type: text/html; charset=utf-8\r\n"
+                f"Content-Length: {len(body)}\r\n"
+                "Connection: close\r\n\r\n"
+            ) + html
             return response
         except Exception as e:
             log.error(f"[WEB] Error generating restart page: {e}")
@@ -550,7 +588,14 @@ class AsyncWebServer:
                 config_content = f.read()
             
             # Generate download response with proper headers
-            response = f"""HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Disposition: attachment; filename="config.json"\r\nContent-Length: {len(config_content)}\r\nConnection: close\r\n\r\n{config_content}"""
+            body = config_content.encode('utf-8')
+            response = (
+                "HTTP/1.1 200 OK\r\n"
+                "Content-Type: application/json; charset=utf-8\r\n"
+                "Content-Disposition: attachment; filename=\"config.json\"\r\n"
+                f"Content-Length: {len(body)}\r\n"
+                "Connection: close\r\n\r\n"
+            ) + config_content
             return response
             
         except Exception as e:
@@ -565,14 +610,14 @@ class AsyncWebServer:
                 sun_times_content = f.read()
 
             # Generate download response with proper headers
+            body = sun_times_content.encode('utf-8')
             response = (
                 "HTTP/1.1 200 OK\r\n"
-                "Content-Type: application/json\r\n"
+                "Content-Type: application/json; charset=utf-8\r\n"
                 "Content-Disposition: attachment; filename=\"sun_times.json\"\r\n"
-                f"Content-Length: {len(sun_times_content)}\r\n"
+                f"Content-Length: {len(body)}\r\n"
                 "Connection: close\r\n\r\n"
-                f"{sun_times_content}"
-            )
+            ) + sun_times_content
             return response
 
         except Exception as e:
@@ -630,7 +675,13 @@ class AsyncWebServer:
 </body>
 </html>"""
             
-            response = f"HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: {len(html)}\r\nConnection: close\r\n\r\n{html}"
+            body = html.encode('utf-8')
+            response = (
+                "HTTP/1.1 200 OK\r\n"
+                "Content-Type: text/html; charset=utf-8\r\n"
+                f"Content-Length: {len(body)}\r\n"
+                "Connection: close\r\n\r\n"
+            ) + html
             return response
             
         except Exception as e:
@@ -736,7 +787,13 @@ class AsyncWebServer:
                 # Schedule soft reboot after response is sent
                 asyncio.create_task(self.soft_reboot_delayed())
                 
-                response = f"HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: {len(html)}\r\nConnection: close\r\n\r\n{html}"
+                body = html.encode('utf-8')
+                response = (
+                    "HTTP/1.1 200 OK\r\n"
+                    "Content-Type: text/html; charset=utf-8\r\n"
+                    f"Content-Length: {len(body)}\r\n"
+                    "Connection: close\r\n\r\n"
+                ) + html
                 return response
                 
             except Exception as e:
@@ -775,7 +832,13 @@ class AsyncWebServer:
 </body>
 </html>"""
         
-        response = f"HTTP/1.1 400 Bad Request\r\nContent-Type: text/html\r\nContent-Length: {len(html)}\r\nConnection: close\r\n\r\n{html}"
+        body = html.encode('utf-8')
+        response = (
+            "HTTP/1.1 400 Bad Request\r\n"
+            "Content-Type: text/html; charset=utf-8\r\n"
+            f"Content-Length: {len(body)}\r\n"
+            "Connection: close\r\n\r\n"
+        ) + html
         return response
     
     def generate_sun_times_upload_page(self):
