@@ -143,6 +143,13 @@ class AsyncWebServer:
                     response = await self.handle_config_upload(request_str)
                 else:
                     response = self.generate_404()
+            elif path == '/upload-sun-times':
+                if method == 'GET':
+                    response = self.generate_sun_times_upload_page()
+                elif method == 'POST':
+                    response = await self.handle_sun_times_upload(request_str)
+                else:
+                    response = self.generate_404()
             else:
                 response = self.generate_404()
             
@@ -342,6 +349,7 @@ class AsyncWebServer:
                 <a href="/status">View JSON Status</a>
                 <a href="/download-config">Download Config</a>
                 <a href="/upload-config">Upload Config</a>
+                <a href="/upload-sun-times">Upload Sun Times</a>
                 <div class="refresh-info" id="refresh-countdown"></div>
             </div>
         </div>
@@ -614,11 +622,243 @@ class AsyncWebServer:
         response = f"HTTP/1.1 400 Bad Request\r\nContent-Type: text/html\r\nContent-Length: {len(html)}\r\nConnection: close\r\n\r\n{html}"
         return response
     
+    def generate_sun_times_upload_page(self):
+        """Generate sun_times.json upload page."""
+        try:
+            html = """<!DOCTYPE html>
+<html>
+<head>
+    <title>Upload Sun Times - PagodaLightPico</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+        .container { max-width: 600px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; }
+        h1 { color: #2c3e50; text-align: center; }
+        .form-group { margin: 20px 0; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input[type="file"] { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; }
+        .btn { background: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; }
+        .btn:hover { background: #0056b3; }
+        .btn-secondary { background: #6c757d; }
+        .btn-secondary:hover { background: #545b62; }
+        .warning { background: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 4px; margin: 20px 0; }
+        .info { background: #d1ecf1; border: 1px solid #bee5eb; padding: 15px; border-radius: 4px; margin: 20px 0; }
+        .footer { text-align: center; margin-top: 30px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Upload Sun Times Data</h1>
+        
+        <div class="info">
+            <strong>Info:</strong> Upload a new sun_times.json file to update sunrise and sunset times for your location.
+            The file should contain location data and daily sunrise/sunset times in JSON format.
+        </div>
+        
+        <div class="warning">
+            <strong>Warning:</strong> Uploading new sun times data will replace the current data and trigger a soft reboot.
+            Make sure your JSON file is properly formatted.
+        </div>
+        
+        <form method="POST" enctype="multipart/form-data">
+            <div class="form-group">
+                <label for="sun-times-file">Select sun_times.json file:</label>
+                <input type="file" id="sun-times-file" name="sun_times" accept=".json" required>
+            </div>
+            
+            <div class="form-group">
+                <button type="submit" class="btn">Upload and Apply</button>
+                <a href="/" class="btn btn-secondary" style="text-decoration: none; margin-left: 10px;">Cancel</a>
+            </div>
+        </form>
+        
+        <div class="footer">
+            <p><a href="/upload-config">Upload Config</a> | <a href="/">Back to Home</a></p>
+        </div>
+    </div>
+</body>
+</html>"""
+            
+            response = f"HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: {len(html)}\r\nConnection: close\r\n\r\n{html}"
+            return response
+            
+        except Exception as e:
+            log.error(f"[WEB] Error generating sun times upload page: {e}")
+            return self.generate_500()
+    
+    async def handle_sun_times_upload(self, request_str):
+        """Handle sun_times.json file upload and validation."""
+        try:
+            # Parse multipart form data (simplified for MicroPython)
+            lines = request_str.split('\r\n')
+            
+            # Find the boundary
+            boundary = None
+            for line in lines:
+                if line.startswith('Content-Type: multipart/form-data'):
+                    boundary_part = line.split('boundary=')
+                    if len(boundary_part) > 1:
+                        boundary = '--' + boundary_part[1]
+                        break
+            
+            if not boundary:
+                return self.generate_sun_times_upload_error("Invalid multipart data")
+            
+            # Find the file content
+            file_content = None
+            in_file_data = False
+            content_lines = []
+            
+            for line in lines:
+                if in_file_data:
+                    if line.startswith(boundary):
+                        break
+                    content_lines.append(line)
+                elif 'Content-Disposition: form-data' in line and 'filename=' in line:
+                    # Skip the next line (Content-Type) and empty line
+                    in_file_data = True
+                    continue
+            
+            if content_lines:
+                file_content = '\r\n'.join(content_lines).strip()
+            
+            if not file_content:
+                return self.generate_sun_times_upload_error("No file content found")
+            
+            # Validate JSON
+            try:
+                sun_times_data = json.loads(file_content)
+            except json.JSONDecodeError as e:
+                return self.generate_sun_times_upload_error(f"Invalid JSON format: {e}")
+            
+            # Basic validation of sun_times structure
+            if not self.validate_sun_times_structure(sun_times_data):
+                return self.generate_sun_times_upload_error("Invalid sun_times.json structure. Expected format with 'location', 'lat', 'lon', and 'days' fields.")
+            
+            # Backup current sun_times
+            try:
+                os.rename('sun_times.json', 'sun_times.json.backup')
+            except:
+                pass  # Backup failed, continue anyway
+            
+            # Save new sun_times
+            try:
+                with open('sun_times.json', 'w') as f:
+                    f.write(file_content)
+                
+                log.info("[WEB] New sun_times.json uploaded successfully")
+                
+                # Generate success response with auto-reboot
+                html = """<!DOCTYPE html>
+<html>
+<head>
+    <title>Sun Times Upload Success - PagodaLightPico</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta http-equiv="refresh" content="5;url=/">
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+        .container { max-width: 600px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; text-align: center; }
+        .success { background: #d4edda; border: 1px solid #c3e6cb; padding: 15px; border-radius: 4px; margin: 20px 0; color: #155724; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Sun Times Data Updated Successfully</h1>
+        <div class="success">
+            <p>The new sun times data has been uploaded successfully. The system will perform a soft reboot in a few seconds.</p>
+            <p>You will be redirected to the home page automatically.</p>
+        </div>
+        <p><a href="/">Return to Home</a></p>
+    </div>
+</body>
+</html>"""
+                
+                # Schedule soft reboot after response is sent
+                asyncio.create_task(self.soft_reboot_delayed())
+                
+                response = f"HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: {len(html)}\r\nConnection: close\r\n\r\n{html}"
+                return response
+                
+            except Exception as e:
+                # Restore backup if save failed
+                try:
+                    os.rename('sun_times.json.backup', 'sun_times.json')
+                except:
+                    pass
+                return self.generate_sun_times_upload_error(f"Failed to save sun times data: {e}")
+                
+        except Exception as e:
+            log.error(f"[WEB] Error handling sun times upload: {e}")
+            return self.generate_sun_times_upload_error(f"Upload processing failed: {e}")
+    
+    def validate_sun_times_structure(self, data):
+        """Validate basic structure of sun_times.json data."""
+        try:
+            # Check required top-level fields
+            required_fields = ['location', 'lat', 'lon', 'days']
+            for field in required_fields:
+                if field not in data:
+                    return False
+            
+            # Check that days is a dict
+            if not isinstance(data['days'], dict):
+                return False
+            
+            # Check that lat/lon are numbers
+            if not isinstance(data['lat'], (int, float)) or not isinstance(data['lon'], (int, float)):
+                return False
+            
+            # Check a few day entries have proper format
+            for date_key, day_data in list(data['days'].items())[:3]:  # Check first 3 entries
+                if not isinstance(day_data, dict):
+                    return False
+                if 'rise' not in day_data or 'set' not in day_data:
+                    return False
+                # Basic time format check (HH:MM)
+                rise_time = day_data['rise']
+                set_time = day_data['set']
+                if not (isinstance(rise_time, str) and ':' in rise_time):
+                    return False
+                if not (isinstance(set_time, str) and ':' in set_time):
+                    return False
+            
+            return True
+            
+        except Exception:
+            return False
+    
+    def generate_sun_times_upload_error(self, error_msg):
+        """Generate sun times upload error page."""
+        html = f"""<!DOCTYPE html>
+<html>
+<head>
+    <title>Sun Times Upload Error - PagodaLightPico</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body {{ font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }}
+        .container {{ max-width: 600px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; }}
+        .error {{ background: #f8d7da; border: 1px solid #f5c6cb; padding: 15px; border-radius: 4px; margin: 20px 0; color: #721c24; }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Sun Times Upload Failed</h1>
+        <div class="error">
+            <p><strong>Error:</strong> {error_msg}</p>
+        </div>
+        <p><a href="/upload-sun-times">Try Again</a> | <a href="/">Back to Home</a></p>
+    </div>
+</body>
+</html>"""
+        
+        response = f"HTTP/1.1 400 Bad Request\r\nContent-Type: text/html\r\nContent-Length: {len(html)}\r\nConnection: close\r\n\r\n{html}"
+        return response
+
     async def soft_reboot_delayed(self):
         """Perform soft reboot after a short delay."""
         try:
             await asyncio.sleep(3)  # Wait 3 seconds
-            log.info("[WEB] Performing soft reboot after config update")
+            log.info("[WEB] Performing soft reboot after file update")
             machine.soft_reset()
         except Exception as e:
             log.error(f"[WEB] Error during soft reboot: {e}")
