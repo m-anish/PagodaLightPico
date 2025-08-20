@@ -666,7 +666,7 @@ class AsyncWebServer:
 <head>
     <title>Upload Success - PagodaLightPico</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta http-equiv="refresh" content="5;url=/">
+    <meta http-equiv="refresh" content="8;url=/">
     <style>
         body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
         .container { max-width: 600px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; text-align: center; }
@@ -857,7 +857,7 @@ class AsyncWebServer:
 <head>
     <title>Sun Times Upload Success - PagodaLightPico</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta http-equiv="refresh" content="5;url=/">
+    <meta http-equiv="refresh" content="8;url=/">
     <style>
         body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
         .container { max-width: 600px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; text-align: center; }
