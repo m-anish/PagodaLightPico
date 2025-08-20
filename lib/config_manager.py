@@ -132,6 +132,9 @@ class ConfigManager:
         system = self.config.get("system", {})
         self.LOG_LEVEL = system.get("log_level", "INFO")
         self.UPDATE_INTERVAL = system.get("update_interval", 120)
+        # New: backoff/sleep tunables (milliseconds)
+        self.SERVER_IDLE_SLEEP_MS = system.get("server_idle_sleep_ms", 300)
+        self.CLIENT_READ_SLEEP_MS = system.get("client_read_sleep_ms", 50)
         
         # Notification settings  
         notifications = self.config.get("notifications", {})
@@ -185,6 +188,13 @@ class ConfigManager:
         update_interval = system.get("update_interval", 60)
         if not isinstance(update_interval, int) or update_interval < 1:
             errors.append("Update interval must be a positive integer")
+        # Validate server/client sleeps (ms)
+        server_idle_ms = system.get("server_idle_sleep_ms", 300)
+        client_read_ms = system.get("client_read_sleep_ms", 50)
+        if not isinstance(server_idle_ms, int) or server_idle_ms < 50 or server_idle_ms > 5000:
+            errors.append("system.server_idle_sleep_ms must be int 50..5000 ms")
+        if not isinstance(client_read_ms, int) or client_read_ms < 10 or client_read_ms > 2000:
+            errors.append("system.client_read_sleep_ms must be int 10..2000 ms")
         
         # Validate PWM pins configuration
         pwm_pins = self.config.get("pwm_pins", {})
@@ -315,4 +325,6 @@ RTC_I2C_SCL_PIN = config_manager.RTC_I2C_SCL_PIN
 PWM_FREQUENCY = config_manager.PWM_FREQUENCY
 LOG_LEVEL = config_manager.LOG_LEVEL
 UPDATE_INTERVAL = config_manager.UPDATE_INTERVAL
+SERVER_IDLE_SLEEP_MS = config_manager.SERVER_IDLE_SLEEP_MS
+CLIENT_READ_SLEEP_MS = config_manager.CLIENT_READ_SLEEP_MS
 PWM_PINS = config_manager.PWM_PINS

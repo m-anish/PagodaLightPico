@@ -80,7 +80,7 @@ class AsyncWebServer:
                     
                 except OSError:
                     # No connection available, yield control
-                    await asyncio.sleep(0.3)
+                    await asyncio.sleep(config.SERVER_IDLE_SLEEP_MS / 1000.0)
                     continue
                     
             except Exception as e:
@@ -106,7 +106,7 @@ class AsyncWebServer:
                         headers_end = request_data.find(b'\r\n\r\n')
                         break
                 except OSError:
-                    await asyncio.sleep(0.05)
+                    await asyncio.sleep(config.CLIENT_READ_SLEEP_MS / 1000.0)
                     continue
             
             if not request_data:
@@ -139,7 +139,7 @@ class AsyncWebServer:
                             break
                         request_data += chunk
                     except OSError:
-                        await asyncio.sleep(0.05)
+                        await asyncio.sleep(config.CLIENT_READ_SLEEP_MS / 1000.0)
                         continue
 
             # Parse request (headers + body)
