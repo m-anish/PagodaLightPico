@@ -6,6 +6,39 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 
 ## [Unreleased]
 
+## [0.1.4] - 2025-08-20
+
+### Added
+- Homepage: show all Controllers including inactive (disabled) ones with an orange background. Section renamed from "PWM Controllers" to "Controllers".
+
+### Changed
+- Homepage: replaced "WiFi: Connected" with "WiFi: <SSID>, <IP>" in the same row.
+- Homepage: removed redundant "Web Server: Running" status block.
+- Network: increased WiFi/network health check interval from 30s to 120s to reduce unnecessary checks.
+
+### Fixed
+- Homepage: fixed a rendering error caused by an invalid f-string default expression.
+
+## [0.1.3] - 2025-08-20
+
+### Documentation
+- Consolidated all essential docs into a single concise `README.md`:
+  - Added sections: Networking (mDNS), Notifications (MQTT), Troubleshooting, Developer Quickstart.
+- Marked the following files for removal as redundant/outdated (content merged or obsolete):
+  - `ASYNC_MIGRATION.md`
+  - `HARDWARE.md`
+  - `INSTALL_MDNS.md`
+  - `MDNS_SETUP.md`
+  - `MQTT_BROKERS.md`
+  - `PUSH_NOTIFICATIONS.md`
+  - `TIMEOUT_TROUBLESHOOTING.md`
+  - `WARP.md`
+  - `system_architecture.md`
+  - `QWEN.md`
+
+### Notes
+- Runtime behavior unchanged. This release focuses on documentation simplification.
+
 ## [0.1.2] - 2025-08-20
 
 ### Removed
