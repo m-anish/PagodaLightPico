@@ -264,3 +264,24 @@ Use an MQTT app (e.g., MQTT Dash on Android), connect to `broker.hivemq.com:1883
 - REPL/debug: `rshell -p /dev/ttyACM0 repl` or `screen /dev/ttyACM0 115200`
 - After edits: Ctrl+D in REPL for soft reset
 - Check memory in REPL: `import gc; gc.collect(); print(gc.mem_free())`
+
+## Automated GitHub Pages deployment and Auto-merge
+
+The helper app in `helper-app/` is deployed to GitHub Pages via the workflow at `.github/workflows/gh-pages.yml`.
+
+- The site deploys automatically on pushes to the default branch (`main`/`master`).
+- For feature branches, open a Pull Request. You can automate merging with the "automerge" label.
+
+### Auto-merge PRs with the "automerge" label
+
+We use `.github/workflows/auto-merge.yml` to merge PRs labeled `automerge` after all checks pass.
+
+Steps:
+1. Create a PR targeting `main`.
+2. Add the label `automerge` to the PR.
+3. Wait for required checks to pass. The workflow will squash-merge the PR automatically.
+4. Merge to `main` triggers the Pages deploy workflow which publishes the latest `helper-app/` and includes `config.json.sample` and `sun_times.json.sample` at the site root.
+
+Recommended repo settings:
+- Settings → Branches → Protect `main` with required status checks (e.g., "Deploy helper app to GitHub Pages").
+- Settings → Pages → Build and deployment → Source = "GitHub Actions".
