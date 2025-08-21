@@ -185,9 +185,14 @@
     </form>
 
     <div class="actions">
-      <button onclick="downloadJSON()">Download config.json</button>
+      <button type="button" onclick="downloadJSON()">Download config.json</button>
+      <label class="button" style="position:relative; overflow:hidden;">
+        <input id="upload_config" type="file" accept="application/json,.json" style="position:absolute; inset:0; opacity:0; cursor:pointer;" />
+        Upload and prefill
+      </label>
       <a class="button" href="./index.html">Back to Home</a>
     </div>
+    <div id="upload_msg" class="tip"></div>
 
     <h2>Preview</h2>
     <pre id="preview"></pre>
@@ -575,11 +580,13 @@
 
     // initialize from sample, fallback to one default pin
     (async function init(){
+      await fetchSampleVersion();
       await loadSamplePins();
       if (pins.length === 0) { pins.push(newPin()); }
       populateTimezoneSelect();
       setupTimezoneSearch();
       setupCollapsibles();
+      setupUpload();
       renderPinsUI();
       render();
     })();
