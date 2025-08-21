@@ -9,6 +9,7 @@ A MicroPython-based LED lighting controller for the Dhamma Laddha Vipassana medi
 - PWM-controlled LED lighting for pagoda and meditation cells
 - **NEW: Web-based configuration interface** for runtime settings updates
 - **NEW: JSON configuration system** with live validation and reload
+- **NEW (0.4.1): Streaming upload pages** for `config.json` and `sun_times.json` with chunked uploads for low RAM usage on Pico W
 - Modular codebase using MicroPython with hardware abstraction layers
 - Robust logging and debug facilities
 - Designed for low power and serene environmental control
@@ -46,6 +47,21 @@ The system now uses JSON-based configuration for easy runtime updates:
   - `client_read_sleep_ms` (milliseconds): Web server client recv backoff. Default: 50
 - **Time Windows**: LED brightness schedules for different times of day
 
+#### Ordering helper keys (UI-only)
+- Keys beginning with `_` are ignored by firmware logic but can be used by tools/UI.
+- You may include:
+  - A numeric `_order` inside each window object (e.g., `"day": { ..., "_order": 1 }`) to hint display order.
+  - A top-level `_order` array within `time_windows` that lists window names in order, e.g.:
+    ```json
+    "time_windows": {
+      "_order": ["day", "evening", "night"],
+      "day": { "start": "sunrise", "end": "sunset", "duty_cycle": 0 },
+      "evening": { "start": "sunset", "end": "22:00", "duty_cycle": 60 },
+      "night": { "start": "22:00", "end": "sunrise", "duty_cycle": 20 }
+    }
+    ```
+  - Ordering is for display only; the device selects a window by checking the current time against each window (keys starting with `_` are ignored).
+
 ### Web Interface (Async server)
 When WiFi is connected, access the web interface at:
 ```
@@ -76,6 +92,11 @@ The new Microdot-powered web interface provides:
 - `GET /api/config` - Current configuration as JSON
 - `GET /api/status` - System status as JSON  
 - `GET /api/pins` - PWM pins status as JSON
+
+#### Upload Pages (0.4.1)
+- `GET /upload-config` — Streamed HTML page to upload a new `config.json` in 1KB chunks.
+- `GET /upload-sun-times` — Streamed HTML page to upload a new `sun_times.json` in 1KB chunks.
+- Uploads use chunked endpoints to reduce RAM usage on Pico W. On success, the device applies the new file (config may require a soft reboot).
 
 ## Usage
 

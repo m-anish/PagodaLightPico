@@ -30,7 +30,7 @@
         <legend>Header</legend>
         <div class="row">
           <label>Version (semver)
-            <input id="version" type="text" value="0.3.0" />
+            <input id="version" type="text" value="0.4.1" />
           </label>
           <label>Location name
             <input id="location" type="text" value="Demo Location" />
@@ -119,7 +119,7 @@
 
     function buildSunTimes(){
       return {
-        version: document.getElementById('version').value || '0.3.0',
+        version: document.getElementById('version').value || '0.4.1',
         location: document.getElementById('location').value || 'Unknown',
         lat: parseFloat(document.getElementById('lat').value||'0'),
         lon: parseFloat(document.getElementById('lon').value||'0'),
