@@ -321,20 +321,61 @@
       } catch { return '00:00'; }
     }
 
-    function generateDatesLocal(year, freq, tz){
+    // Intl helpers (spacetime-free)
+    function localParts(date, tz){
+      const fmt = new Intl.DateTimeFormat('en-GB', { timeZone: tz, year:'numeric', month:'2-digit', day:'2-digit', weekday:'long' });
+      const parts = fmt.formatToParts(date);
+      const get = (t) => parts.find(p=>p.type===t)?.value;
+      return { y: parseInt(get('year')), m: parseInt(get('month')), d: parseInt(get('day')), weekday: get('weekday') };
+    }
+    function* daysOfYearUTC(year){
+      let d = new Date(Date.UTC(year,0,1));
+      while (d.getUTCFullYear() === year){ yield new Date(d.getTime()); d.setUTCDate(d.getUTCDate()+1); }
+    }
+    function generateDatesLocalFallback(year, freq, tz){
       const out = [];
-      let s = spacetime(`${year}-01-01`, tz).startOf('day');
-      const end = s.endOf('year');
-      if (freq === 'daily') {
-        while (s.year() === year) { out.push(s.clone()); s = s.add(1, 'day'); }
-      } else if (freq === 'weekly') {
-        while (s.isBefore(end)) { if (s.dayName() === 'Monday') out.push(s.clone()); s = s.add(1, 'day'); }
-      } else if (freq === 'fortnightly') {
-        for (let m=0;m<12;m++){ out.push(spacetime({year, month:m, date:1}, tz)); out.push(spacetime({year, month:m, date:15}, tz)); }
-      } else { // monthly
-        for (let m=0;m<12;m++){ out.push(spacetime({year, month:m, date:1}, tz)); }
+      if (freq === 'daily'){
+        for (const d of daysOfYearUTC(year)) out.push(d);
+      } else if (freq === 'weekly'){
+        for (const d of daysOfYearUTC(year)) { const lp = localParts(d, tz); if (lp.weekday === 'Monday') out.push(d); }
+      } else if (freq === 'fortnightly'){
+        // pick all days where local day is 1 or 15; de-dup months per key
+        const pick = new Map(); // key: `${m}-${d}` => first date
+        for (const d of daysOfYearUTC(year)){
+          const lp = localParts(d, tz);
+          if (lp.d === 1 || lp.d === 15){ const k = `${lp.m}-${lp.d}`; if (!pick.has(k)) pick.set(k, d); }
+        }
+        // order Jan..Dec (1 and 15 per month)
+        for (let m=1;m<=12;m++){ const k1=`${m}-1`, k2=`${m}-15`; if (pick.has(k1)) out.push(pick.get(k1)); if (pick.has(k2)) out.push(pick.get(k2)); }
+      } else { // monthly -> local day 1 of each month
+        const pick = new Map();
+        for (const d of daysOfYearUTC(year)){
+          const lp = localParts(d, tz);
+          if (lp.d === 1){ const k = `${lp.m}-1`; if (!pick.has(k)) pick.set(k, d); }
+        }
+        for (let m=1;m<=12;m++){ const k=`${m}-1`; if (pick.has(k)) out.push(pick.get(k)); }
       }
-      return out;
+      return out.map(d => ({ date: d }));
+    }
+
+    function generateDatesLocal(year, freq, tz){
+      if (typeof spacetime !== 'undefined' && spacetime){
+        const out = [];
+        let s = spacetime(`${year}-01-01`, tz).startOf('day');
+        const end = s.endOf('year');
+        if (freq === 'daily') {
+          while (s.year() === year) { out.push(s.clone()); s = s.add(1, 'day'); }
+        } else if (freq === 'weekly') {
+          while (s.isBefore(end)) { if (s.dayName() === 'Monday') out.push(s.clone()); s = s.add(1, 'day'); }
+        } else if (freq === 'fortnightly') {
+          for (let m=0;m<12;m++){ out.push(spacetime({year, month:m, date:1}, tz)); out.push(spacetime({year, month:m, date:15}, tz)); }
+        } else { // monthly
+          for (let m=0;m<12;m++){ out.push(spacetime({year, month:m, date:1}, tz)); }
+        }
+        return out;
+      }
+      // Fallback using Intl + UTC dates
+      return generateDatesLocalFallback(year, freq, tz);
     }
 
     async function generateFromLocation(){
@@ -344,14 +385,19 @@
       const tz = canonicalizeTimeZone(document.getElementById('tz').value.trim() || 'UTC');
       const year = parseInt(document.getElementById('year').value || new Date().getFullYear(), 10);
       if (isNaN(lat) || isNaN(lon)) { alert('Please choose a valid place (lat/lon).'); return; }
-      const ok = await ensureSpacetime();
-      if (!ok) { alert('Timezone engine failed to load. Check your network and try again.'); return; }
+      // Try to load spacetime but proceed even if it fails (fallback path)
+      try { await ensureSpacetime(); } catch {}
       daysClear();
       const dates = generateDatesLocal(year, document.getElementById('freq').value, tz);
       dates.forEach(s => {
-        const native = s.clone().hour(12).minute(0).second(0).millisecond(0).toNativeDate(); // local noon
+        const native = (typeof s.clone === 'function')
+          ? s.clone().hour(12).minute(0).second(0).millisecond(0).toNativeDate()
+          : new Date(s.date.getTime()); // UTC date; SunCalc works with Date regardless of tz
         const times = SunCalc.getTimes(native, lat, lon);
-        const mmdd = `${pad2(s.month()+1)}-${pad2(s.date())}`;
+        const lp = (typeof s.month === 'function')
+          ? { m: s.month()+1, d: s.date() }
+          : localParts(native, tz);
+        const mmdd = `${pad2(lp.m)}-${pad2(lp.d)}`;
         days[mmdd] = { rise: formatHM(times.sunrise, tz), set: formatHM(times.sunset, tz) };
       });
       document.getElementById('location').value = loc; // keep
