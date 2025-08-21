@@ -420,7 +420,7 @@ class AsyncWebServer:
                 let secondsLeft = 180;
                 function setText() {{
                     const el = document.getElementById('refresh-countdown');
-                    if (el) {{ el.textContent = `Next refresh in ${{secondsLeft}} seconds`; return true; }}
+                    if (el) {{ el.textContent = `Next refresh in ${secondsLeft} seconds`; return true; }}
                     return false;
                 }}
                 // Initial text; if element isn't in DOM yet (streaming), retry until it appears
@@ -779,6 +779,14 @@ class AsyncWebServer:
             await self._awrite(client_socket, b"</div></body></html>")
         except Exception as e:
             log.error(f"[WEB] Error streaming main page: {e}")
+            # Best-effort minimal error page so the browser shows something
+            try:
+                await self._awrite(client_socket, b"HTTP/1.1 500 Internal Server Error\r\n")
+                await self._awrite(client_socket, b"Content-Type: text/html; charset=utf-8\r\n")
+                await self._awrite(client_socket, b"Connection: close\r\n\r\n")
+                await self._awrite(client_socket, b"<html><body><h1>Server Error</h1><p>Failed to render homepage.</p></body></html>")
+            except Exception:
+                pass
     
     async def stream_upload_page_chunked(self, client_socket):
         """Stream the config upload page (chunked upload JS) to minimize RAM usage."""
