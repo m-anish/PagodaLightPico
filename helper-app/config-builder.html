@@ -6,17 +6,24 @@
   <title>Build config.json • PagodaLightPico</title>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, 'Noto Sans', 'Liberation Sans', sans-serif; margin: 20px; background: #f5f5f5; }
-    .container { max-width: 920px; margin: 0 auto; background: #fff; padding: 20px; border-radius: 8px; }
+    .container { max-width: 920px; margin: 0 auto; background: #fff; padding: 20px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
     h1 { color: #2c3e50; text-align: center; }
-    fieldset { border: 1px solid #ddd; border-radius: 8px; margin: 16px 0; padding: 12px; }
-    legend { padding: 0 6px; color: #34495e; }
-    label { display: block; margin: 8px 0 4px; font-weight: 600; }
-    input[type="text"], input[type="number"], input[type="password"], select { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 6px; }
+    fieldset { border: 1px solid #e5e7eb; border-radius: 10px; margin: 16px 0; padding: 12px; background: #fafafa; }
+    fieldset.meta { border-left: 4px solid #60a5fa; }
+    fieldset.wifi { border-left: 4px solid #34d399; }
+    fieldset.tz { border-left: 4px solid #f59e0b; }
+    fieldset.system { border-left: 4px solid #a78bfa; }
+    fieldset.notif { border-left: 4px solid #f87171; }
+    fieldset.pwm { border-left: 4px solid #22d3ee; }
+    label { display: block; margin: 6px 0; }
+    input, select { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 6px; }
     .row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
     .actions { display: flex; gap: 12px; flex-wrap: wrap; }
     button, a.button { padding: 10px 14px; border: 1px solid #999; border-radius: 8px; background: #fff; cursor: pointer; text-decoration: none; color: #222; }
     pre { background: #0b1020; color: #d5e6ff; padding: 12px; border-radius: 8px; overflow: auto; max-height: 420px; }
     .tip { font-size: 12px; color: #666; }
+    legend { font-weight: 600; color: #374151; }
+    .emoji { font-size: 1.1em; margin-right: 6px; }
   </style>
 </head>
 <body>
@@ -24,8 +31,8 @@
     <h1>Build config.json</h1>
 
     <form id="cfgForm" oninput="render()" onchange="render()">
-      <fieldset>
-        <legend>Meta</legend>
+      <fieldset class="meta">
+        <legend><span class="emoji">🧩</span>Meta</legend>
         <label>Version (semver)
           <input id="version" type="text" value="0.4.0" placeholder="0.4.0" required />
         </label>
@@ -34,8 +41,8 @@
         </label>
       </fieldset>
 
-      <fieldset>
-        <legend>WiFi</legend>
+      <fieldset class="wifi">
+        <legend><span class="emoji">📶</span>WiFi</legend>
         <div class="row">
           <label>SSID
             <input id="ssid" type="text" placeholder="your_wifi_ssid_here" />
@@ -46,15 +53,20 @@
         </div>
       </fieldset>
 
-      <fieldset>
-        <legend>Timezone</legend>
+      <fieldset class="tz">
+        <legend><span class="emoji">🌍</span>Timezone</legend>
         <div class="row">
-          <label>Name
-            <input id="tz_name" type="text" value="IST" />
+          <label>Choose your timezone
+            <select id="tz_select"></select>
           </label>
-          <label>UTC Offset (hours, can be decimal like 5.5)
-            <input id="tz_offset" type="number" step="0.25" value="5.5" />
-          </label>
+          <div style="display:none">
+            <label>Name
+              <input id="tz_name" type="text" value="IST" />
+            </label>
+            <label>UTC Offset (hours)
+              <input id="tz_offset" type="number" step="0.25" value="5.5" />
+            </label>
+          </div>
         </div>
       </fieldset>
 
@@ -73,8 +85,8 @@
         </label>
       </fieldset>
 
-      <fieldset>
-        <legend>System</legend>
+      <fieldset class="system">
+        <legend><span class="emoji">🛠️</span>System</legend>
         <div class="row">
           <label>Log level
             <select id="log_level">
@@ -112,8 +124,8 @@
         </label>
       </fieldset>
 
-      <fieldset>
-        <legend>Notifications (MQTT)</legend>
+      <fieldset class="notif">
+        <legend><span class="emoji">🔔</span>Notifications (MQTT)</legend>
         <div class="row">
           <label>Enabled
             <select id="notif_enabled"><option value="true">true</option><option value="false" selected>false</option></select>
@@ -143,9 +155,9 @@
         </label>
       </fieldset>
 
-      <fieldset>
-        <legend>PWM Pins</legend>
-        <div class="tip">Add up to 5 pins. For each pin, add 1–5 time windows. Duty cycle is 0–1000.</div>
+      <fieldset class="pwm">
+        <legend><span class="emoji">🎚️</span>PWM Pins</legend>
+        <div class="tip">Add up to 5 pins. For each pin, add 1–5 time windows. Duty cycle is 0–100.</div>
         <div class="actions" style="margin:6px 0 12px;">
           <button type="button" onclick="addPin()">Add Pin</button>
         </div>
@@ -175,6 +187,40 @@
       for (let i=0;i<=22;i++){ if(!usedGpios.has(i)){ gpio=i; break; } }
       return { gpio_pin: gpio, name: `Pin ${gpio}`, enabled: false, windows: [ newWindow() ] };
     }
+
+    // --- Timezone selector ---
+    const TZ_OPTIONS = [
+      { name: 'UTC', offset: 0, label: 'UTC (±0:00)' },
+      { name: 'IST', offset: 5.5, label: 'India Standard Time (IST) UTC+5:30' },
+      { name: 'PST', offset: -8, label: 'Pacific Standard Time (PST) UTC-8:00' },
+      { name: 'PDT', offset: -7, label: 'Pacific Daylight Time (PDT) UTC-7:00' },
+      { name: 'EST', offset: -5, label: 'Eastern Standard Time (EST) UTC-5:00' },
+      { name: 'EDT', offset: -4, label: 'Eastern Daylight Time (EDT) UTC-4:00' },
+      { name: 'CET', offset: 1, label: 'Central European Time (CET) UTC+1:00' },
+      { name: 'CEST', offset: 2, label: 'Central European Summer Time (CEST) UTC+2:00' },
+      { name: 'JST', offset: 9, label: 'Japan Standard Time (JST) UTC+9:00' },
+      { name: 'AEST', offset: 10, label: 'Australian Eastern Standard (AEST) UTC+10:00' },
+      { name: 'AEDT', offset: 11, label: 'Australian Eastern Daylight (AEDT) UTC+11:00' }
+    ];
+
+    function populateTimezoneSelect(){
+      const sel = document.getElementById('tz_select');
+      sel.innerHTML = TZ_OPTIONS.map(tz => `<option value="${tz.name}" data-offset="${tz.offset}">${tz.label}</option>`).join('');
+      // default IST if present
+      const def = TZ_OPTIONS.findIndex(z => z.name === 'IST');
+      sel.selectedIndex = def >= 0 ? def : 0;
+      applyTimezoneFromSelect();
+      sel.addEventListener('change', applyTimezoneFromSelect);
+    }
+
+    function applyTimezoneFromSelect(){
+      const sel = document.getElementById('tz_select');
+      const name = sel.value;
+      const offset = parseFloat(sel.options[sel.selectedIndex].getAttribute('data-offset'));
+      document.getElementById('tz_name').value = name;
+      document.getElementById('tz_offset').value = String(offset);
+      render();
+    }
     function newWindow(name){ return { name: name || '', start: 'sunrise', end: 'sunset', duty_cycle: 0 }; }
 
     function addPin(){ if (pins.length < MAX_PINS) { pins.push(newPin()); renderPinsUI(); render(); } }
@@ -202,8 +248,8 @@
               <option value="custom" ${keyword==='custom'?'selected':''}>custom</option>
             </select>
           </label>
-          <label data-time-label="${which}" style="grid-column: span 1; ${disp}">${which} time (HH:MM)
-            <input type="text" value="${time}" placeholder="hh:mm" data-type="${which}-time" ${dis} />
+          <label data-time-label="${which}" style="grid-column: span 1; ${disp}">${which} time
+            <input type="time" value="${time}" data-type="${which}-time" ${dis} />
           </label>
         </div>`;
     }
@@ -439,6 +485,7 @@
     (async function init(){
       await loadSamplePins();
       if (pins.length === 0) { pins.push(newPin()); }
+      populateTimezoneSelect();
       renderPinsUI();
       render();
     })();
