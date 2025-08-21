@@ -158,6 +158,15 @@ class AsyncWebServer:
                 
             method = parts[0]
             path = parts[1]
+            # Extract headers text and body bytes for binary-safe handlers
+            headers_text = ''
+            body_bytes = b''
+            if headers_end != -1:
+                try:
+                    headers_text = request_data[:headers_end].decode('utf-8')
+                except:
+                    headers_text = request_data[:headers_end].decode('latin-1')
+                body_bytes = request_data[headers_end+4: headers_end+4+content_length]
             
             log.debug(f"[WEB] {method} {path} from {addr}")
             
@@ -172,9 +181,16 @@ class AsyncWebServer:
                 response = self.generate_config_download()
             elif path == '/download-sun-times':
                 response = self.generate_sun_times_download()
+            elif path == '/upload-config-begin' and method == 'POST':
+                response = self.handle_config_upload_begin()
+            elif path == '/upload-config-chunk' and method == 'POST':
+                response = self.handle_config_upload_chunk(body_bytes, headers_text)
+            elif path == '/upload-config-finalize' and method == 'POST':
+                response = await self.handle_config_upload_finalize(request_str)
             elif path == '/upload-config':
                 if method == 'GET':
-                    response = self.generate_upload_page()
+                    # Serve chunked-upload page
+                    response = self.generate_upload_page_chunked()
                 elif method == 'POST':
                     response = await self.handle_config_upload(request_str)
                 else:
@@ -864,8 +880,7 @@ class AsyncWebServer:
     <style>
         body {{ font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }}
         .container {{ max-width: 600px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; text-align: center; }}
-        h1 {{ color: #2c3e50; text-align: center; }}
-        .info {{ background: #d1ecf1; border: 1px solid #bee5eb; padding: 15px; border-radius: 4px; margin: 20px 0; color: #0c5460; }}
+        .success {{ background: #d4edda; border: 1px solid #c3e6cb; padding: 15px; border-radius: 4px; margin: 20px 0; color: #155724; }}
     </style>
     <script>
         // Simple countdown display
@@ -883,7 +898,7 @@ class AsyncWebServer:
 <body>
     <div class="container">
         <h1>Restarting Device</h1>
-        <div class="info">
+        <div class="success">
             <p>The device will restart in <strong id="count">5</strong> seconds.</p>
             <p>You will be redirected to the home page automatically after restart.</p>
         </div>
@@ -891,15 +906,18 @@ class AsyncWebServer:
     </div>
 </body>
 </html>"""
-
-            body = html.encode('utf-8')
-            response = (
-                "HTTP/1.1 200 OK\r\n"
-                "Content-Type: text/html; charset=utf-8\r\n"
-                f"Content-Length: {len(body)}\r\n"
-                "Connection: close\r\n\r\n"
-            ) + html
-            return response
+                
+                # Schedule soft reboot after response is sent
+                asyncio.create_task(self.soft_reboot_delayed())
+                
+                body = html.encode('utf-8')
+                response = (
+                    "HTTP/1.1 200 OK\r\n"
+                    "Content-Type: text/html; charset=utf-8\r\n"
+                    f"Content-Length: {len(body)}\r\n"
+                    "Connection: close\r\n\r\n"
+                ) + html
+                return response
         except Exception as e:
             log.error(f"[WEB] Error generating restart page: {e}")
             return self.generate_500()
@@ -1012,10 +1030,245 @@ class AsyncWebServer:
             log.error(f"[WEB] Error generating upload page: {e}")
             return self.generate_500()
     
+    def generate_upload_page_chunked(self):
+        """Generate config upload page with chunked upload support."""
+        try:
+            html = f"""<!DOCTYPE html>
+<html>
+<head>
+    <title>Upload Config - {config.WEB_TITLE}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body {{ font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }}
+        .container {{ max-width: 600px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; }}
+        h1 {{ color: #2c3e50; text-align: center; }}
+        .form-group {{ margin: 20px 0; }}
+        label {{ display: block; margin-bottom: 5px; font-weight: bold; }}
+        input[type="file"] {{ width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; }}
+        .btn {{ background: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; }}
+        .btn:hover {{ background: #0056b3; }}
+        .btn-secondary {{ background: #6c757d; }}
+        .btn-secondary:hover {{ background: #545b62; }}
+        .warning {{ background: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 4px; margin: 20px 0; }}
+        .footer {{ text-align: center; margin-top: 30px; }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Upload Configuration</h1>
+        
+        <div class="warning">
+            <strong>Warning:</strong> Uploading a new configuration will replace the current settings and trigger a restart. 
+            Make sure your configuration is valid to avoid system issues.
+        </div>
+        
+        <form id="uploadForm">
+            <div class="form-group">
+                <label for="configFile">Select config.json file:</label>
+                <input type="file" id="configFile" name="config" accept=".json" required>
+            </div>
+            
+            <div class="form-group">
+                <button type="submit" class="btn">Upload and Apply</button>
+                <a href="/" class="btn btn-secondary" style="text-decoration: none; margin-left: 10px;">Cancel</a>
+            </div>
+            <div id="progress" style="display: none; margin: 10px 0;">
+                <div id="bar" style="background-color: #007bff; height: 10px; width: 0%;"></div>
+                <span id="percent">0%</span>
+            </div>
+            <div id="status"></div>
+            <div id="result"></div>
+        </form>
+        
+        <div class="footer">
+            <p><a href="/download-config">Download Current Config</a> | <a href="/">Back to Home</a></p>
+        </div>
+    </div>
+    <script>
+    (function() {{
+        const form = document.getElementById('uploadForm');
+        const fileInput = document.getElementById('configFile');
+        const progress = document.getElementById('progress');
+        const statusEl = document.getElementById('status');
+        const resultEl = document.getElementById('result');
+        const bar = document.getElementById('bar');
+        const percentEl = document.getElementById('percent');
+        const CHUNK_SIZE = 4096;
+
+        function setStatus(txt) {{ statusEl.textContent = txt; }}
+        function setProgress(done, total) {{
+            const pct = total ? Math.floor(done * 100 / total) : 0;
+            progress.style.display = 'block';
+            bar.style.width = pct + '%';
+            percentEl.textContent = pct + '%';
+        }}
+
+        form.addEventListener('submit', async function(e) {{
+            e.preventDefault();
+            const file = fileInput.files[0];
+            if (!file) {{ return; }}
+            resultEl.innerHTML = '';
+            setStatus('Starting upload...');
+            setProgress(0, 100);
+            try {{
+                // Begin
+                let resp = await fetch('/upload-config-begin', {{ method: 'POST' }});
+                if (!resp.ok) throw new Error('Failed to begin upload');
+
+                // Send chunks
+                let offset = 0;
+                while (offset < file.size) {{
+                    const chunk = file.slice(offset, Math.min(offset + CHUNK_SIZE, file.size));
+                    const buf = await chunk.arrayBuffer();
+                    resp = await fetch('/upload-config-chunk', {{
+                        method: 'POST',
+                        headers: {{ 'Content-Type': 'application/octet-stream' }},
+                        body: buf
+                    }});
+                    if (!resp.ok) throw new Error('Chunk upload failed at offset ' + offset);
+                    offset += CHUNK_SIZE;
+                    setStatus(`Uploaded ${Math.min(offset, file.size)} / ${file.size} bytes`);
+                    setProgress(Math.min(offset, file.size), file.size);
+                }}
+
+                // Finalize
+                resp = await fetch('/upload-config-finalize', {{ method: 'POST' }});
+                if (!resp.ok) throw new Error('Finalize failed');
+                const text = await resp.text();
+                // Server returns an HTML success page (restart page). Replace document.
+                document.open(); document.write(text); document.close();
+            }} catch (err) {{
+                setStatus('Error: ' + err.message);
+                resultEl.innerHTML = '<div class=\"error\">Upload failed: ' + err.message + '</div>';
+            }}
+        }});
+    }})();
+    </script>
+    </html>"""
+            
+            body = html.encode('utf-8')
+            response = (
+                "HTTP/1.1 200 OK\r\n"
+                "Content-Type: text/html; charset=utf-8\r\n"
+                f"Content-Length: {len(body)}\r\n"
+                "Connection: close\r\n\r\n"
+            ) + html
+            return response
+            
+        except Exception as e:
+            log.error(f"[WEB] Error generating upload page: {e}")
+            return self.generate_500()
+
+    def _tmp_config_path(self):
+        return 'config.json.upload'
+
+    def _json_response(self, status_code, obj):
+        try:
+            s = json.dumps(obj)
+        except Exception:
+            s = '{}'
+        body = s.encode('utf-8')
+        return (
+            f"HTTP/1.1 {status_code} OK\r\n"
+            "Content-Type: application/json; charset=utf-8\r\n"
+            f"Content-Length: {len(body)}\r\n"
+            "Connection: close\r\n\r\n"
+        ) + s
+
+    def handle_config_upload_begin(self):
+        """Begin chunked upload: create/truncate temp file."""
+        try:
+            # Remove any previous temp
+            try:
+                os.remove(self._tmp_config_path())
+            except Exception:
+                pass
+            with open(self._tmp_config_path(), 'wb') as f:
+                pass  # just create/truncate
+            return self._json_response(200, { 'ok': True })
+        except Exception as e:
+            log.error(f"[WEB] upload-begin error: {e}")
+            return self._json_response(500, { 'ok': False, 'error': 'begin failed' })
+
+    def handle_config_upload_chunk(self, body_bytes, headers_text):
+        """Append a binary chunk to temp file."""
+        try:
+            # Basic safety: ensure temp exists
+            with open(self._tmp_config_path(), 'ab') as f:
+                f.write(body_bytes)
+            # Report current size
+            size = 0
+            try:
+                stat = os.stat(self._tmp_config_path())
+                size = stat[6] if isinstance(stat, tuple) else stat.st_size
+            except Exception:
+                pass
+            return self._json_response(200, { 'ok': True, 'size': size })
+        except Exception as e:
+            log.error(f"[WEB] upload-chunk error: {e}")
+            return self._json_response(500, { 'ok': False, 'error': 'chunk failed' })
+
+    async def handle_config_upload_finalize(self, request_str):
+        """Validate temp config and replace current config.json; then show restart page."""
+        try:
+            # Read uploaded file
+            with open(self._tmp_config_path(), 'r') as f:
+                uploaded_text = f.read()
+            # Parse JSON to ensure validity
+            uploaded_json = json.loads(uploaded_text)
+
+            # Version compatibility check
+            expected_prefix = self._expected_version_prefix()
+            up_ver = str(uploaded_json.get('version', '')).strip()
+            if not up_ver:
+                raise ValueError("Uploaded config missing 'version'")
+            if not self._version_compatible(up_ver, expected_prefix):
+                raise ValueError(f"Version {up_ver} not compatible with required {expected_prefix}.*")
+
+            # Backup current config and replace atomically
+            try:
+                if os.stat('config.json'):
+                    try:
+                        os.remove('config.json.backup')
+                    except Exception:
+                        pass
+                    os.rename('config.json', 'config.json.backup')
+            except Exception:
+                pass
+
+            # Move temp into place
+            try:
+                # Write validated JSON to ensure formatting
+                with open('config.json', 'w') as f:
+                    f.write(uploaded_text)
+            except Exception as e:
+                # restore backup if write failed
+                try:
+                    os.rename('config.json.backup', 'config.json')
+                except Exception:
+                    pass
+                raise e
+            finally:
+                try:
+                    os.remove(self._tmp_config_path())
+                except Exception:
+                    pass
+
+            # Return restart page and schedule reset
+            return self.generate_restart_page()
+        except Exception as e:
+            log.error(f"[WEB] upload-finalize error: {e}")
+            try:
+                os.remove(self._tmp_config_path())
+            except Exception:
+                pass
+            return self.generate_upload_error(f"Finalize failed: {e}")
+    
     async def handle_config_upload(self, request_str):
         """Handle config file upload and validation."""
         try:
             # Parse multipart form data (simplified and robust)
+{{ ... }}
             lines = request_str.split('\r\n')
 
             # Find boundary from headers
