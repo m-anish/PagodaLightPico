@@ -221,14 +221,17 @@
     }
 
   // Load RTC SDA/SCL from sample config to prefill hardware selects
+  const SAMPLE_HW = { sda: null, scl: null };
   async function loadSampleHardware(){
     try {
-      const resp = await fetch('./config.json.sample', { cache: 'no-store' });
+      const resp = await fetch('../config.json.sample', { cache: 'no-store' });
       if (!resp.ok) return;
       const sample = await resp.json();
       const hw = sample && sample.hardware || {};
       const sda = hw.rtc_i2c_sda_pin ?? hw.rtc_sda;
       const scl = hw.rtc_i2c_scl_pin ?? hw.rtc_scl;
+      SAMPLE_HW.sda = (typeof sda !== 'undefined') ? parseInt(sda) : SAMPLE_HW.sda;
+      SAMPLE_HW.scl = (typeof scl !== 'undefined') ? parseInt(scl) : SAMPLE_HW.scl;
       if (typeof sda !== 'undefined') {
         const sel = document.getElementById('rtc_sda');
         if (sel) sel.value = String(sda);
@@ -510,15 +513,17 @@
     function populateHardwareGpioSelects(){
       const make = (sel, defVal) => {
         sel.innerHTML = GOOD_GPIO.map(i=>`<option value="${i}">${i}</option>`).join('');
-        const cur = sel.value;
-        const dv = isNaN(parseInt(cur)) ? parseInt(defVal) : parseInt(cur);
-        const idx = GOOD_GPIO.indexOf(dv);
-        sel.selectedIndex = idx >= 0 ? idx : 0;
+        const parsedDef = parseInt(defVal);
+        const dv = Number.isFinite(parsedDef) ? parsedDef : GOOD_GPIO[0];
+        const desired = String(dv);
+        // prefer setting value directly; fallback to first option if missing
+        sel.value = desired;
+        if (sel.value !== desired) sel.selectedIndex = 0;
       };
       const sda = document.getElementById('rtc_sda');
       const scl = document.getElementById('rtc_scl');
-      if (sda) make(sda, 20);
-      if (scl) make(scl, 21);
+      if (sda) make(sda, (SAMPLE_HW.sda ?? 20));
+      if (scl) make(scl, (SAMPLE_HW.scl ?? 21));
     }
 
     function readRTC(){
@@ -624,7 +629,7 @@
 
     async function loadSamplePins(){
       try {
-        const resp = await fetch('./config.json.sample', { cache: 'no-store' });
+        const resp = await fetch('../config.json.sample', { cache: 'no-store' });
         if (!resp.ok) throw new Error('fetch failed');
         const sample = await resp.json();
         const pwm = sample && sample.pwm_pins || {};
@@ -868,6 +873,7 @@
       if (pins.length === 0) { pins.push(newPin()); }
       populateTimezoneSelect();
       setupTimezoneSearch();
+      await loadSampleHardware();
       populateHardwareGpioSelects();
       setupCollapsibles();
       setupUpload();
