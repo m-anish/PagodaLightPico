@@ -28,6 +28,7 @@ class AsyncWebServer:
         self.port = port
         self.running = False
         self.server_socket = None
+        self._cleanup_task_handle = None
     
     async def start(self):
         """Start the web server."""
@@ -41,6 +42,17 @@ class AsyncWebServer:
             self.server_socket.listen(1)
             
             self.running = True
+            # Cleanup abandoned uploads on startup
+            try:
+                self._cleanup_stale_uploads()
+            except Exception as _e:
+                log.debug("[WEB] Cleanup on start skipped: " + str(_e))
+
+            # Start background cleanup task
+            try:
+                self._cleanup_task_handle = asyncio.create_task(self._cleanup_task())
+            except Exception:
+                self._cleanup_task_handle = None
             log.info(f"[WEB] Async web server started on port {self.port}")
             return True
             
@@ -52,12 +64,76 @@ class AsyncWebServer:
     def stop(self):
         """Stop the web server."""
         self.running = False
+        # Best-effort cancel/let background task exit
+        try:
+            if self._cleanup_task_handle is not None:
+                # Task loop checks self.running; it will exit shortly.
+                self._cleanup_task_handle = None
+        except Exception:
+            pass
         if self.server_socket:
             try:
                 self.server_socket.close()
             except:
                 pass
         log.info("[WEB] Web server stopped")
+
+    def _cleanup_stale_uploads(self, max_age_seconds=15*60):
+        """Delete temp upload files older than max_age_seconds."""
+        try:
+            now = time.time()
+        except Exception:
+            # If time not available, skip cleanup
+            return
+
+        def _maybe_remove(path):
+            try:
+                st = os.stat(path)
+            except Exception:
+                return
+            try:
+                # MicroPython: mtime typically at index 8
+                mtime = st[8] if len(st) > 8 else None
+            except Exception:
+                mtime = None
+            if mtime is None:
+                return
+            try:
+                age = now - mtime
+                if age > max_age_seconds:
+                    try:
+                        os.remove(path)
+                        log.info(f"[WEB] Removed stale temp upload: {path}")
+                    except Exception as e:
+                        log.debug(f"[WEB] Failed to remove stale temp '{path}': {e}")
+            except Exception:
+                pass
+
+        # Check known temp files
+        try:
+            _maybe_remove(self._tmp_config_path())
+        except Exception:
+            pass
+        try:
+            _maybe_remove(self._tmp_sun_times_path())
+        except Exception:
+            pass
+
+    async def _cleanup_task(self):
+        """Periodic cleanup of abandoned uploads."""
+        try:
+            while self.running:
+                try:
+                    self._cleanup_stale_uploads()
+                except Exception as e:
+                    log.debug(f"[WEB] Cleanup task error: {e}")
+                # Sleep 10 minutes between checks
+                for _ in range(600):
+                    if not self.running:
+                        break
+                    await asyncio.sleep(1)
+        except Exception:
+            pass
     
     async def serve_forever(self):
         """Main server loop."""
