@@ -558,27 +558,26 @@
     function windowsFromObject(time_windows){
       if (!time_windows || typeof time_windows !== 'object') return [ newWindow() ];
       const arr = [];
-      if (time_windows.day) {
-        const w = time_windows.day;
+      // Determine the intended order: prefer explicit _order, else rely on object insertion order
+      let keys = [];
+      if (Array.isArray(time_windows._order) && time_windows._order.length){
+        keys = time_windows._order.filter(k => k in time_windows);
+        // append any extra non-internal keys not listed in _order, preserving insertion order
+        Object.keys(time_windows).forEach(k => {
+          if (!k.startsWith('_') && !keys.includes(k)) keys.push(k);
+        });
+      } else {
+        keys = Object.keys(time_windows).filter(k => !k.startsWith('_'));
+      }
+      keys.forEach(k => {
+        const w = time_windows[k] || {};
         arr.push({
-          name: 'day',
-          start: validateTimeString(w.start) ? w.start : 'sunrise',
-          end: validateTimeString(w.end) ? w.end : 'sunset',
+          name: k,
+          start: validateTimeString(w.start) ? w.start : 'sunset',
+          end: validateTimeString(w.end) ? w.end : 'sunrise',
           duty_cycle: Math.max(0, Math.min(100, parseInt(w.duty_cycle||0)))
         });
-      }
-      Object.keys(time_windows)
-        .filter(k => k !== 'day' && !k.startsWith('_'))
-        .sort()
-        .forEach(k => {
-          const w = time_windows[k] || {};
-          arr.push({
-            name: k,
-            start: validateTimeString(w.start) ? w.start : 'sunset',
-            end: validateTimeString(w.end) ? w.end : 'sunrise',
-            duty_cycle: Math.max(0, Math.min(100, parseInt(w.duty_cycle||0)))
-          });
-        });
+      });
       if (arr.length === 0) arr.push(newWindow());
       return arr.slice(0, MAX_WINDOWS);
     }
@@ -651,6 +650,7 @@
       pins.forEach((p, idx) => {
         const key = `pin_${p.gpio_pin}`;
         const tw = {};
+        const orderKeys = [];
         p.windows.forEach((w, widx) => {
           // sanitize times and determine key name
           const s = validateTimeString(w.start) ? w.start : 'sunset';
@@ -658,7 +658,10 @@
           const provided = (w.name || '').trim();
           const keyName = (widx === 0 && provided === '') ? 'day' : (provided || `w${widx+1}`);
           tw[keyName] = { start: s, end: e, duty_cycle: Math.max(0, Math.min(100, parseInt(w.duty_cycle||0))) };
+          orderKeys.push(keyName);
         });
+        // Persist the intended order so re-uploads preserve UI ordering
+        tw._order = orderKeys;
         cfg.pwm_pins[key] = {
           name: p.name || key,
           gpio_pin: p.gpio_pin,
