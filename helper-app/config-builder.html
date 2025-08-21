@@ -237,6 +237,7 @@
         const sel = document.getElementById('rtc_scl');
         if (sel) sel.value = String(scl);
       }
+      render();
     } catch {}
   }
 
@@ -767,10 +768,19 @@
         // Hardware pins (RTC SDA/SCL) via dropdowns
         populateHardwareGpioSelects();
         if (cfg.hardware){
-          if (cfg.hardware.rtc_sda !== undefined) document.getElementById('rtc_sda').value = cfg.hardware.rtc_sda;
-          if (cfg.hardware.rtc_i2c_sda_pin !== undefined) document.getElementById('rtc_sda').value = cfg.hardware.rtc_i2c_sda_pin;
-          if (cfg.hardware.rtc_scl !== undefined) document.getElementById('rtc_scl').value = cfg.hardware.rtc_scl;
-          if (cfg.hardware.rtc_i2c_scl_pin !== undefined) document.getElementById('rtc_scl').value = cfg.hardware.rtc_i2c_scl_pin;
+          const setSel = (selId, val, list) => {
+            const sel = document.getElementById(selId);
+            if (!sel || val === undefined) return;
+            const v = String(parseInt(val));
+            const has = Array.from(sel.options).some(o => o.value === v);
+            if (!has && v !== 'NaN'){
+              const opt = document.createElement('option');
+              opt.value = v; opt.textContent = v; sel.appendChild(opt);
+            }
+            if (v !== 'NaN') sel.value = v;
+          };
+          setSel('rtc_sda', cfg.hardware.rtc_i2c_sda_pin ?? cfg.hardware.rtc_sda, GOOD_GPIO);
+          setSel('rtc_scl', cfg.hardware.rtc_i2c_scl_pin ?? cfg.hardware.rtc_scl, GOOD_GPIO);
           if (cfg.hardware.pwm_freq !== undefined) document.getElementById('pwm_freq').value = cfg.hardware.pwm_freq;
           if (cfg.hardware.pwm_frequency !== undefined) document.getElementById('pwm_freq').value = cfg.hardware.pwm_frequency;
         }
