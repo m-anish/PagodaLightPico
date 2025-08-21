@@ -286,6 +286,55 @@
       return s === 'sunrise' || s === 'sunset' || /^\d{2}:\d{2}$/.test(s);
     }
 
+    function windowsFromObject(time_windows){
+      if (!time_windows || typeof time_windows !== 'object') return [ newWindow() ];
+      const arr = [];
+      if (time_windows.day) {
+        const w = time_windows.day;
+        arr.push({
+          start: validateTimeString(w.start) ? w.start : 'sunrise',
+          end: validateTimeString(w.end) ? w.end : 'sunset',
+          duty_cycle: Math.max(0, Math.min(100, parseInt(w.duty_cycle||0)))
+        });
+      }
+      Object.keys(time_windows)
+        .filter(k => k !== 'day' && !k.startsWith('_'))
+        .sort()
+        .forEach(k => {
+          const w = time_windows[k] || {};
+          arr.push({
+            start: validateTimeString(w.start) ? w.start : 'sunset',
+            end: validateTimeString(w.end) ? w.end : 'sunrise',
+            duty_cycle: Math.max(0, Math.min(100, parseInt(w.duty_cycle||0)))
+          });
+        });
+      if (arr.length === 0) arr.push(newWindow());
+      return arr.slice(0, MAX_WINDOWS);
+    }
+
+    async function loadSamplePins(){
+      try {
+        const resp = await fetch('./config.json.sample', { cache: 'no-store' });
+        if (!resp.ok) throw new Error('fetch failed');
+        const sample = await resp.json();
+        const pwm = sample && sample.pwm_pins || {};
+        const list = Object.values(pwm)
+          .filter(x => x && typeof x === 'object')
+          .map(x => ({
+            gpio_pin: parseInt(x.gpio_pin),
+            name: (x.name || `Pin ${x.gpio_pin}`),
+            enabled: !!x.enabled,
+            windows: windowsFromObject(x.time_windows || {})
+          }))
+          .filter(x => !isNaN(x.gpio_pin));
+        // Sort by gpio_pin ascending to have deterministic order
+        list.sort((a,b)=>a.gpio_pin-b.gpio_pin);
+        pins.splice(0, pins.length, ...list.slice(0, MAX_PINS));
+      } catch (e) {
+        // ignore; fallback will add a default pin
+      }
+    }
+
     // --- existing builder ---
     function buildConfig(){
       const getBool = (el) => (document.getElementById(el).value === 'true');
@@ -363,10 +412,13 @@
       URL.revokeObjectURL(a.href);
     }
 
-    // initialize with one default pin
-    if (pins.length === 0) { pins.push(newPin()); }
-    renderPinsUI();
-    render();
+    // initialize from sample, fallback to one default pin
+    (async function init(){
+      await loadSamplePins();
+      if (pins.length === 0) { pins.push(newPin()); }
+      renderPinsUI();
+      render();
+    })();
   </script>
 </body>
 </html>
