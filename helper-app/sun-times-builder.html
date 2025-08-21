@@ -30,7 +30,7 @@
         <legend>Header</legend>
         <div class="row">
           <label>Version (semver)
-            <input id="version" type="text" value="0.3.0" />
+            <input id="version" type="text" placeholder="0.4.1" />
           </label>
           <label>Location name
             <input id="location" type="text" value="Demo Location" />
@@ -87,6 +87,7 @@
 
   <script>
     const days = {};
+    let SAMPLE_VERSION = null;
 
     function validateKey(key){ return /^\d{2}-\d{2}$/.test(key); }
     function validateTime(t){ return /^\d{2}:\d{2}$/.test(t); }
@@ -117,9 +118,32 @@
       });
     }
 
+    async function loadSampleVersion(){
+      try {
+        // GitHub Pages workflow copies sample JSONs to site root (same dir as this page)
+        let resp = await fetch('sun_times.json.sample');
+        if (!resp.ok) resp = await fetch('./sun_times.json.sample');
+        if (!resp.ok) resp = await fetch('/sun_times.json.sample');
+        if (resp.ok) {
+          const data = await resp.json();
+          if (data && typeof data.version === 'string') {
+            SAMPLE_VERSION = data.version;
+            const verInput = document.getElementById('version');
+            if (verInput && !verInput.value) {
+              verInput.value = SAMPLE_VERSION;
+            }
+          }
+        }
+      } catch (e) {
+        // Ignore fetch errors (e.g., file:// access); fallback remains
+      } finally {
+        render();
+      }
+    }
+
     function buildSunTimes(){
       return {
-        version: document.getElementById('version').value || '0.3.0',
+        version: document.getElementById('version').value || SAMPLE_VERSION || '0.4.1',
         location: document.getElementById('location').value || 'Unknown',
         lat: parseFloat(document.getElementById('lat').value||'0'),
         lon: parseFloat(document.getElementById('lon').value||'0'),

@@ -6,6 +6,23 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 
 ## [Unreleased]
 
+## [0.4.1] - 2025-08-21
+
+### Added
+- Streaming upload pages for `config.json` and `sun_times.json` with preserved CSS and minimal JS to upload in 1KB chunks.
+- Chunked upload endpoints:
+  - `POST /upload-config-begin`, `/upload-config-chunk`, `/upload-config-finalize`
+  - `POST /upload-sun-times-begin`, `/upload-sun-times-chunk`, `/upload-sun-times-finalize`
+- Abandoned upload cleanup: remove `config.json.upload` and `sun_times.json.upload` older than 15 minutes on startup and via periodic background task (every 10 minutes).
+
+### Changed
+- Web server routing in `AsyncWebServer.handle_client()` to serve new streaming pages and handle chunked endpoints.
+- Fixed homepage countdown JS template literal issue in the streaming method and added a minimal 500 error fallback.
+
+### Notes
+- Default upload chunk size is 1024 bytes to balance memory and performance on Pico W.
+- Sun times finalize does not trigger reboot to allow hot data swap; config finalize behavior unchanged.
+
 ## [0.4.0] - 2025-08-21
 
 ### Added

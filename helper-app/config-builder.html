@@ -56,7 +56,7 @@
       <fieldset class="meta">
         <legend><span class="legend-row"><button type="button" class="collapse-toggle" aria-label="toggle">▼</button><span class="emoji">🧩</span>Meta</span></legend>
         <label>Version (semver)
-          <input id="version" type="text" value="0.4.0" placeholder="0.4.0" required />
+          <input id="version" type="text" value="0.4.1" placeholder="0.4.1" required />
         </label>
         <label>Hostname
           <input id="hostname" type="text" value="PagodaLightPico" />
@@ -609,7 +609,7 @@
     function buildConfig(){
       const getBool = (el) => (document.getElementById(el).value === 'true');
       const cfg = {
-        version: document.getElementById('version').value.trim() || '0.4.0',
+        version: document.getElementById('version').value.trim() || '0.4.1',
         wifi: {
           ssid: document.getElementById('ssid').value,
           password: document.getElementById('password').value
