@@ -42,6 +42,12 @@
             <input id="place" type="text" placeholder="e.g., Dharamsala, India" list="placeList" />
             <datalist id="placeList"></datalist>
           </label>
+          <div>
+            <label>&nbsp;</label>
+            <button type="button" id="applyPlace">Use selected place</button>
+          </div>
+        </div>
+        <div class="row">
           <label>Chosen name
             <input id="location" type="text" placeholder="Location name" />
           </label>
@@ -59,10 +65,6 @@
             <input id="tz" type="text" placeholder="Asia/Kolkata" list="tzList" />
             <datalist id="tzList"></datalist>
           </label>
-          <div>
-            <label>&nbsp;</label>
-            <button type="button" id="applyPlace">Use selected place</button>
-          </div>
         </div>
         <div class="tip">Pick timezone closest to your location (e.g., Asia/Kolkata). Autodetect is not guaranteed.</div>
       </fieldset>
@@ -79,7 +81,7 @@
             </select>
           </label>
           <label>Year (for calculations)
-            <input id="year" type="number" min="2000" max="2100" />
+            <select id="year"></select>
           </label>
         </div>
         <div>
@@ -108,6 +110,8 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/suncalc@1.9.0/suncalc.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/spacetime@7.5.1/builds/spacetime.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/spacetime-geo@0.1.2/spacetime-geo.min.js"></script>
   <script>
     const days = {};
     let SAMPLE_VERSION = null;
@@ -172,6 +176,7 @@
       if (!q) return;
       suggestTimer = setTimeout(async () => {
         try {
+          // Note: Browsers do not allow setting User-Agent header. Keep requests light and cache-friendly.
           const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5&q=${encodeURIComponent(q)}`;
           const resp = await fetch(url, { headers: { 'Accept': 'application/json' }});
           if (!resp.ok) return;
@@ -189,6 +194,20 @@
       }, 250);
     });
 
+    function autoFillTimezone(){
+      const lat = parseFloat(document.getElementById('lat').value);
+      const lon = parseFloat(document.getElementById('lon').value);
+      if (isNaN(lat) || isNaN(lon)) return;
+      try {
+        if (typeof spacetime !== 'undefined' && spacetime && spacetime.where) {
+          const info = spacetime.where(lat, lon);
+          if (info && info.timezone && info.timezone.name) {
+            document.getElementById('tz').value = info.timezone.name;
+          }
+        }
+      } catch {}
+    }
+
     document.getElementById('applyPlace').addEventListener('click', () => {
       const val = document.getElementById('place').value.trim();
       if (placeMap.has(val)) {
@@ -196,9 +215,13 @@
         document.getElementById('location').value = val;
         document.getElementById('lat').value = p.lat.toFixed(4);
         document.getElementById('lon').value = p.lon.toFixed(4);
+        autoFillTimezone();
       }
       render();
     });
+
+    // If user edits coordinates manually, try to auto-fill timezone as well
+    ['lat','lon'].forEach(id => document.getElementById(id).addEventListener('change', autoFillTimezone));
 
     // ---- Generation ----
     function pad2(n){ return n.toString().padStart(2,'0'); }
@@ -211,22 +234,18 @@
       } catch { return '00:00'; }
     }
 
-    function eachDateOfYear(year, cb){
-      const d = new Date(Date.UTC(year,0,1));
-      while (d.getUTCFullYear() === year) { cb(new Date(d)); d.setUTCDate(d.getUTCDate()+1); }
-    }
-
-    function generateDates(year, freq){
+    function generateDatesLocal(year, freq, tz){
       const out = [];
+      let s = spacetime(`${year}-01-01`, tz).startOf('day');
+      const end = s.endOf('year');
       if (freq === 'daily') {
-        eachDateOfYear(year, d => out.push(new Date(d)));
+        while (s.year() === year) { out.push(s.clone()); s = s.add(1, 'day'); }
       } else if (freq === 'weekly') {
-        // pick Mondays in UTC, later times will be converted to tz
-        eachDateOfYear(year, d => { if (d.getUTCDay() === 1) out.push(new Date(d)); });
+        while (s.isBefore(end)) { if (s.dayName() === 'Monday') out.push(s.clone()); s = s.add(1, 'day'); }
       } else if (freq === 'fortnightly') {
-        for (let m=0;m<12;m++){ out.push(new Date(Date.UTC(year,m,1))); out.push(new Date(Date.UTC(year,m,15))); }
+        for (let m=0;m<12;m++){ out.push(spacetime({year, month:m, date:1}, tz)); out.push(spacetime({year, month:m, date:15}, tz)); }
       } else { // monthly
-        for (let m=0;m<12;m++){ out.push(new Date(Date.UTC(year,m,1))); }
+        for (let m=0;m<12;m++){ out.push(spacetime({year, month:m, date:1}, tz)); }
       }
       return out;
     }
@@ -239,10 +258,11 @@
       const year = parseInt(document.getElementById('year').value || new Date().getFullYear(), 10);
       if (isNaN(lat) || isNaN(lon)) { alert('Please choose a valid place (lat/lon).'); return; }
       daysClear();
-      const dates = generateDates(year, document.getElementById('freq').value);
-      dates.forEach(d => {
-        const times = SunCalc.getTimes(d, lat, lon);
-        const mmdd = `${pad2(d.getUTCMonth()+1)}-${pad2(d.getUTCDate())}`;
+      const dates = generateDatesLocal(year, document.getElementById('freq').value, tz);
+      dates.forEach(s => {
+        const native = s.clone().hour(12).minute(0).second(0).millisecond(0).toNativeDate(); // local noon
+        const times = SunCalc.getTimes(native, lat, lon);
+        const mmdd = `${pad2(s.month()+1)}-${pad2(s.date())}`;
         days[mmdd] = { rise: formatHM(times.sunrise, tz), set: formatHM(times.sunset, tz) };
       });
       document.getElementById('location').value = loc; // keep
@@ -275,8 +295,20 @@
       URL.revokeObjectURL(a.href);
     }
 
+    function populateYearSelect(){
+      const sel = document.getElementById('year');
+      const y = new Date().getFullYear();
+      const years = [y-1, y, y+1];
+      sel.innerHTML = '';
+      years.forEach(v => {
+        const opt = document.createElement('option');
+        opt.value = v; opt.textContent = v; if (v===y) opt.selected = true; sel.appendChild(opt);
+      });
+    }
+
     document.getElementById('generateBtn').addEventListener('click', generateFromLocation);
     populateTZList();
+    populateYearSelect();
     loadSampleVersion();
     render();
   </script>
