@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Build config.json • PagodaLightPico</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, 'Noto Sans', 'Liberation Sans', sans-serif; margin: 20px; background: #f5f5f5; }
+    .container { max-width: 920px; margin: 0 auto; background: #fff; padding: 20px; border-radius: 8px; }
+    h1 { color: #2c3e50; text-align: center; }
+    fieldset { border: 1px solid #ddd; border-radius: 8px; margin: 16px 0; padding: 12px; }
+    legend { padding: 0 6px; color: #34495e; }
+    label { display: block; margin: 8px 0 4px; font-weight: 600; }
+    input[type="text"], input[type="number"], input[type="password"], select { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 6px; }
+    .row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .actions { display: flex; gap: 12px; flex-wrap: wrap; }
+    button, a.button { padding: 10px 14px; border: 1px solid #999; border-radius: 8px; background: #fff; cursor: pointer; text-decoration: none; color: #222; }
+    pre { background: #0b1020; color: #d5e6ff; padding: 12px; border-radius: 8px; overflow: auto; max-height: 420px; }
+    .tip { font-size: 12px; color: #666; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Build config.json</h1>
+
+    <form id="cfgForm" oninput="render()" onchange="render()">
+      <fieldset>
+        <legend>Meta</legend>
+        <label>Version (semver)
+          <input id="version" type="text" value="0.4.0" placeholder="0.4.0" required />
+        </label>
+        <label>Hostname
+          <input id="hostname" type="text" value="PagodaLightPico" />
+        </label>
+      </fieldset>
+
+      <fieldset>
+        <legend>WiFi</legend>
+        <div class="row">
+          <label>SSID
+            <input id="ssid" type="text" placeholder="your_wifi_ssid_here" />
+          </label>
+          <label>Password
+            <input id="password" type="password" placeholder="your_wifi_password_here" />
+          </label>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Timezone</legend>
+        <div class="row">
+          <label>Name
+            <input id="tz_name" type="text" value="IST" />
+          </label>
+          <label>UTC Offset (hours, can be decimal like 5.5)
+            <input id="tz_offset" type="number" step="0.25" value="5.5" />
+          </label>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Hardware</legend>
+        <div class="row">
+          <label>RTC SDA pin
+            <input id="rtc_sda" type="number" value="20" />
+          </label>
+          <label>RTC SCL pin
+            <input id="rtc_scl" type="number" value="21" />
+          </label>
+        </div>
+        <label>PWM frequency (Hz)
+          <input id="pwm_freq" type="number" value="1000" />
+        </label>
+      </fieldset>
+
+      <fieldset>
+        <legend>System</legend>
+        <div class="row">
+          <label>Log level
+            <select id="log_level">
+              <option>DEBUG</option>
+              <option selected>INFO</option>
+              <option>WARNING</option>
+              <option>ERROR</option>
+            </select>
+          </label>
+          <label>Update interval (s)
+            <input id="update_interval" type="number" value="120" />
+          </label>
+        </div>
+        <div class="row">
+          <label>Server idle sleep (ms)
+            <input id="server_idle_sleep_ms" type="number" value="300" />
+          </label>
+          <label>Client read sleep (ms)
+            <input id="client_read_sleep_ms" type="number" value="50" />
+          </label>
+        </div>
+        <label>Network check interval (s)
+          <input id="network_check_interval" type="number" value="120" />
+        </label>
+        <div class="row">
+          <label>RAM telemetry enabled
+            <select id="ram_telemetry_enabled"><option value="true">true</option><option value="false" selected>false</option></select>
+          </label>
+          <label>RAM telemetry interval (s)
+            <input id="ram_telemetry_interval" type="number" value="300" />
+          </label>
+        </div>
+        <label>Web title
+          <input id="web_title" type="text" value="PagodaLightPico" />
+        </label>
+      </fieldset>
+
+      <fieldset>
+        <legend>Notifications (MQTT)</legend>
+        <div class="row">
+          <label>Enabled
+            <select id="notif_enabled"><option value="true">true</option><option value="false" selected>false</option></select>
+          </label>
+          <label>Broker
+            <input id="mqtt_broker" type="text" value="broker.hivemq.com" />
+          </label>
+        </div>
+        <div class="row">
+          <label>Port
+            <input id="mqtt_port" type="number" value="1883" />
+          </label>
+          <label>Topic
+            <input id="mqtt_topic" type="text" value="PagodaLightPico/notifications" />
+          </label>
+        </div>
+        <div class="row">
+          <label>Client ID
+            <input id="mqtt_client_id" type="text" value="PagodaLightPico" />
+          </label>
+          <label>Notify on window change
+            <select id="notify_window"><option>true</option><option selected>false</option></select>
+          </label>
+        </div>
+        <label>Notify on errors
+          <select id="notify_errors"><option>true</option><option selected>false</option></select>
+        </label>
+      </fieldset>
+
+      <fieldset>
+        <legend>PWM Pins (quick start)</legend>
+        <div class="tip">Define up to two pins here. You can edit JSON below for more.</div>
+        <div class="row">
+          <label>Pin A GPIO
+            <input id="pinA_gpio" type="number" value="16" />
+          </label>
+          <label>Pin A Name
+            <input id="pinA_name" type="text" value="Main LED Strip" />
+          </label>
+        </div>
+        <div class="row">
+          <label>Pin A Enabled
+            <select id="pinA_enabled"><option>true</option><option selected>false</option></select>
+          </label>
+          <label>Pin B GPIO
+            <input id="pinB_gpio" type="number" value="15" />
+          </label>
+        </div>
+        <div class="row">
+          <label>Pin B Name
+            <input id="pinB_name" type="text" value="Accent Lighting" />
+          </label>
+          <label>Pin B Enabled
+            <select id="pinB_enabled"><option>true</option><option selected>false</option></select>
+          </label>
+        </div>
+      </fieldset>
+    </form>
+
+    <div class="actions">
+      <button onclick="downloadJSON()">Download config.json</button>
+      <a class="button" href="./index.html">Back to Home</a>
+    </div>
+
+    <h2>Preview</h2>
+    <pre id="preview"></pre>
+  </div>
+
+  <script>
+    function buildConfig(){
+      const getBool = (el) => (document.getElementById(el).value === 'true');
+      const cfg = {
+        version: document.getElementById('version').value.trim() || '0.4.0',
+        wifi: {
+          ssid: document.getElementById('ssid').value,
+          password: document.getElementById('password').value
+        },
+        hostname: document.getElementById('hostname').value || 'PagodaLightPico',
+        timezone: {
+          name: document.getElementById('tz_name').value || 'IST',
+          offset: parseFloat(document.getElementById('tz_offset').value || '0')
+        },
+        hardware: {
+          rtc_i2c_sda_pin: parseInt(document.getElementById('rtc_sda').value||'20'),
+          rtc_i2c_scl_pin: parseInt(document.getElementById('rtc_scl').value||'21'),
+          pwm_frequency: parseInt(document.getElementById('pwm_freq').value||'1000')
+        },
+        system: {
+          log_level: document.getElementById('log_level').value,
+          update_interval: parseInt(document.getElementById('update_interval').value||'120'),
+          server_idle_sleep_ms: parseInt(document.getElementById('server_idle_sleep_ms').value||'300'),
+          client_read_sleep_ms: parseInt(document.getElementById('client_read_sleep_ms').value||'50'),
+          network_check_interval: parseInt(document.getElementById('network_check_interval').value||'120'),
+          ram_telemetry_enabled: getBool('ram_telemetry_enabled'),
+          ram_telemetry_interval: parseInt(document.getElementById('ram_telemetry_interval').value||'300'),
+          web_title: document.getElementById('web_title').value || 'PagodaLightPico'
+        },
+        notifications: {
+          enabled: getBool('notif_enabled'),
+          mqtt_broker: document.getElementById('mqtt_broker').value || 'broker.hivemq.com',
+          mqtt_port: parseInt(document.getElementById('mqtt_port').value||'1883'),
+          mqtt_topic: document.getElementById('mqtt_topic').value || 'PagodaLightPico/notifications',
+          mqtt_client_id: document.getElementById('mqtt_client_id').value || 'PagodaLightPico',
+          notify_on_window_change: document.getElementById('notify_window').value === 'true',
+          notify_on_errors: document.getElementById('notify_errors').value === 'true'
+        },
+        pwm_pins: {}
+      };
+
+      const pinA_gpio = parseInt(document.getElementById('pinA_gpio').value||'16');
+      if (!Number.isNaN(pinA_gpio)) {
+        cfg.pwm_pins[`pin_${pinA_gpio}`] = {
+          name: document.getElementById('pinA_name').value || `Pin ${pinA_gpio}`,
+          gpio_pin: pinA_gpio,
+          enabled: (document.getElementById('pinA_enabled').value === 'true'),
+          time_windows: {
+            day: { start: 'sunrise', end: 'sunset', duty_cycle: 0 },
+            evening: { start: 'sunset', end: '22:00', duty_cycle: 60 },
+            night: { start: '22:00', end: 'sunrise', duty_cycle: 20 }
+          }
+        };
+      }
+      const pinB_gpio = parseInt(document.getElementById('pinB_gpio').value||'15');
+      if (!Number.isNaN(pinB_gpio)) {
+        cfg.pwm_pins[`pin_${pinB_gpio}`] = {
+          name: document.getElementById('pinB_name').value || `Pin ${pinB_gpio}`,
+          gpio_pin: pinB_gpio,
+          enabled: (document.getElementById('pinB_enabled').value === 'true'),
+          time_windows: {
+            day: { start: 'sunrise', end: 'sunset', duty_cycle: 0 },
+            night: { start: 'sunset', end: 'sunrise', duty_cycle: 30 }
+          }
+        };
+      }
+
+      return cfg;
+    }
+
+    function render(){
+      const cfg = buildConfig();
+      document.getElementById('preview').textContent = JSON.stringify(cfg, null, 2);
+    }
+
+    function downloadJSON(){
+      const blob = new Blob([JSON.stringify(buildConfig(), null, 2)], {type:'application/json'});
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'config.json';
+      a.click();
+      URL.revokeObjectURL(a.href);
+    }
+
+    render();
+  </script>
+</body>
+</html>
