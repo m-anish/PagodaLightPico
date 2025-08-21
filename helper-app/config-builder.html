@@ -175,7 +175,7 @@
       for (let i=0;i<=22;i++){ if(!usedGpios.has(i)){ gpio=i; break; } }
       return { gpio_pin: gpio, name: `Pin ${gpio}`, enabled: false, windows: [ newWindow() ] };
     }
-    function newWindow(){ return { start: 'sunrise', end: 'sunset', duty_cycle: 0 }; }
+    function newWindow(name){ return { name: name || '', start: 'sunrise', end: 'sunset', duty_cycle: 0 }; }
 
     function addPin(){ if (pins.length < MAX_PINS) { pins.push(newPin()); renderPinsUI(); render(); } }
     function removePin(idx){ pins.splice(idx,1); renderPinsUI(); render(); }
@@ -191,6 +191,8 @@
       const isKeyword = (val === 'sunrise' || val === 'sunset');
       const keyword = isKeyword ? val : 'custom';
       const time = isKeyword ? '' : (val || '18:00');
+      const disp = keyword==='custom' ? '' : 'display:none;';
+      const dis = keyword==='custom' ? '' : 'disabled';
       return `
         <div class="row">
           <label style="grid-column: span 1;">${which} type
@@ -200,8 +202,8 @@
               <option value="custom" ${keyword==='custom'?'selected':''}>custom</option>
             </select>
           </label>
-          <label style="grid-column: span 1;">${which} time (HH:MM)
-            <input type="text" value="${time}" placeholder="hh:mm" data-type="${which}-time" />
+          <label data-time-label="${which}" style="grid-column: span 1; ${disp}">${which} time (HH:MM)
+            <input type="text" value="${time}" placeholder="hh:mm" data-type="${which}-time" ${dis} />
           </label>
         </div>`;
     }
@@ -239,11 +241,17 @@
           block.style.padding = '8px';
           block.style.margin = '8px 0';
           block.innerHTML = `
+            <div class="row">
+              <label>Window title
+                <input type="text" value="${w.name ?? (widx===0?'day':`w${widx+1}`)}" data-type="win-name" />
+              </label>
+            </div>
             ${timeSelector(w.start,'start')}
             ${timeSelector(w.end,'end')}
             <div class="row">
               <label>Duty cycle (0-100)
-                <input type="number" min="0" max="100" value="${w.duty_cycle}" data-type="duty" />
+                <input type="range" min="0" max="100" value="${w.duty_cycle}" data-type="duty" />
+                <span data-type="duty-val">${w.duty_cycle}</span>
               </label>
               <div style="display:flex; align-items:flex-end;">
                 <button type="button" ${p.windows.length<=MIN_WINDOWS?'disabled':''} data-action="remove-window" data-widx="${widx}">Remove Window</button>
@@ -252,11 +260,23 @@
           // attach events for this window
           block.addEventListener('input', (e) => {
             const t = e.target.getAttribute('data-type');
+            if (t === 'win-name') { w.name = e.target.value; }
             if (t === 'start-type') { w.start = e.target.value === 'custom' ? (w.start.match(/^\d{2}:\d{2}$/) ? w.start : '18:00') : e.target.value; }
             if (t === 'start-time') { w.start = e.target.value.trim(); }
             if (t === 'end-type') { w.end = e.target.value === 'custom' ? (w.end.match(/^\d{2}:\d{2}$/) ? w.end : '22:00') : e.target.value; }
             if (t === 'end-time') { w.end = e.target.value.trim(); }
-            if (t === 'duty') { let v = parseInt(e.target.value||'0'); if (isNaN(v)) v=0; v=Math.max(0,Math.min(100,v)); w.duty_cycle = v; e.target.value = v; }
+            if (t === 'start-type' || t === 'end-type') {
+              // toggle visibility of time inputs for the specific which
+              const which = t.startsWith('start') ? 'start' : 'end';
+              const lbl = block.querySelector(`label[data-time-label="${which}"]`);
+              if (lbl) {
+                const isCustom = e.target.value === 'custom';
+                const input = lbl.querySelector('input');
+                if (isCustom) { lbl.style.display=''; input.removeAttribute('disabled'); }
+                else { lbl.style.display='none'; input.setAttribute('disabled',''); }
+              }
+            }
+            if (t === 'duty') { let v = parseInt(e.target.value||'0'); if (isNaN(v)) v=0; v=Math.max(0,Math.min(100,v)); w.duty_cycle = v; const span = block.querySelector('span[data-type="duty-val"]'); if (span) span.textContent = v; }
             render();
           });
           block.addEventListener('click', (e) => {
@@ -292,6 +312,7 @@
       if (time_windows.day) {
         const w = time_windows.day;
         arr.push({
+          name: 'day',
           start: validateTimeString(w.start) ? w.start : 'sunrise',
           end: validateTimeString(w.end) ? w.end : 'sunset',
           duty_cycle: Math.max(0, Math.min(100, parseInt(w.duty_cycle||0)))
@@ -303,6 +324,7 @@
         .forEach(k => {
           const w = time_windows[k] || {};
           arr.push({
+            name: k,
             start: validateTimeString(w.start) ? w.start : 'sunset',
             end: validateTimeString(w.end) ? w.end : 'sunrise',
             duty_cycle: Math.max(0, Math.min(100, parseInt(w.duty_cycle||0)))
@@ -381,11 +403,12 @@
         const key = `pin_${p.gpio_pin}`;
         const tw = {};
         p.windows.forEach((w, widx) => {
-          // sanitize times
+          // sanitize times and determine key name
           const s = validateTimeString(w.start) ? w.start : 'sunset';
           const e = validateTimeString(w.end) ? w.end : 'sunrise';
-          const key = (widx === 0) ? 'day' : `w${widx+1}`;
-          tw[key] = { start: s, end: e, duty_cycle: Math.max(0, Math.min(100, parseInt(w.duty_cycle||0))) };
+          const provided = (w.name || '').trim();
+          const keyName = (widx === 0 && provided === '') ? 'day' : (provided || `w${widx+1}`);
+          tw[keyName] = { start: s, end: e, duty_cycle: Math.max(0, Math.min(100, parseInt(w.duty_cycle||0))) };
         });
         cfg.pwm_pins[key] = {
           name: p.name || key,
