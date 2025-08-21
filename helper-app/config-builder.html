@@ -144,32 +144,12 @@
       </fieldset>
 
       <fieldset>
-        <legend>PWM Pins (quick start)</legend>
-        <div class="tip">Define up to two pins here. You can edit JSON below for more.</div>
-        <div class="row">
-          <label>Pin A GPIO
-            <input id="pinA_gpio" type="number" value="16" />
-          </label>
-          <label>Pin A Name
-            <input id="pinA_name" type="text" value="Main LED Strip" />
-          </label>
+        <legend>PWM Pins</legend>
+        <div class="tip">Add up to 5 pins. For each pin, add 1–5 time windows. Duty cycle is 0–1000.</div>
+        <div class="actions" style="margin:6px 0 12px;">
+          <button type="button" onclick="addPin()">Add Pin</button>
         </div>
-        <div class="row">
-          <label>Pin A Enabled
-            <select id="pinA_enabled"><option>true</option><option selected>false</option></select>
-          </label>
-          <label>Pin B GPIO
-            <input id="pinB_gpio" type="number" value="15" />
-          </label>
-        </div>
-        <div class="row">
-          <label>Pin B Name
-            <input id="pinB_name" type="text" value="Accent Lighting" />
-          </label>
-          <label>Pin B Enabled
-            <select id="pinB_enabled"><option>true</option><option selected>false</option></select>
-          </label>
-        </div>
+        <div id="pinsContainer"></div>
       </fieldset>
     </form>
 
@@ -183,6 +163,130 @@
   </div>
 
   <script>
+    // --- PWM Pins dynamic state ---
+    const MAX_PINS = 5;
+    const MAX_WINDOWS = 5;
+    const MIN_WINDOWS = 1;
+    const pins = [];
+
+    function newPin() {
+      const usedGpios = new Set(pins.map(p => p.gpio_pin));
+      let gpio = 16;
+      for (let i=0;i<=22;i++){ if(!usedGpios.has(i)){ gpio=i; break; } }
+      return { gpio_pin: gpio, name: `Pin ${gpio}`, enabled: false, windows: [ newWindow() ] };
+    }
+    function newWindow(){ return { start: 'sunrise', end: 'sunset', duty_cycle: 0 }; }
+
+    function addPin(){ if (pins.length < MAX_PINS) { pins.push(newPin()); renderPinsUI(); render(); } }
+    function removePin(idx){ pins.splice(idx,1); renderPinsUI(); render(); }
+    function addWindowToPin(idx){ if (pins[idx].windows.length < MAX_WINDOWS){ pins[idx].windows.push(newWindow()); renderPinsUI(); render(); } }
+    function removeWindowFromPin(pidx, widx){ if (pins[pidx].windows.length > MIN_WINDOWS){ pins[pidx].windows.splice(widx,1); renderPinsUI(); render(); } }
+
+    function gpioSelect(current){
+      const opts = Array.from({length:23}, (_,i)=>`<option value="${i}" ${i===current? 'selected':''}>${i}</option>`).join('');
+      return `<select data-type="gpio">${opts}</select>`;
+    }
+    function boolSelect(val){ return `<select data-type="enabled"><option value="true" ${val? 'selected':''}>true</option><option value="false" ${!val? 'selected':''}>false</option></select>`; }
+    function timeSelector(val, which){
+      const isKeyword = (val === 'sunrise' || val === 'sunset');
+      const keyword = isKeyword ? val : 'custom';
+      const time = isKeyword ? '' : (val || '18:00');
+      return `
+        <div class="row">
+          <label style="grid-column: span 1;">${which} type
+            <select data-type="${which}-type">
+              <option value="sunrise" ${keyword==='sunrise'?'selected':''}>sunrise</option>
+              <option value="sunset" ${keyword==='sunset'?'selected':''}>sunset</option>
+              <option value="custom" ${keyword==='custom'?'selected':''}>custom</option>
+            </select>
+          </label>
+          <label style="grid-column: span 1;">${which} time (HH:MM)
+            <input type="text" value="${time}" placeholder="hh:mm" data-type="${which}-time" />
+          </label>
+        </div>`;
+    }
+
+    function renderPinsUI(){
+      const container = document.getElementById('pinsContainer');
+      container.innerHTML = '';
+      pins.forEach((p, idx) => {
+        const card = document.createElement('div');
+        card.style.border = '1px solid #eee';
+        card.style.borderRadius = '8px';
+        card.style.padding = '12px';
+        card.style.marginBottom = '12px';
+        card.innerHTML = `
+          <div class="row">
+            <label>GPIO ${gpioSelect(p.gpio_pin)}</label>
+            <label>Name <input type="text" value="${p.name}" data-type="name" /></label>
+          </div>
+          <div class="row">
+            <label>Enabled ${boolSelect(p.enabled)}</label>
+            <div style="display:flex; align-items:flex-end; gap:8px;">
+              <button type="button" ${pins.length<=1?'disabled':''} data-action="remove-pin">Remove Pin</button>
+              <button type="button" ${p.windows.length>=MAX_WINDOWS?'disabled':''} data-action="add-window">Add Window</button>
+            </div>
+          </div>
+          <div class="tip">Windows (min ${MIN_WINDOWS}, max ${MAX_WINDOWS}). Note: device requires at least a 'day' window and 2–5 windows when the pin is enabled.</div>
+          <div class="windows"></div>
+        `;
+
+        const winWrap = card.querySelector('.windows');
+        p.windows.forEach((w, widx) => {
+          const block = document.createElement('div');
+          block.style.border = '1px dashed #ddd';
+          block.style.borderRadius = '6px';
+          block.style.padding = '8px';
+          block.style.margin = '8px 0';
+          block.innerHTML = `
+            ${timeSelector(w.start,'start')}
+            ${timeSelector(w.end,'end')}
+            <div class="row">
+              <label>Duty cycle (0-100)
+                <input type="number" min="0" max="100" value="${w.duty_cycle}" data-type="duty" />
+              </label>
+              <div style="display:flex; align-items:flex-end;">
+                <button type="button" ${p.windows.length<=MIN_WINDOWS?'disabled':''} data-action="remove-window" data-widx="${widx}">Remove Window</button>
+              </div>
+            </div>`;
+          // attach events for this window
+          block.addEventListener('input', (e) => {
+            const t = e.target.getAttribute('data-type');
+            if (t === 'start-type') { w.start = e.target.value === 'custom' ? (w.start.match(/^\d{2}:\d{2}$/) ? w.start : '18:00') : e.target.value; }
+            if (t === 'start-time') { w.start = e.target.value.trim(); }
+            if (t === 'end-type') { w.end = e.target.value === 'custom' ? (w.end.match(/^\d{2}:\d{2}$/) ? w.end : '22:00') : e.target.value; }
+            if (t === 'end-time') { w.end = e.target.value.trim(); }
+            if (t === 'duty') { let v = parseInt(e.target.value||'0'); if (isNaN(v)) v=0; v=Math.max(0,Math.min(100,v)); w.duty_cycle = v; e.target.value = v; }
+            render();
+          });
+          block.addEventListener('click', (e) => {
+            if (e.target.getAttribute('data-action') === 'remove-window') { removeWindowFromPin(idx, parseInt(e.target.getAttribute('data-widx'))); }
+          });
+          winWrap.appendChild(block);
+        });
+
+        card.addEventListener('input', (e) => {
+          const t = e.target.getAttribute('data-type');
+          if (t === 'name') p.name = e.target.value;
+          if (t === 'gpio') p.gpio_pin = parseInt(e.target.value);
+          if (t === 'enabled') p.enabled = (e.target.value === 'true');
+          render();
+        });
+        card.addEventListener('click', (e) => {
+          const act = e.target.getAttribute('data-action');
+          if (act === 'remove-pin') removePin(idx);
+          if (act === 'add-window') addWindowToPin(idx);
+        });
+
+        container.appendChild(card);
+      });
+    }
+
+    function validateTimeString(s){
+      return s === 'sunrise' || s === 'sunset' || /^\d{2}:\d{2}$/.test(s);
+    }
+
+    // --- existing builder ---
     function buildConfig(){
       const getBool = (el) => (document.getElementById(el).value === 'true');
       const cfg = {
@@ -223,31 +327,24 @@
         pwm_pins: {}
       };
 
-      const pinA_gpio = parseInt(document.getElementById('pinA_gpio').value||'16');
-      if (!Number.isNaN(pinA_gpio)) {
-        cfg.pwm_pins[`pin_${pinA_gpio}`] = {
-          name: document.getElementById('pinA_name').value || `Pin ${pinA_gpio}`,
-          gpio_pin: pinA_gpio,
-          enabled: (document.getElementById('pinA_enabled').value === 'true'),
-          time_windows: {
-            day: { start: 'sunrise', end: 'sunset', duty_cycle: 0 },
-            evening: { start: 'sunset', end: '22:00', duty_cycle: 60 },
-            night: { start: '22:00', end: 'sunrise', duty_cycle: 20 }
-          }
+      // Build pwm_pins from dynamic pins[] state
+      pins.forEach((p, idx) => {
+        const key = `pin_${p.gpio_pin}`;
+        const tw = {};
+        p.windows.forEach((w, widx) => {
+          // sanitize times
+          const s = validateTimeString(w.start) ? w.start : 'sunset';
+          const e = validateTimeString(w.end) ? w.end : 'sunrise';
+          const key = (widx === 0) ? 'day' : `w${widx+1}`;
+          tw[key] = { start: s, end: e, duty_cycle: Math.max(0, Math.min(100, parseInt(w.duty_cycle||0))) };
+        });
+        cfg.pwm_pins[key] = {
+          name: p.name || key,
+          gpio_pin: p.gpio_pin,
+          enabled: !!p.enabled,
+          time_windows: tw
         };
-      }
-      const pinB_gpio = parseInt(document.getElementById('pinB_gpio').value||'15');
-      if (!Number.isNaN(pinB_gpio)) {
-        cfg.pwm_pins[`pin_${pinB_gpio}`] = {
-          name: document.getElementById('pinB_name').value || `Pin ${pinB_gpio}`,
-          gpio_pin: pinB_gpio,
-          enabled: (document.getElementById('pinB_enabled').value === 'true'),
-          time_windows: {
-            day: { start: 'sunrise', end: 'sunset', duty_cycle: 0 },
-            night: { start: 'sunset', end: 'sunrise', duty_cycle: 30 }
-          }
-        };
-      }
+      });
 
       return cfg;
     }
@@ -266,6 +363,9 @@
       URL.revokeObjectURL(a.href);
     }
 
+    // initialize with one default pin
+    if (pins.length === 0) { pins.push(newPin()); }
+    renderPinsUI();
     render();
   </script>
 </body>
