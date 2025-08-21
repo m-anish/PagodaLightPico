@@ -26,50 +26,72 @@
     <h1>Build sun_times.json</h1>
 
     <form id="stForm" oninput="render()" onchange="render()">
-      <fieldset>
-        <legend>Header</legend>
+      <fieldset class="meta">
+        <legend>Meta</legend>
         <div class="row">
           <label>Version (semver)
             <input id="version" type="text" placeholder="0.4.1" />
           </label>
-          <label>Location name
-            <input id="location" type="text" value="Demo Location" />
+        </div>
+      </fieldset>
+
+      <fieldset class="location">
+        <legend>Location</legend>
+        <div class="row">
+          <label>Search place or address
+            <input id="place" type="text" placeholder="e.g., Dharamsala, India" list="placeList" />
+            <datalist id="placeList"></datalist>
+          </label>
+          <label>Chosen name
+            <input id="location" type="text" placeholder="Location name" />
           </label>
         </div>
         <div class="row">
           <label>Latitude
-            <input id="lat" type="number" step="0.0001" value="34.15" />
+            <input id="lat" type="number" step="0.0001" placeholder="0.0000" />
           </label>
           <label>Longitude
-            <input id="lon" type="number" step="0.0001" value="77.58" />
+            <input id="lon" type="number" step="0.0001" placeholder="0.0000" />
           </label>
+        </div>
+        <div class="row">
+          <label>IANA Timezone
+            <input id="tz" type="text" placeholder="Asia/Kolkata" list="tzList" />
+            <datalist id="tzList"></datalist>
+          </label>
+          <div>
+            <label>&nbsp;</label>
+            <button type="button" id="applyPlace">Use selected place</button>
+          </div>
+        </div>
+        <div class="tip">Pick timezone closest to your location (e.g., Asia/Kolkata). Autodetect is not guaranteed.</div>
+      </fieldset>
+
+      <fieldset class="options">
+        <legend>Options</legend>
+        <div class="row">
+          <label>Frequency
+            <select id="freq">
+              <option value="monthly" selected>Monthly (1st of each month)</option>
+              <option value="fortnightly">Fortnightly (1st and 15th)</option>
+              <option value="weekly">Weekly (Mondays)</option>
+              <option value="daily">Daily</option>
+            </select>
+          </label>
+          <label>Year (for calculations)
+            <input id="year" type="number" min="2000" max="2100" />
+          </label>
+        </div>
+        <div>
+          <button type="button" id="generateBtn">Generate from location</button>
         </div>
       </fieldset>
 
       <fieldset>
-        <legend>Days</legend>
-        <div class="tip">Add entries in MM-DD format with 24h times HH:MM for rise/set.</div>
-        <div class="row">
-          <label>Date (MM-DD)
-            <input id="d_key" type="text" placeholder="01-01" />
-          </label>
-          <label>Sunrise (HH:MM)
-            <input id="d_rise" type="text" placeholder="07:15" />
-          </label>
-        </div>
-        <div class="row">
-          <label>Sunset (HH:MM)
-            <input id="d_set" type="text" placeholder="17:25" />
-          </label>
-          <div>
-            <label>&nbsp;</label>
-            <button type="button" onclick="addDay()">Add/Update Day</button>
-          </div>
-        </div>
-
+        <legend>Generated Days</legend>
         <table id="daysTable">
           <thead>
-            <tr><th>Date</th><th>Rise</th><th>Set</th><th></th></tr>
+            <tr><th>Date (MM-DD)</th><th>Sunrise</th><th>Sunset</th></tr>
           </thead>
           <tbody></tbody>
         </table>
@@ -85,35 +107,21 @@
     <pre id="preview"></pre>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/suncalc@1.9.0/suncalc.min.js"></script>
   <script>
     const days = {};
     let SAMPLE_VERSION = null;
+    const placeMap = new Map();
 
     function validateKey(key){ return /^\d{2}-\d{2}$/.test(key); }
     function validateTime(t){ return /^\d{2}:\d{2}$/.test(t); }
-
-    function addDay(){
-      const k = document.getElementById('d_key').value.trim();
-      const r = document.getElementById('d_rise').value.trim();
-      const s = document.getElementById('d_set').value.trim();
-      if (!validateKey(k) || !validateTime(r) || !validateTime(s)) {
-        alert('Please use MM-DD for date and HH:MM for times');
-        return;
-      }
-      days[k] = { rise: r, set: s };
-      renderDays();
-      render();
-    }
-
-    function removeDay(k){ delete days[k]; renderDays(); render(); }
 
     function renderDays(){
       const tb = document.querySelector('#daysTable tbody');
       tb.innerHTML = '';
       Object.keys(days).sort().forEach(k => {
         const tr = document.createElement('tr');
-        tr.innerHTML = `<td>${k}</td><td>${days[k].rise}</td><td>${days[k].set}</td>` +
-          `<td><button type="button" onclick="removeDay('${k}')">Remove</button></td>`;
+        tr.innerHTML = `<td>${k}</td><td>${days[k].rise}</td><td>${days[k].set}</td>`;
         tb.appendChild(tr);
       });
     }
@@ -141,6 +149,109 @@
       }
     }
 
+    // ---- Place autocomplete via Nominatim ----
+    const tzCandidates = [
+      'UTC','Europe/London','Europe/Berlin','Europe/Paris','Europe/Moscow',
+      'Asia/Kolkata','Asia/Kathmandu','Asia/Dhaka','Asia/Bangkok','Asia/Singapore',
+      'Asia/Shanghai','Asia/Tokyo','Australia/Sydney','America/New_York','America/Chicago',
+      'America/Denver','America/Los_Angeles','America/Sao_Paulo','Africa/Johannesburg'
+    ];
+    function populateTZList(){
+      const dl = document.getElementById('tzList');
+      dl.innerHTML = '';
+      tzCandidates.forEach(z => {
+        const opt = document.createElement('option');
+        opt.value = z; dl.appendChild(opt);
+      });
+    }
+
+    let suggestTimer = null;
+    document.getElementById('place').addEventListener('input', e => {
+      const q = e.target.value.trim();
+      clearTimeout(suggestTimer);
+      if (!q) return;
+      suggestTimer = setTimeout(async () => {
+        try {
+          const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5&q=${encodeURIComponent(q)}`;
+          const resp = await fetch(url, { headers: { 'Accept': 'application/json' }});
+          if (!resp.ok) return;
+          const arr = await resp.json();
+          placeMap.clear();
+          const dl = document.getElementById('placeList');
+          dl.innerHTML = '';
+          arr.forEach(item => {
+            const name = item.display_name;
+            placeMap.set(name, { lat: parseFloat(item.lat), lon: parseFloat(item.lon) });
+            const opt = document.createElement('option');
+            opt.value = name; dl.appendChild(opt);
+          });
+        } catch {}
+      }, 250);
+    });
+
+    document.getElementById('applyPlace').addEventListener('click', () => {
+      const val = document.getElementById('place').value.trim();
+      if (placeMap.has(val)) {
+        const p = placeMap.get(val);
+        document.getElementById('location').value = val;
+        document.getElementById('lat').value = p.lat.toFixed(4);
+        document.getElementById('lon').value = p.lon.toFixed(4);
+      }
+      render();
+    });
+
+    // ---- Generation ----
+    function pad2(n){ return n.toString().padStart(2,'0'); }
+    function formatHM(date, tz){
+      try {
+        const parts = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: tz }).formatToParts(date);
+        const h = parts.find(p=>p.type==='hour')?.value || '00';
+        const m = parts.find(p=>p.type==='minute')?.value || '00';
+        return `${h}:${m}`;
+      } catch { return '00:00'; }
+    }
+
+    function eachDateOfYear(year, cb){
+      const d = new Date(Date.UTC(year,0,1));
+      while (d.getUTCFullYear() === year) { cb(new Date(d)); d.setUTCDate(d.getUTCDate()+1); }
+    }
+
+    function generateDates(year, freq){
+      const out = [];
+      if (freq === 'daily') {
+        eachDateOfYear(year, d => out.push(new Date(d)));
+      } else if (freq === 'weekly') {
+        // pick Mondays in UTC, later times will be converted to tz
+        eachDateOfYear(year, d => { if (d.getUTCDay() === 1) out.push(new Date(d)); });
+      } else if (freq === 'fortnightly') {
+        for (let m=0;m<12;m++){ out.push(new Date(Date.UTC(year,m,1))); out.push(new Date(Date.UTC(year,m,15))); }
+      } else { // monthly
+        for (let m=0;m<12;m++){ out.push(new Date(Date.UTC(year,m,1))); }
+      }
+      return out;
+    }
+
+    async function generateFromLocation(){
+      const loc = document.getElementById('location').value.trim() || 'Unknown';
+      const lat = parseFloat(document.getElementById('lat').value);
+      const lon = parseFloat(document.getElementById('lon').value);
+      const tz = document.getElementById('tz').value.trim() || 'UTC';
+      const year = parseInt(document.getElementById('year').value || new Date().getFullYear(), 10);
+      if (isNaN(lat) || isNaN(lon)) { alert('Please choose a valid place (lat/lon).'); return; }
+      daysClear();
+      const dates = generateDates(year, document.getElementById('freq').value);
+      dates.forEach(d => {
+        const times = SunCalc.getTimes(d, lat, lon);
+        const mmdd = `${pad2(d.getUTCMonth()+1)}-${pad2(d.getUTCDate())}`;
+        days[mmdd] = { rise: formatHM(times.sunrise, tz), set: formatHM(times.sunset, tz) };
+      });
+      document.getElementById('location').value = loc; // keep
+      renderDays();
+      render();
+    }
+
+    function daysClear(){ for (const k of Object.keys(days)) delete days[k]; }
+
     function buildSunTimes(){
       return {
         version: document.getElementById('version').value || SAMPLE_VERSION || '0.4.1',
@@ -164,6 +275,9 @@
       URL.revokeObjectURL(a.href);
     }
 
+    document.getElementById('generateBtn').addEventListener('click', generateFromLocation);
+    populateTZList();
+    loadSampleVersion();
     render();
   </script>
 </body>
