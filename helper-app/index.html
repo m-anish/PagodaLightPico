@@ -1,48 +1,82 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>PagodaLightPico Helper</title>
-  <meta name="description" content="Helper tools for PagodaLightPico" />
-  <link rel="icon" href="data:," />
-  <style>
-    :root { color-scheme: light dark; }
-    html, body { margin: 0; padding: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji"; }
-    header { padding: 16px; border-bottom: 1px solid #ccc; }
-    main { padding: 24px; max-width: 920px; margin: 0 auto; }
-    h1 { margin: 0 0 4px; font-size: 1.6rem; }
-    .subtitle { color: #666; font-size: 0.95rem; }
-    .card { border: 1px solid #ccc; border-radius: 10px; padding: 16px; margin: 16px 0; }
-    footer { padding: 16px; border-top: 1px solid #ccc; font-size: 0.9rem; color: #666; }
-    a.button { display: inline-block; padding: 10px 14px; border-radius: 8px; border: 1px solid #999; text-decoration: none; }
-  </style>
-</head>
-<body>
-  <header>
-    <h1>PagodaLightPico Helper</h1>
-    <div class="subtitle">Static helper site hosted via GitHub Pages</div>
-  </header>
-  <main>
-    <section class="card">
-      <h2>Status</h2>
-      <p>This is a minimal skeleton. Extend this page with tools for config, MQTT testing, and PWM insights as needed.</p>
-    </section>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>PagodaLightPico Helper</title>
+    <meta name="description" content="Helper tools for PagodaLightPico" />
+    <link rel="icon" href="data:," />
+    <style>
+      body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, 'Noto Sans', 'Liberation Sans', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji'; margin: 20px; background: #f5f5f5; }
+      .container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; }
+      h1 { color: #2c3e50; text-align: center; }
+      h2 { color: #34495e; margin-top: 30px; }
+      .status { padding: 10px; margin: 10px 0; border-radius: 5px; }
+      .online { background: #d4edda; border-left: 4px solid #28a745; }
+      .offline { background: #f8d7da; border-left: 4px solid #dc3545; }
+      .disabled { background: #fff3cd; border-left: 4px solid #ffc107; }
+      .time { font-size: 24px; text-align: center; margin: 20px 0; color: #2c3e50; }
+      .footer { text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; }
+      .footer a { color: #007bff; text-decoration: none; }
+      .footer a:hover { text-decoration: underline; }
+      .footer-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px 16px; align-items: start; padding: 0; margin: 8px 0 0 0; }
+      .footer-grid .col { display: flex; flex-direction: column; gap: 6px; }
+      .footer .col-title { font-size: 12px; color: #555; text-transform: uppercase; letter-spacing: 0.03em; }
+      .version { background: #e9ecef; border-left: 4px solid #6c757d; }
+      .location { background: #e7f3ff; border-left: 4px solid #0d6efd; }
+      @media (max-width: 480px) { .container { padding: 12px; } }
+    </style>
+    <script>
+      function startClock() {
+        const timeEl = document.getElementById('time');
+        function pad(n){return (n<10?'0':'')+n}
+        function tick(){
+          const d = new Date();
+          timeEl.textContent = pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds());
+        }
+        tick(); setInterval(tick,1000);
+      }
+      window.addEventListener('DOMContentLoaded', startClock);
+    </script>
+  </head>
+  <body>
+    <div class="container">
+      <h1>PagodaLightPico Helper</h1>
+      <div class="time">🕒 <span id="time">--:--:--</span></div>
 
-    <section class="card">
-      <h2>Quick Links</h2>
+      <div class="status version"><strong>🏷️ Config:</strong> Sample files and utilities</div>
+      <div class="status location"><strong>📍 Hosted:</strong> GitHub Pages</div>
+
+      <h2>Tools</h2>
+      <p>This helper site mirrors the look-and-feel of the Pico web interface. Extend it with config validators, MQTT tests, and PWM viewers.</p>
+
+      <h2>Downloads</h2>
       <ul>
-        <li><a href="https://github.com/" target="_blank" rel="noreferrer">GitHub</a></li>
-        <li><a href="../" rel="noreferrer">Repository root</a></li>
+        <li><a href="/PagodaLightPico/config.json.sample" download>⬇️ config.json.sample</a></li>
+        <li><a href="/PagodaLightPico/sun_times.json.sample" download>⬇️ sun_times.json.sample</a></li>
       </ul>
-    </section>
-  </main>
-  <footer>
-    <span>Built for PagodaLightPico</span>
-  </footer>
-  <script>
-    // Placeholder: add client-side helpers here.
-    console.log("PagodaLightPico Helper loaded");
-  </script>
-</body>
+
+      <div class="footer">
+        <div class="footer-grid">
+          <div class="col">
+            <span class="col-title">Project</span>
+            <a href="https://github.com/m-anish/PagodaLightPico" target="_blank" rel="noopener">Repository</a>
+          </div>
+          <div class="col">
+            <span class="col-title">Device</span>
+            <span>Styling aligned with device UI</span>
+          </div>
+          <div class="col">
+            <span class="col-title">Samples</span>
+            <a href="/PagodaLightPico/config.json.sample" download>config.json.sample</a>
+            <a href="/PagodaLightPico/sun_times.json.sample" download>sun_times.json.sample</a>
+          </div>
+          <div class="col">
+            <span class="col-title">About</span>
+            <span>Static site via GitHub Pages</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
 </html>
