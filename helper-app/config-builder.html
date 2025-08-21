@@ -585,7 +585,7 @@
 
     async function loadSamplePins(){
       try {
-        const resp = await fetch('../config.json.sample', { cache: 'no-store' });
+        const resp = await fetch('./config.json.sample', { cache: 'no-store' });
         if (!resp.ok) throw new Error('fetch failed');
         const sample = await resp.json();
         const pwm = sample && sample.pwm_pins || {};
@@ -698,7 +698,7 @@
 
     async function fetchSampleVersion(){
       try {
-        const resp = await fetch('../config.json.sample', { cache: 'no-store' });
+        const resp = await fetch('./config.json.sample', { cache: 'no-store' });
         if (!resp.ok) return;
         const sample = await resp.json();
         sampleMajorMinor = majorMinor(sample.version || '');
