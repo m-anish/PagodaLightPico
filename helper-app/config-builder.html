@@ -331,9 +331,10 @@
     function addWindowToPin(idx){ if (pins[idx].windows.length < MAX_WINDOWS){ pins[idx].windows.push(newWindow()); renderPinsUI(); render(); } }
     function removeWindowFromPin(pidx, widx){ if (pins[pidx].windows.length > MIN_WINDOWS){ pins[pidx].windows.splice(widx,1); renderPinsUI(); render(); } }
 
-    // Known-good GPIO lists for Pico W
+    // Known-good GPIO lists for Pico W (conservative: only commonly exposed 0–22)
     const GOOD_GPIO = [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22];
-    const PWM_GPIO = GOOD_GPIO.slice(); // RP2040 PWM available on these general pins
+    // PWM is broadly available across general GPIOs on RP2040; restrict to exposed set
+    const PWM_GPIO = GOOD_GPIO.slice();
 
     function gpioSelect(current){
       const opts = PWM_GPIO.map(i=>`<option value="${i}" ${i===current? 'selected':''}>${i}</option>`).join('');
@@ -484,11 +485,12 @@
       });
     }
 
-    // Populate hardware GPIO selects with known-good list and defaults
+    // Populate hardware GPIO selects with known-good list and keep current value if set
     function populateHardwareGpioSelects(){
       const make = (sel, defVal) => {
         sel.innerHTML = GOOD_GPIO.map(i=>`<option value="${i}">${i}</option>`).join('');
-        const dv = parseInt(defVal);
+        const cur = sel.value;
+        const dv = isNaN(parseInt(cur)) ? parseInt(defVal) : parseInt(cur);
         const idx = GOOD_GPIO.indexOf(dv);
         sel.selectedIndex = idx >= 0 ? idx : 0;
       };
@@ -740,13 +742,10 @@
         if (cfg.timezone){
           if (cfg.timezone.name !== undefined) document.getElementById('tz_name').value = cfg.timezone.name;
           if (cfg.timezone.offset !== undefined) document.getElementById('tz_offset').value = String(cfg.timezone.offset);
-          const sel = document.getElementById('tz_select');
-          if (sel){
-            const idx = Array.from(sel.options).findIndex(o => o.value === (cfg.timezone.name||''));
-            if (idx >= 0) sel.selectedIndex = idx;
-          }
         }
 
+        // Hardware pins (RTC SDA/SCL) via dropdowns
+        populateHardwareGpioSelects();
         if (cfg.hardware){
           if (cfg.hardware.rtc_sda !== undefined) document.getElementById('rtc_sda').value = cfg.hardware.rtc_sda;
           if (cfg.hardware.rtc_i2c_sda_pin !== undefined) document.getElementById('rtc_sda').value = cfg.hardware.rtc_i2c_sda_pin;
@@ -839,6 +838,7 @@
       if (pins.length === 0) { pins.push(newPin()); }
       populateTimezoneSelect();
       setupTimezoneSearch();
+      populateHardwareGpioSelects();
       setupCollapsibles();
       setupUpload();
       renderPinsUI();
