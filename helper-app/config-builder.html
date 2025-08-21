@@ -22,7 +22,7 @@
     .row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 12px; row-gap: 12px; align-items: start; }
     @media (max-width: 640px){ .row { grid-template-columns: 1fr; } }
     .actions { display: flex; gap: 12px; flex-wrap: wrap; }
-    button, a.button { padding: 10px 14px; border: 1px solid #999; border-radius: 8px; background: #fff; cursor: pointer; text-decoration: none; color: #222; }
+    button, a.button, label.button { padding: 10px 14px; border: 1px solid #999; border-radius: 8px; background: #fff; cursor: pointer; text-decoration: none; color: #222; display:inline-flex; align-items:center; gap:6px; }
     pre { background: #0b1020; color: #d5e6ff; padding: 12px; border-radius: 8px; overflow: auto; max-height: 420px; }
     .tip { font-size: 12px; color: #666; }
     legend { font-weight: 600; color: #374151; }
@@ -33,8 +33,12 @@
     .collapse-toggle { border:none; background:none; cursor:pointer; font-size:14px; }
     /* PWM visuals */
     .pin-card { background:#f8fafc; }
-    .window-block { background:#f8fbff; border-left:4px solid #bae6fd; }
-    .window-head { font-size: 12px; color: #4b5563; margin-bottom: 6px; display:flex; align-items:center; gap:6px; }
+    .gpio-head { font-size:12px; color:#374151; margin:2px 0 6px; display:flex; align-items:center; gap:6px; }
+    .window-block { background:#e8f2ff; border-left:6px solid #3b82f6; border:1px solid #dbeafe; }
+    .window-head { font-size: 12px; color: #374151; margin-bottom: 6px; display:flex; align-items:center; gap:6px; }
+    .sub-toggle { border:none; background:none; cursor:pointer; font-size:12px; padding:0 4px; }
+    .window-block.collapsed > .window-body { display:none; }
+    .pin-card .gpio-body.collapsed { display:none; }
     /* password reveal */
     .password-wrapper { position: relative; }
     .reveal-btn { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: transparent; border: none; cursor: pointer; font-size: 14px; }
@@ -187,10 +191,8 @@
 
     <div class="actions">
       <button type="button" onclick="downloadJSON()">Download config.json</button>
-      <label class="button" style="position:relative; overflow:hidden;">
-        <input id="upload_config" type="file" accept="application/json,.json" style="position:absolute; inset:0; opacity:0; cursor:pointer;" />
-        Upload and prefill
-      </label>
+      <button id="upload_btn" type="button">Upload and prefill</button>
+      <input id="upload_config" type="file" accept="application/json,.json" style="position:absolute; width:1px; height:1px; padding:0; margin:-1px; border:0; clip:rect(0,0,0,0); overflow:hidden;" />
       <a class="button" href="./index.html">Back to Home</a>
     </div>
     <div id="upload_msg" class="tip"></div>
@@ -361,19 +363,22 @@
         card.style.padding = '12px';
         card.style.marginBottom = '12px';
         card.innerHTML = `
-          <div class="row">
-            <label>GPIO ${gpioSelect(p.gpio_pin)}</label>
-            <label>Name <input type="text" value="${p.name}" data-type="name" /></label>
-          </div>
-          <div class="row">
-            <label>Enabled ${boolSelect(p.enabled)}</label>
-            <div style="display:flex; align-items:flex-end; gap:8px;">
-              <button type="button" ${pins.length<=1?'disabled':''} data-action="remove-pin">Remove Pin</button>
-              <button type="button" ${p.windows.length>=MAX_WINDOWS?'disabled':''} data-action="add-window">Add Window</button>
+          <div class="gpio-head"><button type="button" class="sub-toggle" data-action="toggle-gpio">▼</button> GPIO Pin ${p.gpio_pin}</div>
+          <div class="gpio-body">
+            <div class="row">
+              <label>GPIO ${gpioSelect(p.gpio_pin)}</label>
+              <label>Name <input type="text" value="${p.name}" data-type="name" /></label>
             </div>
+            <div class="row">
+              <label>Enabled ${boolSelect(p.enabled)}</label>
+              <div style="display:flex; align-items:flex-end; gap:8px;">
+                <button type="button" ${pins.length<=1?'disabled':''} data-action="remove-pin">Remove Pin</button>
+                <button type="button" ${p.windows.length>=MAX_WINDOWS?'disabled':''} data-action="add-window">Add Window</button>
+              </div>
+            </div>
+            <div class="tip">Windows (min ${MIN_WINDOWS}, max ${MAX_WINDOWS}). Note: device requires at least a 'day' window and 2–5 windows when the pin is enabled.</div>
+            <div class="windows"></div>
           </div>
-          <div class="tip">Windows (min ${MIN_WINDOWS}, max ${MAX_WINDOWS}). Note: device requires at least a 'day' window and 2–5 windows when the pin is enabled.</div>
-          <div class="windows"></div>
         `;
 
         const winWrap = card.querySelector('.windows');
@@ -384,9 +389,10 @@
           block.style.borderRadius = '6px';
           block.style.padding = '8px';
           block.style.margin = '8px 0';
-          block.style.background = '#f7f7f7';
+          block.style.background = '#e8f2ff';
           block.innerHTML = `
-            <div class="window-head">🪟 Window ${widx+1}</div>
+            <div class="window-head"><button type="button" class="sub-toggle" data-action="toggle-window" data-widx="${widx}">▼</button> ⏱️ Window ${widx+1}</div>
+            <div class="window-body">
             <div class="row">
               <label>Window title
                 <input type="text" value="${w.name ?? (widx===0?'day':`w${widx+1}`)}" data-type="win-name" />
@@ -402,6 +408,7 @@
               <div style="display:flex; align-items:flex-end;">
                 <button type="button" ${p.windows.length<=MIN_WINDOWS?'disabled':''} data-action="remove-window" data-widx="${widx}">Remove Window</button>
               </div>
+            </div>
             </div>`;
           // attach events for this window
           block.addEventListener('input', (e) => {
@@ -442,6 +449,17 @@
           const act = e.target.getAttribute('data-action');
           if (act === 'remove-pin') removePin(idx);
           if (act === 'add-window') addWindowToPin(idx);
+          if (act === 'toggle-gpio') {
+            const body = card.querySelector('.gpio-body');
+            e.target.textContent = body.classList.contains('collapsed') ? '▼' : '▶';
+            body.classList.toggle('collapsed');
+          }
+          if (act === 'toggle-window') {
+            const wTarget = e.target.closest('.window-block');
+            const nowCollapsed = !wTarget.classList.contains('collapsed');
+            e.target.textContent = nowCollapsed ? '▶' : '▼';
+            wTarget.classList.toggle('collapsed');
+          }
         });
 
         container.appendChild(card);
@@ -689,7 +707,9 @@
 
     function setupUpload(){
       const inp = document.getElementById('upload_config');
+      const btn = document.getElementById('upload_btn');
       if (!inp) return;
+      if (btn) btn.addEventListener('click', () => inp.click());
       inp.addEventListener('change', async (ev) => {
         const f = ev.target.files && ev.target.files[0];
         if (!f) return;
