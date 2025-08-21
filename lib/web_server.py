@@ -196,10 +196,19 @@ class AsyncWebServer:
                     response = await self.handle_config_upload(request_str)
                 else:
                     response = self.generate_404()
+            elif path == '/upload-sun-times-begin' and method == 'POST':
+                response = self.handle_sun_times_upload_begin()
+            elif path == '/upload-sun-times-chunk' and method == 'POST':
+                response = self.handle_sun_times_upload_chunk(body_bytes, headers_text)
+            elif path == '/upload-sun-times-finalize' and method == 'POST':
+                response = await self.handle_sun_times_upload_finalize()
             elif path == '/upload-sun-times':
                 if method == 'GET':
-                    response = self.generate_sun_times_upload_page()
+                    # Stream the sun times upload page to minimize memory usage
+                    await self.stream_upload_sun_times_page_chunked(client_socket)
+                    response = None
                 elif method == 'POST':
+                    # Legacy multipart handler
                     response = await self.handle_sun_times_upload(request_str)
                 else:
                     response = self.generate_404()
@@ -1509,69 +1518,194 @@ class AsyncWebServer:
         ) + html
         return response
     
-    def generate_sun_times_upload_page(self):
-        """Generate sun_times.json upload page."""
+    async def stream_upload_sun_times_page_chunked(self, client_socket):
+        """Stream the sun_times upload page with chunked JS upload to reduce RAM."""
         try:
-            html = f"""<!DOCTYPE html>
+            await self._awrite(client_socket, b"HTTP/1.1 200 OK\r\n")
+            await self._awrite(client_socket, b"Content-Type: text/html; charset=utf-8\r\n")
+            await self._awrite(client_socket, b"Connection: close\r\n\r\n")
+
+            await self._awrite(client_socket, f"""<!DOCTYPE html>
 <html>
 <head>
     <title>Upload Sun Times - {config.WEB_TITLE}</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">
     <style>
         body {{ font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }}
         .container {{ max-width: 600px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; }}
         h1 {{ color: #2c3e50; text-align: center; }}
         .form-group {{ margin: 20px 0; }}
         label {{ display: block; margin-bottom: 5px; font-weight: bold; }}
-        input[type="file"] {{ width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; }}
+        input[type=\"file\"] {{ width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; }}
         .btn {{ background: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; }}
         .btn:hover {{ background: #0056b3; }}
         .btn-secondary {{ background: #6c757d; }}
         .btn-secondary:hover {{ background: #545b62; }}
         .warning {{ background: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 4px; margin: 20px 0; }}
-        .info {{ background: #d1ecf1; border: 1px solid #bee5eb; padding: 15px; border-radius: 4px; margin: 20px 0; }}
         .footer {{ text-align: center; margin-top: 30px; }}
+        .error {{ background: #f8d7da; border: 1px solid #f5c6cb; padding: 10px; border-radius: 4px; margin: 10px 0; color: #721c24; }}
+        .ok {{ background: #d4edda; border: 1px solid #c3e6cb; padding: 10px; border-radius: 4px; margin: 10px 0; color: #155724; }}
     </style>
+    <script>
+    (function() {{
+        const CHUNK_SIZE = 1024;
+        function ge(id) {{ return document.getElementById(id); }}
+        function setStatus(t) {{ ge('status').textContent = t; }}
+        async function post(url, opts) {{
+            const r = await fetch(url, opts || {{ method: 'POST' }});
+            if (!r.ok) throw new Error(url + ' failed');
+            return r;
+        }}
+        window.addEventListener('load', function() {{
+            const form = ge('uploadForm');
+            form.addEventListener('submit', async function(e) {{
+                e.preventDefault();
+                const f = ge('sunFile').files[0];
+                if (!f) return;
+                ge('result').innerHTML = '';
+                setStatus('Starting upload...');
+                try {{
+                    await post('/upload-sun-times-begin');
+                    let off = 0;
+                    while (off < f.size) {{
+                        const chunk = f.slice(off, Math.min(off + CHUNK_SIZE, f.size));
+                        const buf = await chunk.arrayBuffer();
+                        await post('/upload-sun-times-chunk', {{ method: 'POST', headers: {{ 'Content-Type': 'application/octet-stream' }}, body: buf }});
+                        off += CHUNK_SIZE;
+                        setStatus(`Uploaded ${{Math.min(off, f.size)}} / ${{f.size}} bytes`);
+                    }}
+                    const resp = await post('/upload-sun-times-finalize');
+                    const text = await resp.text();
+                    document.open(); document.write(text); document.close();
+                }} catch (err) {{
+                    setStatus('Error: ' + err.message);
+                    ge('result').innerHTML = '<div class=\"error\">Upload failed: ' + err.message + '</div>';
+                }}
+            }});
+        }});
+    }})();
+    </script>
 </head>
 <body>
-    <div class="container">
-        <h1>Upload Sun Times Data</h1>
-        
-        <div class="info">
-            <strong>Info:</strong> Upload a new sun_times.json file to update sunrise and sunset times for your location.
-            The file should contain location data and daily sunrise/sunset times in JSON format.
-        </div>
-        
-        <div class="warning">
-            <strong>Warning:</strong> Uploading new sun times data will replace the current data and trigger a restart.
-            Make sure your JSON file is properly formatted.
-        </div>
-        
-        <form method="POST" enctype="multipart/form-data">
-            <div class="form-group">
-                <label for="sun-times-file">Select sun_times.json file:</label>
-                <input type="file" id="sun-times-file" name="sun_times" accept=".json" required>
-            </div>
-            
-            <div class="form-group">
-                <button type="submit" class="btn">Upload and Apply</button>
-                <a href="/" class="btn btn-secondary" style="text-decoration: none; margin-left: 10px;">Cancel</a>
-            </div>
-        </form>
-        
-        <div class="footer">
-            <p><a href="/upload-config">Upload Config</a> | <a href="/">Back to Home</a></p>
-        </div>
-    </div>
-</body>
-</html>"""
-            
-            response = f"HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: {len(html)}\r\nConnection: close\r\n\r\n{html}"
-            return response
-            
+<div class=\"container\">""".encode('utf-8'))
+
+            await self._awrite(client_socket, b"<h1>Upload Sun Times</h1>")
+            await self._awrite(client_socket, b"<div class=\"warning\"><strong>Note:</strong> Uploading a new sun_times.json replaces the current sunrise/sunset schedule without restarting.</div>")
+            await self._awrite(client_socket, b"<form id=\"uploadForm\">")
+            await self._awrite(client_socket, b"<div class=\"form-group\"><label for=\"sunFile\">Select sun_times.json file:</label><input type=\"file\" id=\"sunFile\" name=\"sun_times\" accept=\".json\" required></div>")
+            await self._awrite(client_socket, b"<div class=\"form-group\"><button type=\"submit\" class=\"btn\">Upload</button> <a href=\"/\" class=\"btn btn-secondary\" style=\"text-decoration: none; margin-left: 10px;\">Cancel</a></div>")
+            await self._awrite(client_socket, b"<div id=\"status\"></div><div id=\"result\"></div>")
+            await self._awrite(client_socket, b"</form>")
+            await self._awrite(client_socket, b"<div class=\"footer\"><p><a href=\"/download-sun-times\">Download Current Sun Times</a> | <a href=\"/\">Back to Home</a></p></div>")
+            await self._awrite(client_socket, b"</div></body></html>")
         except Exception as e:
-            log.error(f"[WEB] Error generating sun times upload page: {e}")
-            return self.generate_500()
+            log.error(f"[WEB] Error streaming sun times upload page: {e}")
+
+    def _tmp_sun_times_path(self):
+        return 'sun_times.json.upload'
+
+    def handle_sun_times_upload_begin(self):
+        """Begin chunked upload for sun_times.json."""
+        try:
+            try:
+                os.remove(self._tmp_sun_times_path())
+            except Exception:
+                pass
+            with open(self._tmp_sun_times_path(), 'wb') as f:
+                pass
+            return self._json_response(200, { 'ok': True })
+        except Exception as e:
+            log.error(f"[WEB] sun-begin error: {e}")
+            return self._json_response(500, { 'ok': False, 'error': 'begin failed' })
+
+    def handle_sun_times_upload_chunk(self, body_bytes, headers_text):
+        """Append a chunk to temporary sun_times upload file."""
+        try:
+            with open(self._tmp_sun_times_path(), 'ab') as f:
+                f.write(body_bytes)
+            size = os.stat(self._tmp_sun_times_path())[6]
+            return self._json_response(200, { 'ok': True, 'size': size })
+        except Exception as e:
+            log.error(f"[WEB] sun-chunk error: {e}")
+            return self._json_response(500, { 'ok': False, 'error': 'chunk failed' })
+
+    async def handle_sun_times_upload_finalize(self):
+        """Validate temp sun_times and replace file atomically."""
+        try:
+            # Read uploaded file
+            with open(self._tmp_sun_times_path(), 'r') as f:
+                uploaded_text = f.read()
+            data = json.loads(uploaded_text)
+
+            # Validate structure using existing helper
+            if not self.validate_sun_times_structure(data):
+                raise ValueError('Invalid sun_times.json structure')
+
+            # Backup current file if exists
+            try:
+                if os.stat('sun_times.json'):
+                    try:
+                        os.remove('sun_times.json.backup')
+                    except Exception:
+                        pass
+                    os.rename('sun_times.json', 'sun_times.json.backup')
+            except Exception:
+                pass
+
+            # Write to temp and replace atomically
+            try:
+                with open('sun_times.json.new', 'w') as nf:
+                    nf.write(uploaded_text)
+                try:
+                    os.remove('sun_times.json')
+                except Exception:
+                    pass
+                os.rename('sun_times.json.new', 'sun_times.json')
+                try:
+                    os.remove('sun_times.json.backup')
+                except Exception:
+                    pass
+            except Exception as e:
+                # Restore backup
+                try:
+                    os.rename('sun_times.json.backup', 'sun_times.json')
+                except Exception:
+                    pass
+                raise e
+            finally:
+                try:
+                    os.remove(self._tmp_sun_times_path())
+                except Exception:
+                    pass
+
+            # Success page (no restart needed)
+            html = """<!DOCTYPE html>
+<html><head><title>Sun Times Updated</title><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"></head>
+<body><div class=\"container\"><h1>Sun Times Updated</h1><p>sun_times.json has been updated successfully.</p><p><a href=\"/\">Back to Home</a></p></div></body></html>"""
+            body = html.encode('utf-8')
+            return (
+                "HTTP/1.1 200 OK\r\n"
+                "Content-Type: text/html; charset=utf-8\r\n"
+                f"Content-Length: {len(body)}\r\n"
+                "Connection: close\r\n\r\n"
+            ) + html
+        except Exception as e:
+            log.error(f"[WEB] sun-finalize error: {e}")
+            try:
+                os.remove(self._tmp_sun_times_path())
+            except Exception:
+                pass
+            err = f"Finalize failed: {e}"
+            html = f"""<!DOCTYPE html>
+<html><head><title>Sun Times Upload Error</title><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"></head>
+<body><div class=\"container\"><h1>Upload Failed</h1><p><strong>Error:</strong> {err}</p><p><a href=\"/upload-sun-times\">Try Again</a> | <a href=\"/\">Home</a></p></div></body></html>"""
+            body = html.encode('utf-8')
+            return (
+                "HTTP/1.1 400 Bad Request\r\n"
+                "Content-Type: text/html; charset=utf-8\r\n"
+                f"Content-Length: {len(body)}\r\n"
+                "Connection: close\r\n\r\n"
+            ) + html
     
     async def handle_sun_times_upload(self, request_str):
         """Handle sun_times.json file upload and validation."""
