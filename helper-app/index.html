@@ -18,9 +18,15 @@
       .footer { text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; }
       .footer a { color: #007bff; text-decoration: none; }
       .footer a:hover { text-decoration: underline; }
-      .footer-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px 16px; align-items: start; padding: 0; margin: 8px 0 0 0; }
+      .footer-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 16px; align-items: start; padding: 0; margin: 8px 0 0 0; }
       .footer-grid .col { display: flex; flex-direction: column; gap: 6px; }
       .footer .col-title { font-size: 12px; color: #555; text-transform: uppercase; letter-spacing: 0.03em; }
+      .actions { display: flex; gap: 12px; flex-wrap: wrap; }
+      a.button { padding: 10px 14px; border: 1px solid #999; border-radius: 8px; background: #fff; text-decoration: none; color: #222; display:inline-flex; align-items:center; gap:6px; box-shadow: 0 1px 2px rgba(0,0,0,0.06); transition: box-shadow 0.15s ease, background-color 0.15s ease, border-color 0.15s ease; }
+      a.button:hover { background: #f9fafb; border-color: #666; box-shadow: 0 2px 6px rgba(0,0,0,0.12); text-decoration: none; }
+      a.button:active { transform: translateY(0.5px); }
+      a.button:focus { outline: none; }
+      a.button:focus-visible { box-shadow: 0 0 0 3px rgba(59,130,246,0.35); }
       @media (max-width: 480px) { .container { padding: 12px; } }
     </style>
   </head>
@@ -29,27 +35,22 @@
       <h1>PagodaLightPico Helper</h1>
 
       <h2>Tools</h2>
-      <ul>
-        <li><a href="./config-builder.html">⚙️ Create config.json</a></li>
-        <li><a href="./sun-times-builder.html">🌅 Create sun_times.json</a></li>
-      </ul>
+      <div class="actions">
+        <a class="button" href="./config-builder.html">⚙️ Create config.json</a>
+        <a class="button" href="./sun-times-builder.html">🌅 Create sun_times.json</a>
+      </div>
 
       <h2>Downloads</h2>
-      <ul>
-        <li><a href="/PagodaLightPico/config.json.sample" download>⬇️ config.json.sample</a></li>
-        <li><a href="/PagodaLightPico/sun_times.json.sample" download>⬇️ sun_times.json.sample</a></li>
-      </ul>
+      <div class="actions">
+        <a class="button" href="/PagodaLightPico/config.json.sample" download>⬇️ config.json.sample</a>
+        <a class="button" href="/PagodaLightPico/sun_times.json.sample" download>⬇️ sun_times.json.sample</a>
+      </div>
 
       <div class="footer">
         <div class="footer-grid">
           <div class="col">
             <span class="col-title">Project</span>
             <a href="https://github.com/m-anish/PagodaLightPico" target="_blank" rel="noopener">Repository</a>
-          </div>
-          <div class="col">
-            <span class="col-title">Samples</span>
-            <a href="/PagodaLightPico/config.json.sample" download>config.json.sample</a>
-            <a href="/PagodaLightPico/sun_times.json.sample" download>sun_times.json.sample</a>
           </div>
           <div class="col">
             <span class="col-title">About</span>
