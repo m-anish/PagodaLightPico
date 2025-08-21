@@ -124,6 +124,7 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/suncalc@1.9.0/suncalc.min.js"></script>
+  <script src="./vendor/tz-lookup.min.js"></script>
   <script>
     const days = {};
     let SAMPLE_VERSION = null;
@@ -151,41 +152,7 @@
     function validateKey(key){ return /^\d{2}-\d{2}$/.test(key); }
     function validateTime(t){ return /^\d{2}:\d{2}$/.test(t); }
 
-    // --- Dynamic loader & guards for spacetime ---
-    function loadScript(src){
-      return new Promise((resolve, reject) => {
-        const s = document.createElement('script');
-        s.src = src; s.onload = resolve; s.onerror = reject; document.head.appendChild(s);
-      });
-    }
-    let spacetimeLoading = null;
-    async function ensureSpacetime(){
-      if (typeof spacetime !== 'undefined' && spacetime) return true;
-      if (spacetimeLoading) { try { await spacetimeLoading; } catch {} return typeof spacetime !== 'undefined'; }
-      spacetimeLoading = (async () => {
-        const candidates = [
-          // Local vendored copy (preferred)
-          './vendor/spacetime.min.js',
-          'https://cdn.jsdelivr.net/npm/spacetime@7.5.1/builds/spacetime.min.js',
-          'https://unpkg.com/spacetime@7.5.1/builds/spacetime.min.js',
-          'https://cdnjs.cloudflare.com/ajax/libs/spacetime/7.5.1/spacetime.min.js'
-        ];
-        for (const url of candidates){ try { await loadScript(url); if (typeof spacetime !== 'undefined') break; } catch {}
-        }
-        if (typeof spacetime !== 'undefined'){
-          // load plugin
-          const geoCandidates = [
-            './vendor/spacetime-geo.min.js',
-            'https://cdn.jsdelivr.net/npm/spacetime-geo@0.1.2/spacetime-geo.min.js',
-            'https://unpkg.com/spacetime-geo@0.1.2/spacetime-geo.min.js',
-            'https://cdnjs.cloudflare.com/ajax/libs/spacetime-geo/0.1.2/spacetime-geo.min.js'
-          ];
-          for (const url of geoCandidates){ try { await loadScript(url); if (spacetime.where) break; } catch {} }
-        }
-      })();
-      try { await spacetimeLoading; } catch {}
-      return typeof spacetime !== 'undefined';
-    }
+    // Removed spacetime dynamic loader; using tz-lookup for timezone and Intl for generation
 
     function renderDays(){
       const tb = document.querySelector('#daysTable tbody');
@@ -288,12 +255,9 @@
       const lon = parseFloat(document.getElementById('lon').value);
       if (isNaN(lat) || isNaN(lon)) return;
       try {
-        const ok = await ensureSpacetime();
-        if (ok && spacetime && spacetime.where) {
-          const info = spacetime.where(lat, lon);
-          if (info && info.timezone && info.timezone.name) {
-            document.getElementById('tz').value = canonicalizeTimeZone(info.timezone.name);
-          }
+        if (typeof tzlookup === 'function'){
+          const tz = tzlookup(lat, lon);
+          if (tz) document.getElementById('tz').value = canonicalizeTimeZone(tz);
         }
       } catch {}
     }
@@ -362,22 +326,7 @@
     }
 
     function generateDatesLocal(year, freq, tz){
-      if (typeof spacetime !== 'undefined' && spacetime){
-        const out = [];
-        let s = spacetime(`${year}-01-01`, tz).startOf('day');
-        const end = s.endOf('year');
-        if (freq === 'daily') {
-          while (s.year() === year) { out.push(s.clone()); s = s.add(1, 'day'); }
-        } else if (freq === 'weekly') {
-          while (s.isBefore(end)) { if (s.dayName() === 'Monday') out.push(s.clone()); s = s.add(1, 'day'); }
-        } else if (freq === 'fortnightly') {
-          for (let m=0;m<12;m++){ out.push(spacetime({year, month:m, date:1}, tz)); out.push(spacetime({year, month:m, date:15}, tz)); }
-        } else { // monthly
-          for (let m=0;m<12;m++){ out.push(spacetime({year, month:m, date:1}, tz)); }
-        }
-        return out;
-      }
-      // Fallback using Intl + UTC dates
+      // Use Intl-based fallback only
       return generateDatesLocalFallback(year, freq, tz);
     }
 
@@ -388,18 +337,12 @@
       const tz = canonicalizeTimeZone(document.getElementById('tz').value.trim() || 'UTC');
       const year = parseInt(document.getElementById('year').value || new Date().getFullYear(), 10);
       if (isNaN(lat) || isNaN(lon)) { alert('Please choose a valid place (lat/lon).'); return; }
-      // Try to load spacetime but proceed even if it fails (fallback path)
-      try { await ensureSpacetime(); } catch {}
       daysClear();
       const dates = generateDatesLocal(year, document.getElementById('freq').value, tz);
       dates.forEach(s => {
-        const native = (typeof s.clone === 'function')
-          ? s.clone().hour(12).minute(0).second(0).millisecond(0).toNativeDate()
-          : new Date(s.date.getTime()); // UTC date; SunCalc works with Date regardless of tz
+        const native = new Date(s.date.getTime()); // UTC date; SunCalc works with Date regardless of tz
         const times = SunCalc.getTimes(native, lat, lon);
-        const lp = (typeof s.month === 'function')
-          ? { m: s.month()+1, d: s.date() }
-          : localParts(native, tz);
+        const lp = localParts(native, tz);
         const mmdd = `${pad2(lp.m)}-${pad2(lp.d)}`;
         days[mmdd] = { rise: formatHM(times.sunrise, tz), set: formatHM(times.sunset, tz) };
       });
