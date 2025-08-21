@@ -15,40 +15,20 @@
       .online { background: #d4edda; border-left: 4px solid #28a745; }
       .offline { background: #f8d7da; border-left: 4px solid #dc3545; }
       .disabled { background: #fff3cd; border-left: 4px solid #ffc107; }
-      .time { font-size: 24px; text-align: center; margin: 20px 0; color: #2c3e50; }
       .footer { text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; }
       .footer a { color: #007bff; text-decoration: none; }
       .footer a:hover { text-decoration: underline; }
-      .footer-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px 16px; align-items: start; padding: 0; margin: 8px 0 0 0; }
+      .footer-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px 16px; align-items: start; padding: 0; margin: 8px 0 0 0; }
       .footer-grid .col { display: flex; flex-direction: column; gap: 6px; }
       .footer .col-title { font-size: 12px; color: #555; text-transform: uppercase; letter-spacing: 0.03em; }
-      .version { background: #e9ecef; border-left: 4px solid #6c757d; }
-      .location { background: #e7f3ff; border-left: 4px solid #0d6efd; }
       @media (max-width: 480px) { .container { padding: 12px; } }
     </style>
-    <script>
-      function startClock() {
-        const timeEl = document.getElementById('time');
-        function pad(n){return (n<10?'0':'')+n}
-        function tick(){
-          const d = new Date();
-          timeEl.textContent = pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds());
-        }
-        tick(); setInterval(tick,1000);
-      }
-      window.addEventListener('DOMContentLoaded', startClock);
-    </script>
   </head>
   <body>
     <div class="container">
       <h1>PagodaLightPico Helper</h1>
-      <div class="time">🕒 <span id="time">--:--:--</span></div>
-
-      <div class="status version"><strong>🏷️ Config:</strong> Sample files and utilities</div>
-      <div class="status location"><strong>📍 Hosted:</strong> GitHub Pages</div>
 
       <h2>Tools</h2>
-      <p>This helper site mirrors the look-and-feel of the Pico web interface. Extend it with config validators, MQTT tests, and PWM viewers.</p>
       <ul>
         <li><a href="./config-builder.html">⚙️ Create config.json</a></li>
         <li><a href="./sun-times-builder.html">🌅 Create sun_times.json</a></li>
@@ -65,10 +45,6 @@
           <div class="col">
             <span class="col-title">Project</span>
             <a href="https://github.com/m-anish/PagodaLightPico" target="_blank" rel="noopener">Repository</a>
-          </div>
-          <div class="col">
-            <span class="col-title">Device</span>
-            <span>Styling aligned with device UI</span>
           </div>
           <div class="col">
             <span class="col-title">Samples</span>
