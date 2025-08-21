@@ -345,6 +345,41 @@
       fill(document.getElementById('rtc_scl'), (document.getElementById('rtc_scl').value || 21));
     }
 
+    // Helpers to read RTC pins and compute cross-pin validation
+    function readRTC(){
+      const sdaEl = document.getElementById('rtc_sda');
+      const sclEl = document.getElementById('rtc_scl');
+      const sda = parseInt(sdaEl && sdaEl.value || '20');
+      const scl = parseInt(sclEl && sclEl.value || '21');
+      return { sda, scl };
+    }
+
+    function computeGPIOValidation(){
+      const errs = [];
+      const { sda, scl } = readRTC();
+      // Basic validity
+      if (!GOOD_GPIO.includes(sda)) errs.push(`RTC SDA (${sda}) is not a valid GPIO`);
+      if (!GOOD_GPIO.includes(scl)) errs.push(`RTC SCL (${scl}) is not a valid GPIO`);
+
+      // Build usage map
+      const usage = new Map();
+      const addUse = (pin, role) => {
+        if (!Number.isFinite(pin)) return;
+        if (!usage.has(pin)) usage.set(pin, []);
+        usage.get(pin).push(role);
+      };
+      addUse(sda, 'RTC SDA');
+      addUse(scl, 'RTC SCL');
+      pins.forEach((p, idx) => addUse(p.gpio_pin, `PWM pin ${idx+1}`));
+
+      // Detect clashes (same GPIO used by multiple roles)
+      usage.forEach((roles, pin) => {
+        if (roles.length > 1) errs.push(`GPIO ${pin} is used by: ${roles.join(', ')}`);
+      });
+
+      return errs;
+    }
+
     function gpioSelect(current){
       const opts = Array.from({length:23}, (_,i)=>`<option value="${i}" ${i===current? 'selected':''}>${i}</option>`).join('');
       return `<select data-type="gpio">${opts}</select>`;
@@ -517,39 +552,8 @@
       return { ok: true, msg: 'Windows cover 24h continuously' };
     }
 
-    // Aggregate window validation across all pins and reflect near the Download button
-    function updateGlobalValidation(){
-      const errs = [];
-      pins.forEach((p) => {
-        const vd = computePinValidation(p);
-        if (!vd.ok) errs.push(`GPIO ${p.gpio_pin}: ${vd.msg}`);
-      });
-
-      const out = document.getElementById('global_validation');
-      const btn = document.getElementById('download_btn');
-
-      if (out){
-        if (errs.length){
-          out.innerHTML = errs.map(e=>`❌ ${e}`).join('<br>');
-          out.style.color = '#b91c1c';
-        } else {
-          out.textContent = '';
-          out.style.color = '';
-        }
-      }
-
-      if (btn){
-        if (errs.length){
-          btn.setAttribute('disabled','');
-          btn.style.opacity = '0.5';
-          btn.style.cursor = 'not-allowed';
-        } else {
-          btn.removeAttribute('disabled');
-          btn.style.opacity = '';
-          btn.style.cursor = '';
-        }
-      }
-    }
+    // (deprecated) earlier global validation kept for context; superseded by enhanced version below
+    function updateGlobalValidation_old(){ /* superseded by enhanced version */ }
 
     function windowsFromObject(time_windows){
       if (!time_windows || typeof time_windows !== 'object') return [ newWindow() ];
@@ -581,7 +585,7 @@
 
     async function loadSamplePins(){
       try {
-        const resp = await fetch('./config.json.sample', { cache: 'no-store' });
+        const resp = await fetch('../config.json.sample', { cache: 'no-store' });
         if (!resp.ok) throw new Error('fetch failed');
         const sample = await resp.json();
         const pwm = sample && sample.pwm_pins || {};
@@ -669,7 +673,8 @@
     function render(){
       const cfg = buildConfig();
       document.getElementById('preview').textContent = JSON.stringify(cfg, null, 2);
-      updateGlobalValidation();
+      // Update global validation (window continuity + GPIO clashes)
+      if (typeof updateGlobalValidation === 'function') updateGlobalValidation();
     }
 
     function downloadJSON(){
@@ -693,11 +698,43 @@
 
     async function fetchSampleVersion(){
       try {
-        const resp = await fetch('./config.json.sample', { cache: 'no-store' });
+        const resp = await fetch('../config.json.sample', { cache: 'no-store' });
         if (!resp.ok) return;
         const sample = await resp.json();
         sampleMajorMinor = majorMinor(sample.version || '');
       } catch {}
+    }
+
+    // Aggregate validation and reflect near the Download button
+    function updateGlobalValidation(){
+      const errs = [];
+      // Per-pin window validations
+      pins.forEach((p) => { const vd = computePinValidation(p); if (!vd.ok) errs.push(`GPIO ${p.gpio_pin}: ${vd.msg}`); });
+      // Cross-pin GPIO clashes
+      errs.push(...computeGPIOValidation());
+
+      const out = document.getElementById('global_validation');
+      const btn = document.getElementById('download_btn');
+      if (out){
+        if (errs.length){
+          out.innerHTML = errs.map(e=>`❌ ${e}`).join('<br>');
+          out.style.color = '#b91c1c';
+        } else {
+          out.textContent = '';
+          out.style.color = '';
+        }
+      }
+      if (btn){
+        if (errs.length){
+          btn.setAttribute('disabled','');
+          btn.style.opacity = '0.5';
+          btn.style.cursor = 'not-allowed';
+        } else {
+          btn.removeAttribute('disabled');
+          btn.style.opacity = '';
+          btn.style.cursor = '';
+        }
+      }
     }
 
     function setMsg(html, isError){
