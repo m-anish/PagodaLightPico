@@ -1,3 +1,23 @@
+    // Canonicalize time zone to a supported IANA name used by Intl
+    function canonicalizeTimeZone(tz){
+      if (!tz) return tz;
+      const aliasMap = {
+        'Asia/Calcutta': 'Asia/Kolkata',
+        'Asia/Bombay': 'Asia/Kolkata',
+        'Europe/Kiev': 'Europe/Kyiv',
+        'Asia/Rangoon': 'Asia/Yangon'
+      };
+      let zones = [];
+      if (typeof Intl !== 'undefined' && Intl.supportedValuesOf) {
+        try { zones = Intl.supportedValuesOf('timeZone'); } catch {}
+      }
+      const isSupported = (z) => zones && zones.length ? zones.includes(z) : true;
+      if (isSupported(tz)) return tz;
+      const mapped = aliasMap[tz];
+      if (mapped && isSupported(mapped)) return mapped;
+      return tz; // fallback
+    }
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -244,7 +264,7 @@
         if (ok && spacetime && spacetime.where) {
           const info = spacetime.where(lat, lon);
           if (info && info.timezone && info.timezone.name) {
-            document.getElementById('tz').value = info.timezone.name;
+            document.getElementById('tz').value = canonicalizeTimeZone(info.timezone.name);
           }
         }
       } catch {}
@@ -296,7 +316,7 @@
       const loc = document.getElementById('location').value.trim() || 'Unknown';
       const lat = parseFloat(document.getElementById('lat').value);
       const lon = parseFloat(document.getElementById('lon').value);
-      const tz = document.getElementById('tz').value.trim() || 'UTC';
+      const tz = canonicalizeTimeZone(document.getElementById('tz').value.trim() || 'UTC');
       const year = parseInt(document.getElementById('year').value || new Date().getFullYear(), 10);
       if (isNaN(lat) || isNaN(lon)) { alert('Please choose a valid place (lat/lon).'); return; }
       const ok = await ensureSpacetime();
