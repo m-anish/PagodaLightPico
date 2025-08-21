@@ -581,6 +581,135 @@
       URL.revokeObjectURL(a.href);
     }
 
+    // --- Upload + Prefill helpers ---
+    let sampleMajorMinor = null;
+
+    function majorMinor(v){
+      if (!v || typeof v !== 'string') return null;
+      const parts = v.split('.');
+      if (parts.length < 2) return null;
+      return `${parts[0]}.${parts[1]}`;
+    }
+
+    async function fetchSampleVersion(){
+      try {
+        const resp = await fetch('./config.json.sample', { cache: 'no-store' });
+        if (!resp.ok) return;
+        const sample = await resp.json();
+        sampleMajorMinor = majorMinor(sample.version || '');
+      } catch {}
+    }
+
+    function setMsg(html, isError){
+      const el = document.getElementById('upload_msg');
+      if (!el) return;
+      el.innerHTML = html || '';
+      el.style.color = isError ? '#b91c1c' : '#374151';
+    }
+
+    function applyConfigToForm(cfg){
+      try {
+        if (cfg.version) document.getElementById('version').value = cfg.version;
+        if (cfg.hostname) document.getElementById('hostname').value = cfg.hostname;
+
+        if (cfg.wifi){
+          if (cfg.wifi.ssid !== undefined) document.getElementById('ssid').value = cfg.wifi.ssid;
+          if (cfg.wifi.password !== undefined) document.getElementById('password').value = cfg.wifi.password;
+        }
+
+        if (cfg.timezone){
+          if (cfg.timezone.name !== undefined) document.getElementById('tz_name').value = cfg.timezone.name;
+          if (cfg.timezone.offset !== undefined) document.getElementById('tz_offset').value = String(cfg.timezone.offset);
+          const sel = document.getElementById('tz_select');
+          if (sel){
+            const idx = Array.from(sel.options).findIndex(o => o.value === (cfg.timezone.name||''));
+            if (idx >= 0) sel.selectedIndex = idx;
+          }
+        }
+
+        if (cfg.hardware){
+          if (cfg.hardware.rtc_sda !== undefined) document.getElementById('rtc_sda').value = cfg.hardware.rtc_sda;
+          if (cfg.hardware.rtc_i2c_sda_pin !== undefined) document.getElementById('rtc_sda').value = cfg.hardware.rtc_i2c_sda_pin;
+          if (cfg.hardware.rtc_scl !== undefined) document.getElementById('rtc_scl').value = cfg.hardware.rtc_scl;
+          if (cfg.hardware.rtc_i2c_scl_pin !== undefined) document.getElementById('rtc_scl').value = cfg.hardware.rtc_i2c_scl_pin;
+          if (cfg.hardware.pwm_freq !== undefined) document.getElementById('pwm_freq').value = cfg.hardware.pwm_freq;
+          if (cfg.hardware.pwm_frequency !== undefined) document.getElementById('pwm_freq').value = cfg.hardware.pwm_frequency;
+        }
+
+        if (cfg.system){
+          if (cfg.system.log_level) document.getElementById('log_level').value = cfg.system.log_level;
+          if (cfg.system.update_interval !== undefined) document.getElementById('update_interval').value = cfg.system.update_interval;
+          if (cfg.system.server_idle_sleep_ms !== undefined) document.getElementById('server_idle_sleep_ms').value = cfg.system.server_idle_sleep_ms;
+          if (cfg.system.client_read_sleep_ms !== undefined) document.getElementById('client_read_sleep_ms').value = cfg.system.client_read_sleep_ms;
+          if (cfg.system.network_check_interval !== undefined) document.getElementById('network_check_interval').value = cfg.system.network_check_interval;
+          if (cfg.system.ram_telemetry_enabled !== undefined) document.getElementById('ram_telemetry_enabled').value = String(!!cfg.system.ram_telemetry_enabled);
+          if (cfg.system.ram_telemetry_interval !== undefined) document.getElementById('ram_telemetry_interval').value = cfg.system.ram_telemetry_interval;
+          if (cfg.system.web_title) document.getElementById('web_title').value = cfg.system.web_title;
+        }
+
+        if (cfg.notifications){
+          if (cfg.notifications.enabled !== undefined) document.getElementById('notif_enabled').value = String(!!cfg.notifications.enabled);
+          if (cfg.notifications.broker !== undefined) document.getElementById('mqtt_broker').value = cfg.notifications.broker;
+          if (cfg.notifications.mqtt_broker !== undefined) document.getElementById('mqtt_broker').value = cfg.notifications.mqtt_broker;
+          if (cfg.notifications.port !== undefined) document.getElementById('mqtt_port').value = cfg.notifications.port;
+          if (cfg.notifications.mqtt_port !== undefined) document.getElementById('mqtt_port').value = cfg.notifications.mqtt_port;
+          if (cfg.notifications.username !== undefined) document.getElementById('mqtt_username').value = cfg.notifications.username;
+          if (cfg.notifications.password !== undefined) document.getElementById('mqtt_password').value = cfg.notifications.password;
+          if (cfg.notifications.topic !== undefined) document.getElementById('mqtt_topic').value = cfg.notifications.topic;
+          if (cfg.notifications.mqtt_topic !== undefined) document.getElementById('mqtt_topic').value = cfg.notifications.mqtt_topic;
+          if (cfg.notifications.client_id !== undefined) document.getElementById('mqtt_client_id').value = cfg.notifications.client_id;
+          if (cfg.notifications.mqtt_client_id !== undefined) document.getElementById('mqtt_client_id').value = cfg.notifications.mqtt_client_id;
+          if (cfg.notifications.notify_window !== undefined) document.getElementById('notify_window').value = String(!!cfg.notifications.notify_window);
+          if (cfg.notifications.notify_on_window_change !== undefined) document.getElementById('notify_window').value = String(!!cfg.notifications.notify_on_window_change);
+          if (cfg.notifications.notify_errors !== undefined) document.getElementById('notify_errors').value = String(!!cfg.notifications.notify_errors);
+          if (cfg.notifications.notify_on_errors !== undefined) document.getElementById('notify_errors').value = String(!!cfg.notifications.notify_on_errors);
+        }
+
+        if (cfg.pwm_pins && typeof cfg.pwm_pins === 'object'){
+          const list = Object.values(cfg.pwm_pins)
+            .filter(x => x && typeof x === 'object')
+            .map(x => ({
+              gpio_pin: parseInt(x.gpio_pin),
+              name: (x.name || `Pin ${x.gpio_pin}`),
+              enabled: !!x.enabled,
+              windows: windowsFromObject(x.time_windows || {})
+            }))
+            .filter(x => !isNaN(x.gpio_pin));
+          list.sort((a,b)=>a.gpio_pin-b.gpio_pin);
+          pins.splice(0, pins.length, ...list.slice(0, MAX_PINS));
+          renderPinsUI();
+        }
+
+        render();
+        setMsg('Prefilled from uploaded file.');
+      } catch (e) {
+        setMsg('Failed to apply uploaded config.', true);
+      }
+    }
+
+    function setupUpload(){
+      const inp = document.getElementById('upload_config');
+      if (!inp) return;
+      inp.addEventListener('change', async (ev) => {
+        const f = ev.target.files && ev.target.files[0];
+        if (!f) return;
+        try {
+          const text = await f.text();
+          const cfg = JSON.parse(text);
+          const upMM = majorMinor(cfg.version || '');
+          if (sampleMajorMinor && upMM && sampleMajorMinor !== upMM){
+            setMsg(`Version mismatch: expected ${sampleMajorMinor}.x but got ${cfg.version}. Upload aborted.`, true);
+            return;
+          }
+          applyConfigToForm(cfg);
+        } catch (e) {
+          setMsg('Invalid JSON file.', true);
+        } finally {
+          ev.target.value = '';
+        }
+      });
+    }
+
     // initialize from sample, fallback to one default pin
     (async function init(){
       await fetchSampleVersion();
