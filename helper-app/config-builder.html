@@ -39,6 +39,10 @@
     .sub-toggle { border:none; background:none; cursor:pointer; font-size:12px; padding:0 4px; }
     .window-block.collapsed > .window-body { display:none; }
     .pin-card .gpio-body.collapsed { display:none; }
+    /* validation */
+    .validation { margin-top:6px; font-size:12px; }
+    .validation.ok { color:#065f46; }
+    .validation.err { color:#b91c1c; }
     /* password reveal */
     .password-wrapper { position: relative; }
     .reveal-btn { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: transparent; border: none; cursor: pointer; font-size: 14px; }
@@ -378,6 +382,7 @@
             </div>
             <div class="tip">Windows (min ${MIN_WINDOWS}, max ${MAX_WINDOWS}). Note: device requires at least a 'day' window and 2–5 windows when the pin is enabled.</div>
             <div class="windows"></div>
+            <div class="validation" data-role="validation"></div>
           </div>
         `;
 
@@ -430,6 +435,10 @@
               }
             }
             if (t === 'duty') { let v = parseInt(e.target.value||'0'); if (isNaN(v)) v=0; v=Math.max(0,Math.min(100,v)); w.duty_cycle = v; const span = block.querySelector('span[data-type="duty-val"]'); if (span) span.textContent = v; }
+            // Update validation for this pin without full re-render
+            const vd = computePinValidation(p);
+            const vEl = card.querySelector('[data-role="validation"]');
+            if (vEl) { vEl.textContent = vd.msg; vEl.className = `validation ${vd.ok ? 'ok' : 'err'}`; }
             render();
           });
           block.addEventListener('click', (e) => {
@@ -462,12 +471,35 @@
           }
         });
 
+        // Set initial validation message for this pin
+        const vd = computePinValidation(p);
+        const vEl = card.querySelector('[data-role="validation"]');
+        if (vEl) { vEl.textContent = vd.msg; vEl.className = `validation ${vd.ok ? 'ok' : 'err'}`; }
         container.appendChild(card);
       });
     }
 
     function validateTimeString(s){
       return s === 'sunrise' || s === 'sunset' || /^\d{2}:\d{2}$/.test(s);
+    }
+
+    // Compute continuity + wrap-around validation for a pin's windows
+    function computePinValidation(p){
+      const wins = (p && p.windows) ? p.windows : [];
+      if (!wins.length) return { ok: false, msg: 'No windows configured' };
+      for (let i=0; i<wins.length-1; i++){
+        const endPrev = String(wins[i].end||'').trim();
+        const startNext = String(wins[i+1].start||'').trim();
+        if (endPrev !== startNext){
+          return { ok: false, msg: `Window ${i+1} end must equal Window ${i+2} start` };
+        }
+      }
+      const firstStart = String(wins[0].start||'').trim();
+      const lastEnd = String(wins[wins.length-1].end||'').trim();
+      if (firstStart !== lastEnd){
+        return { ok: false, msg: `First start (${firstStart}) must equal last end (${lastEnd}) for 24h coverage` };
+      }
+      return { ok: true, msg: 'Windows cover 24h continuously' };
     }
 
     function windowsFromObject(time_windows){
