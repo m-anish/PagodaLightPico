@@ -26,10 +26,19 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Upload helper app artifact
+      - name: Prepare Pages content
+        run: |
+          set -e
+          mkdir -p site
+          cp -R helper-app/* site/
+          # Copy sample JSON files to be accessible at site root
+          if [ -f config.json.sample ]; then cp -v config.json.sample site/; fi
+          if [ -f sun_times.json.sample ]; then cp -v sun_times.json.sample site/; fi
+
+      - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: helper-app
+          path: site
 
   deploy:
     environment:
