@@ -906,18 +906,14 @@ class AsyncWebServer:
     </div>
 </body>
 </html>"""
-                
-                # Schedule soft reboot after response is sent
-                asyncio.create_task(self.soft_reboot_delayed())
-                
-                body = html.encode('utf-8')
-                response = (
-                    "HTTP/1.1 200 OK\r\n"
-                    "Content-Type: text/html; charset=utf-8\r\n"
-                    f"Content-Length: {len(body)}\r\n"
-                    "Connection: close\r\n\r\n"
-                ) + html
-                return response
+            body = html.encode('utf-8')
+            response = (
+                "HTTP/1.1 200 OK\r\n"
+                "Content-Type: text/html; charset=utf-8\r\n"
+                f"Content-Length: {len(body)}\r\n"
+                "Connection: close\r\n\r\n"
+            ) + html
+            return response
         except Exception as e:
             log.error(f"[WEB] Error generating restart page: {e}")
             return self.generate_500()
@@ -1268,7 +1264,6 @@ class AsyncWebServer:
         """Handle config file upload and validation."""
         try:
             # Parse multipart form data (simplified and robust)
-{{ ... }}
             lines = request_str.split('\r\n')
 
             # Find boundary from headers
