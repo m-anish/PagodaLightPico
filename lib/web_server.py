@@ -419,7 +419,7 @@ class AsyncWebServer:
                 let secondsLeft = 180;
                 function setText() {{
                     const el = document.getElementById('refresh-countdown');
-                    if (el) {{ el.textContent = `Next refresh in ${secondsLeft} seconds`; return true; }}
+                    if (el) {{ el.textContent = `Next refresh in ${{secondsLeft}} seconds`; return true; }}
                     return false;
                 }}
                 // Initial text; if element isn't in DOM yet (streaming), retry until it appears
@@ -1123,7 +1123,7 @@ class AsyncWebServer:
                     }});
                     if (!resp.ok) throw new Error('Chunk upload failed at offset ' + offset);
                     offset += CHUNK_SIZE;
-                    setStatus(`Uploaded ${Math.min(offset, file.size)} / ${file.size} bytes`);
+                    setStatus(`Uploaded ${{Math.min(offset, file.size)}} / ${{file.size}} bytes`);
                     setProgress(Math.min(offset, file.size), file.size);
                 }}
 
