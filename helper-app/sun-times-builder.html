@@ -1,3 +1,23 @@
+    // Canonicalize time zone to a supported IANA name used by Intl
+    function canonicalizeTimeZone(tz){
+      if (!tz) return tz;
+      const aliasMap = {
+        'Asia/Calcutta': 'Asia/Kolkata',
+        'Asia/Bombay': 'Asia/Kolkata',
+        'Europe/Kiev': 'Europe/Kyiv',
+        'Asia/Rangoon': 'Asia/Yangon'
+      };
+      let zones = [];
+      if (typeof Intl !== 'undefined' && Intl.supportedValuesOf) {
+        try { zones = Intl.supportedValuesOf('timeZone'); } catch {}
+      }
+      const isSupported = (z) => zones && zones.length ? zones.includes(z) : true;
+      if (isSupported(tz)) return tz;
+      const mapped = aliasMap[tz];
+      if (mapped && isSupported(mapped)) return mapped;
+      return tz; // fallback
+    }
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -120,6 +140,37 @@
     function validateKey(key){ return /^\d{2}-\d{2}$/.test(key); }
     function validateTime(t){ return /^\d{2}:\d{2}$/.test(t); }
 
+    // --- Dynamic loader & guards for spacetime ---
+    function loadScript(src){
+      return new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = src; s.onload = resolve; s.onerror = reject; document.head.appendChild(s);
+      });
+    }
+    let spacetimeLoading = null;
+    async function ensureSpacetime(){
+      if (typeof spacetime !== 'undefined' && spacetime) return true;
+      if (spacetimeLoading) { try { await spacetimeLoading; } catch {} return typeof spacetime !== 'undefined'; }
+      spacetimeLoading = (async () => {
+        const candidates = [
+          'https://cdn.jsdelivr.net/npm/spacetime@7.5.1/builds/spacetime.min.js',
+          'https://unpkg.com/spacetime@7.5.1/builds/spacetime.min.js'
+        ];
+        for (const url of candidates){ try { await loadScript(url); if (typeof spacetime !== 'undefined') break; } catch {}
+        }
+        if (typeof spacetime !== 'undefined'){
+          // load plugin
+          const geoCandidates = [
+            'https://cdn.jsdelivr.net/npm/spacetime-geo@0.1.2/spacetime-geo.min.js',
+            'https://unpkg.com/spacetime-geo@0.1.2/spacetime-geo.min.js'
+          ];
+          for (const url of geoCandidates){ try { await loadScript(url); if (spacetime.where) break; } catch {} }
+        }
+      })();
+      try { await spacetimeLoading; } catch {}
+      return typeof spacetime !== 'undefined';
+    }
+
     function renderDays(){
       const tb = document.querySelector('#daysTable tbody');
       tb.innerHTML = '';
@@ -204,15 +255,16 @@
       }, 250);
     });
 
-    function autoFillTimezone(){
+    async function autoFillTimezone(){
       const lat = parseFloat(document.getElementById('lat').value);
       const lon = parseFloat(document.getElementById('lon').value);
       if (isNaN(lat) || isNaN(lon)) return;
       try {
-        if (typeof spacetime !== 'undefined' && spacetime && spacetime.where) {
+        const ok = await ensureSpacetime();
+        if (ok && spacetime && spacetime.where) {
           const info = spacetime.where(lat, lon);
           if (info && info.timezone && info.timezone.name) {
-            document.getElementById('tz').value = info.timezone.name;
+            document.getElementById('tz').value = canonicalizeTimeZone(info.timezone.name);
           }
         }
       } catch {}
@@ -264,9 +316,11 @@
       const loc = document.getElementById('location').value.trim() || 'Unknown';
       const lat = parseFloat(document.getElementById('lat').value);
       const lon = parseFloat(document.getElementById('lon').value);
-      const tz = document.getElementById('tz').value.trim() || 'UTC';
+      const tz = canonicalizeTimeZone(document.getElementById('tz').value.trim() || 'UTC');
       const year = parseInt(document.getElementById('year').value || new Date().getFullYear(), 10);
       if (isNaN(lat) || isNaN(lon)) { alert('Please choose a valid place (lat/lon).'); return; }
+      const ok = await ensureSpacetime();
+      if (!ok) { alert('Timezone engine failed to load. Check your network and try again.'); return; }
       daysClear();
       const dates = generateDatesLocal(year, document.getElementById('freq').value, tz);
       dates.forEach(s => {
