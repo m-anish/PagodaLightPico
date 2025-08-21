@@ -189,8 +189,9 @@ class AsyncWebServer:
                 response = await self.handle_config_upload_finalize(request_str)
             elif path == '/upload-config':
                 if method == 'GET':
-                    # Serve chunked-upload page
-                    response = self.generate_upload_page_chunked()
+                    # Stream the chunked-upload page to minimize memory usage
+                    await self.stream_upload_page_chunked(client_socket)
+                    response = None
                 elif method == 'POST':
                     response = await self.handle_config_upload(request_str)
                 else:
@@ -778,6 +779,93 @@ class AsyncWebServer:
             await self._awrite(client_socket, b"</div></body></html>")
         except Exception as e:
             log.error(f"[WEB] Error streaming main page: {e}")
+    
+    async def stream_upload_page_chunked(self, client_socket):
+        """Stream the config upload page (chunked upload JS) to minimize RAM usage."""
+        try:
+            # Send headers without Content-Length
+            await self._awrite(client_socket, b"HTTP/1.1 200 OK\r\n")
+            await self._awrite(client_socket, b"Content-Type: text/html; charset=utf-8\r\n")
+            await self._awrite(client_socket, b"Connection: close\r\n\r\n")
+
+            # Head start
+            await self._awrite(client_socket, f"""<!DOCTYPE html>
+<html>
+<head>
+    <title>Upload Config - {config.WEB_TITLE}</title>
+    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">
+    <style>
+        body {{ font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }}
+        .container {{ max-width: 600px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; }}
+        h1 {{ color: #2c3e50; text-align: center; }}
+        .form-group {{ margin: 20px 0; }}
+        label {{ display: block; margin-bottom: 5px; font-weight: bold; }}
+        input[type=\"file\"] {{ width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; }}
+        .btn {{ background: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; }}
+        .btn:hover {{ background: #0056b3; }}
+        .btn-secondary {{ background: #6c757d; }}
+        .btn-secondary:hover {{ background: #545b62; }}
+        .warning {{ background: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 4px; margin: 20px 0; }}
+        .footer {{ text-align: center; margin-top: 30px; }}
+        .error {{ background: #f8d7da; border: 1px solid #f5c6cb; padding: 10px; border-radius: 4px; margin: 10px 0; color: #721c24; }}
+        .ok {{ background: #d4edda; border: 1px solid #c3e6cb; padding: 10px; border-radius: 4px; margin: 10px 0; color: #155724; }}
+    </style>
+    <script>
+    // Minimal JS to reduce memory footprint
+    (function() {{
+        const CHUNK_SIZE = 1024; // smaller chunks to lower memory spikes
+        function ge(id) {{ return document.getElementById(id); }}
+        function setStatus(t) {{ ge('status').textContent = t; }}
+        async function post(url, opts) {{
+            const r = await fetch(url, opts || {{ method: 'POST' }});
+            if (!r.ok) throw new Error(url + ' failed');
+            return r;
+        }}
+        window.addEventListener('load', function() {{
+            const form = ge('uploadForm');
+            form.addEventListener('submit', async function(e) {{
+                e.preventDefault();
+                const f = ge('configFile').files[0];
+                if (!f) return;
+                ge('result').innerHTML = '';
+                setStatus('Starting upload...');
+                try {{
+                    await post('/upload-config-begin');
+                    let off = 0;
+                    while (off < f.size) {{
+                        const chunk = f.slice(off, Math.min(off + CHUNK_SIZE, f.size));
+                        const buf = await chunk.arrayBuffer();
+                        await post('/upload-config-chunk', {{ method: 'POST', headers: {{ 'Content-Type': 'application/octet-stream' }}, body: buf }});
+                        off += CHUNK_SIZE;
+                        setStatus(`Uploaded ${{Math.min(off, f.size)}} / ${{f.size}} bytes`);
+                    }}
+                    const resp = await post('/upload-config-finalize');
+                    const text = await resp.text();
+                    document.open(); document.write(text); document.close();
+                }} catch (err) {{
+                    setStatus('Error: ' + err.message);
+                    ge('result').innerHTML = '<div class="error">Upload failed: ' + err.message + '</div>';
+                }}
+            }});
+        }});
+    }})();
+    </script>
+</head>
+<body>
+<div class=\"container\">""".encode('utf-8'))
+
+            # Body content in small chunks
+            await self._awrite(client_socket, b"<h1>Upload Configuration</h1>")
+            await self._awrite(client_socket, b"<div class=\"warning\"><strong>Warning:</strong> Uploading a new configuration will replace the current settings and trigger a restart. Make sure your configuration is valid.</div>")
+            await self._awrite(client_socket, b"<form id=\"uploadForm\">")
+            await self._awrite(client_socket, b"<div class=\"form-group\"><label for=\"configFile\">Select config.json file:</label><input type=\"file\" id=\"configFile\" name=\"config\" accept=\".json\" required></div>")
+            await self._awrite(client_socket, b"<div class=\"form-group\"><button type=\"submit\" class=\"btn\">Upload and Apply</button> <a href=\"/\" class=\"btn btn-secondary\" style=\"text-decoration: none; margin-left: 10px;\">Cancel</a></div>")
+            await self._awrite(client_socket, b"<div id=\"status\"></div><div id=\"result\"></div>")
+            await self._awrite(client_socket, b"</form>")
+            await self._awrite(client_socket, b"<div class=\"footer\"><p><a href=\"/download-config\">Download Current Config</a> | <a href=\"/\">Back to Home</a></p></div>")
+            await self._awrite(client_socket, b"</div></body></html>")
+        except Exception as e:
+            log.error(f"[WEB] Error streaming upload page: {e}")
 
     def generate_status_json(self):
         """Generate JSON status response."""
