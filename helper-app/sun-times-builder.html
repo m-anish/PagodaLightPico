@@ -124,8 +124,6 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/suncalc@1.9.0/suncalc.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/spacetime@7.5.1/builds/spacetime.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/spacetime-geo@0.1.2/spacetime-geo.min.js"></script>
   <script>
     const days = {};
     let SAMPLE_VERSION = null;
@@ -166,16 +164,21 @@
       if (spacetimeLoading) { try { await spacetimeLoading; } catch {} return typeof spacetime !== 'undefined'; }
       spacetimeLoading = (async () => {
         const candidates = [
+          // Local vendored copy (preferred)
+          './vendor/spacetime.min.js',
           'https://cdn.jsdelivr.net/npm/spacetime@7.5.1/builds/spacetime.min.js',
-          'https://unpkg.com/spacetime@7.5.1/builds/spacetime.min.js'
+          'https://unpkg.com/spacetime@7.5.1/builds/spacetime.min.js',
+          'https://cdnjs.cloudflare.com/ajax/libs/spacetime/7.5.1/spacetime.min.js'
         ];
         for (const url of candidates){ try { await loadScript(url); if (typeof spacetime !== 'undefined') break; } catch {}
         }
         if (typeof spacetime !== 'undefined'){
           // load plugin
           const geoCandidates = [
+            './vendor/spacetime-geo.min.js',
             'https://cdn.jsdelivr.net/npm/spacetime-geo@0.1.2/spacetime-geo.min.js',
-            'https://unpkg.com/spacetime-geo@0.1.2/spacetime-geo.min.js'
+            'https://unpkg.com/spacetime-geo@0.1.2/spacetime-geo.min.js',
+            'https://cdnjs.cloudflare.com/ajax/libs/spacetime-geo/0.1.2/spacetime-geo.min.js'
           ];
           for (const url of geoCandidates){ try { await loadScript(url); if (spacetime.where) break; } catch {} }
         }
