@@ -41,7 +41,7 @@
 </head>
 <body>
   <div class="container">
-    <h1><span class="emoji">💡</span>Build config.json</h1>
+    <h1><span class="emoji">⚙️</span>Build config.json</h1>
 
     <form id="cfgForm" oninput="render()" onchange="render()">
       <fieldset class="meta">
@@ -63,7 +63,7 @@
           <label>Password
             <span class="password-wrapper">
               <input id="password" type="password" placeholder="your_wifi_password_here" />
-              <button type="button" class="reveal-btn" aria-label="Show/Hide" onclick="togglePassword()">👁️</button>
+              <button id="password_toggle" type="button" class="reveal-btn" aria-label="Show password" onclick="togglePassword()">🙈</button>
             </span>
           </label>
         </div>
@@ -210,7 +210,12 @@
     // Password reveal toggle
     function togglePassword(){
       const input = document.getElementById('password');
-      input.type = input.type === 'password' ? 'text' : 'password';
+      const btn = document.getElementById('password_toggle');
+      const willShow = input.type === 'password';
+      input.type = willShow ? 'text' : 'password';
+      // update icon and aria
+      btn.textContent = willShow ? '👁️' : '🙈';
+      btn.setAttribute('aria-label', willShow ? 'Hide password' : 'Show password');
     }
 
     // Collapsible sections
