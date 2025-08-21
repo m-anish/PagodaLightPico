@@ -12,39 +12,46 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  checks: read
+  statuses: read
 
 jobs:
   automerge:
-    if: ${{ github.event.pull_request && contains(github.event.pull_request.labels.*.name, 'automerge') }}
+    # Run on PR events with label, or on check/workflow completion where we will resolve PR by SHA in the script
+    if: ${{ (github.event.pull_request && contains(github.event.pull_request.labels.*.name, 'automerge')) || github.event_name != 'pull_request' }}
     runs-on: ubuntu-latest
     steps:
       - name: Ensure checks are green and merge
         uses: actions/github-script@v7
         with:
           script: |
-            const pr = context.payload.pull_request;
-            if (!pr) {
-              core.info('No PR in payload (likely check_suite/workflow_run event). Exiting.');
-              return;
-            }
             const owner = context.repo.owner;
             const repo = context.repo.repo;
 
-            // Get combined status + checks conclusion
-            const { data: combined } = await github.repos.getCombinedStatusForRef({ owner, repo, ref: pr.head.sha });
-            if (combined.state !== 'success') {
-              core.info(`Combined status not green: ${combined.state}`);
-              return;
+            async function findAssociatedPR() {
+              if (context.payload.pull_request) return context.payload.pull_request;
+              let sha = context.sha;
+              if (context.eventName === 'check_suite' && context.payload?.check_suite?.head_sha) sha = context.payload.check_suite.head_sha;
+              if (context.eventName === 'workflow_run' && context.payload?.workflow_run?.head_sha) sha = context.payload.workflow_run.head_sha;
+              const { data } = await github.rest.repos.listPullRequestsAssociatedWithCommit({ owner, repo, commit_sha: sha });
+              // Prefer open PRs labeled 'automerge' targeting main/master
+              const candidate = data.find(pr => pr.state === 'open' && pr.base && ['main','master'].includes(pr.base.ref) && pr.labels.some(l => l.name === 'automerge'))
+                              || data.find(pr => pr.state === 'open');
+              return candidate;
             }
 
-            // Also verify all check runs that report conclusions
-            const { data: checks } = await github.checks.listForRef({ owner, repo, ref: pr.head.sha });
+            const pr = await findAssociatedPR();
+            if (!pr) { core.info('No associated PR found for this SHA.'); return; }
+            if (!pr.labels.some(l => l.name === 'automerge')) { core.info('PR not labeled automerge.'); return; }
+
+            // Get combined status + checks conclusion
+            const { data: combined } = await github.rest.repos.getCombinedStatusForRef({ owner, repo, ref: pr.head.sha });
+            if (combined.state !== 'success') { core.info(`Combined status not green: ${combined.state}`); return; }
+
+            const { data: checks } = await github.rest.checks.listForRef({ owner, repo, ref: pr.head.sha });
             const failing = checks.check_runs.find(r => ['failure','cancelled','timed_out','action_required','stopped'].includes((r.conclusion||'').toLowerCase()));
-            if (failing) {
-              core.info(`A check is not successful: ${failing.name} -> ${failing.conclusion}`);
-              return;
-            }
+            if (failing) { core.info(`A check is not successful: ${failing.name} -> ${failing.conclusion}`); return; }
 
             // Merge PR
-            await github.pulls.merge({ owner, repo, pull_number: pr.number, merge_method: 'squash' });
+            await github.rest.pulls.merge({ owner, repo, pull_number: pr.number, merge_method: 'squash' });
             core.info(`Merged PR #${pr.number}`);
