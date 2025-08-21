@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Build config.json • PagodaLightPico</title>
   <style>
+    *, *::before, *::after { box-sizing: border-box; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, 'Noto Sans', 'Liberation Sans', sans-serif; margin: 20px; background: #f5f5f5; }
     .container { max-width: 920px; margin: 0 auto; background: #fff; padding: 20px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
     h1 { color: #2c3e50; text-align: center; }
@@ -12,27 +13,39 @@
     fieldset.meta { border-left: 4px solid #60a5fa; }
     fieldset.wifi { border-left: 4px solid #34d399; }
     fieldset.tz { border-left: 4px solid #f59e0b; }
+    fieldset.hardware { border-left: 4px solid #10b981; }
     fieldset.system { border-left: 4px solid #a78bfa; }
     fieldset.notif { border-left: 4px solid #f87171; }
     fieldset.pwm { border-left: 4px solid #22d3ee; }
     label { display: block; margin: 6px 0; }
-    input, select { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 6px; }
-    .row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    input, select { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 6px; max-width: 100%; }
+    .row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 12px; row-gap: 12px; align-items: start; }
+    @media (max-width: 640px){ .row { grid-template-columns: 1fr; } }
     .actions { display: flex; gap: 12px; flex-wrap: wrap; }
     button, a.button { padding: 10px 14px; border: 1px solid #999; border-radius: 8px; background: #fff; cursor: pointer; text-decoration: none; color: #222; }
     pre { background: #0b1020; color: #d5e6ff; padding: 12px; border-radius: 8px; overflow: auto; max-height: 420px; }
     .tip { font-size: 12px; color: #666; }
     legend { font-weight: 600; color: #374151; }
     .emoji { font-size: 1.1em; margin-right: 6px; }
+    /* collapsible */
+    fieldset.collapsed > :not(legend) { display: none; }
+    .legend-row { display:flex; align-items:center; gap:8px; }
+    .collapse-toggle { border:none; background:none; cursor:pointer; font-size:14px; }
+    /* PWM visuals */
+    .pin-card { background:#f8fafc; }
+    .window-block { background:#fdfdfd; border-left:4px solid #bae6fd; }
+    /* password reveal */
+    .password-wrapper { position: relative; }
+    .reveal-btn { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: transparent; border: none; cursor: pointer; font-size: 14px; }
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>Build config.json</h1>
+    <h1><span class="emoji">💡</span>Build config.json</h1>
 
     <form id="cfgForm" oninput="render()" onchange="render()">
       <fieldset class="meta">
-        <legend><span class="emoji">🧩</span>Meta</legend>
+        <legend><span class="legend-row"><button type="button" class="collapse-toggle" aria-label="toggle">▼</button><span class="emoji">🧩</span>Meta</span></legend>
         <label>Version (semver)
           <input id="version" type="text" value="0.4.0" placeholder="0.4.0" required />
         </label>
@@ -42,22 +55,28 @@
       </fieldset>
 
       <fieldset class="wifi">
-        <legend><span class="emoji">📶</span>WiFi</legend>
+        <legend><span class="legend-row"><button type="button" class="collapse-toggle" aria-label="toggle">▼</button><span class="emoji">📶</span>WiFi</span></legend>
         <div class="row">
           <label>SSID
             <input id="ssid" type="text" placeholder="your_wifi_ssid_here" />
           </label>
           <label>Password
-            <input id="password" type="password" placeholder="your_wifi_password_here" />
+            <span class="password-wrapper">
+              <input id="password" type="password" placeholder="your_wifi_password_here" />
+              <button type="button" class="reveal-btn" aria-label="Show/Hide" onclick="togglePassword()">👁️</button>
+            </span>
           </label>
         </div>
       </fieldset>
 
       <fieldset class="tz">
-        <legend><span class="emoji">🌍</span>Timezone</legend>
+        <legend><span class="legend-row"><button type="button" class="collapse-toggle" aria-label="toggle">▼</button><span class="emoji">🌍</span>Timezone</span></legend>
         <div class="row">
-          <label>Choose your timezone
-            <select id="tz_select"></select>
+          <label>Search timezone
+            <input id="tz_search" type="text" placeholder="Search (e.g., India, PST, +5:30, Tokyo)" />
+          </label>
+          <label>Select timezone
+            <select id="tz_select" size="6" style="height:auto;"></select>
           </label>
           <div style="display:none">
             <label>Name
@@ -70,8 +89,8 @@
         </div>
       </fieldset>
 
-      <fieldset>
-        <legend>Hardware</legend>
+      <fieldset class="hardware">
+        <legend><span class="legend-row"><button type="button" class="collapse-toggle" aria-label="toggle">▼</button><span class="emoji">🧰</span>Hardware</span></legend>
         <div class="row">
           <label>RTC SDA pin
             <input id="rtc_sda" type="number" value="20" />
@@ -86,7 +105,7 @@
       </fieldset>
 
       <fieldset class="system">
-        <legend><span class="emoji">🛠️</span>System</legend>
+        <legend><span class="legend-row"><button type="button" class="collapse-toggle" aria-label="toggle">▼</button><span class="emoji">🛠️</span>System</span></legend>
         <div class="row">
           <label>Log level
             <select id="log_level">
@@ -125,7 +144,7 @@
       </fieldset>
 
       <fieldset class="notif">
-        <legend><span class="emoji">🔔</span>Notifications (MQTT)</legend>
+        <legend><span class="legend-row"><button type="button" class="collapse-toggle" aria-label="toggle">▼</button><span class="emoji">🔔</span>Notifications (MQTT)</span></legend>
         <div class="row">
           <label>Enabled
             <select id="notif_enabled"><option value="true">true</option><option value="false" selected>false</option></select>
@@ -156,7 +175,7 @@
       </fieldset>
 
       <fieldset class="pwm">
-        <legend><span class="emoji">🎚️</span>PWM Pins</legend>
+        <legend><span class="legend-row"><button type="button" class="collapse-toggle" aria-label="toggle">▼</button><span class="emoji">🎚️</span>PWM Pins</span></legend>
         <div class="tip">Add up to 5 pins. For each pin, add 1–5 time windows. Duty cycle is 0–100.</div>
         <div class="actions" style="margin:6px 0 12px;">
           <button type="button" onclick="addPin()">Add Pin</button>
@@ -188,29 +207,77 @@
       return { gpio_pin: gpio, name: `Pin ${gpio}`, enabled: false, windows: [ newWindow() ] };
     }
 
+    // Password reveal toggle
+    function togglePassword(){
+      const input = document.getElementById('password');
+      input.type = input.type === 'password' ? 'text' : 'password';
+    }
+
+    // Collapsible sections
+    function setupCollapsibles(){
+      document.querySelectorAll('fieldset').forEach(fs => {
+        const btn = fs.querySelector('.collapse-toggle');
+        if (!btn) return;
+        btn.addEventListener('click', () => {
+          fs.classList.toggle('collapsed');
+          btn.textContent = fs.classList.contains('collapsed') ? '▶' : '▼';
+        });
+      });
+    }
+
     // --- Timezone selector ---
     const TZ_OPTIONS = [
       { name: 'UTC', offset: 0, label: 'UTC (±0:00)' },
-      { name: 'IST', offset: 5.5, label: 'India Standard Time (IST) UTC+5:30' },
-      { name: 'PST', offset: -8, label: 'Pacific Standard Time (PST) UTC-8:00' },
-      { name: 'PDT', offset: -7, label: 'Pacific Daylight Time (PDT) UTC-7:00' },
-      { name: 'EST', offset: -5, label: 'Eastern Standard Time (EST) UTC-5:00' },
-      { name: 'EDT', offset: -4, label: 'Eastern Daylight Time (EDT) UTC-4:00' },
+      { name: 'GMT', offset: 0, label: 'Greenwich Mean Time (GMT) UTC±0:00' },
+      { name: 'WET', offset: 0, label: 'Western European Time (WET) UTC±0:00' },
       { name: 'CET', offset: 1, label: 'Central European Time (CET) UTC+1:00' },
-      { name: 'CEST', offset: 2, label: 'Central European Summer Time (CEST) UTC+2:00' },
+      { name: 'CEST', offset: 2, label: 'Central European Summer (CEST) UTC+2:00' },
+      { name: 'EET', offset: 2, label: 'Eastern European Time (EET) UTC+2:00' },
+      { name: 'EEST', offset: 3, label: 'Eastern European Summer (EEST) UTC+3:00' },
+      { name: 'MSK', offset: 3, label: 'Moscow Time (MSK) UTC+3:00' },
+      { name: 'GST', offset: 4, label: 'Gulf Standard Time (GST) UTC+4:00' },
+      { name: 'PKT', offset: 5, label: 'Pakistan Standard Time (PKT) UTC+5:00' },
+      { name: 'IST', offset: 5.5, label: 'India Standard Time (IST) UTC+5:30' },
+      { name: 'NPT', offset: 5.75, label: 'Nepal Time (NPT) UTC+5:45' },
+      { name: 'BST_BD', offset: 6, label: 'Bangladesh Standard (BST) UTC+6:00' },
+      { name: 'MMT', offset: 6.5, label: 'Myanmar Time (MMT) UTC+6:30' },
+      { name: 'ICT', offset: 7, label: 'Indochina Time (ICT) UTC+7:00' },
+      { name: 'CST_China', offset: 8, label: 'China Standard Time (CST) UTC+8:00' },
+      { name: 'AWST', offset: 8, label: 'Australian Western (AWST) UTC+8:00' },
       { name: 'JST', offset: 9, label: 'Japan Standard Time (JST) UTC+9:00' },
-      { name: 'AEST', offset: 10, label: 'Australian Eastern Standard (AEST) UTC+10:00' },
-      { name: 'AEDT', offset: 11, label: 'Australian Eastern Daylight (AEDT) UTC+11:00' }
+      { name: 'KST', offset: 9, label: 'Korea Standard Time (KST) UTC+9:00' },
+      { name: 'ACST', offset: 9.5, label: 'Australian Central (ACST) UTC+9:30' },
+      { name: 'AEST', offset: 10, label: 'Australian Eastern (AEST) UTC+10:00' },
+      { name: 'AEDT', offset: 11, label: 'Australian Eastern Daylight (AEDT) UTC+11:00' },
+      { name: 'NZST', offset: 12, label: 'New Zealand Standard (NZST) UTC+12:00' },
+      { name: 'NZDT', offset: 13, label: 'New Zealand Daylight (NZDT) UTC+13:00' },
+      { name: 'AST', offset: -4, label: 'Atlantic Standard Time (AST) UTC-4:00' },
+      { name: 'ADT', offset: -3, label: 'Atlantic Daylight Time (ADT) UTC-3:00' },
+      { name: 'BRST', offset: -2, label: 'Brazil Summer (BRST) UTC-2:00' },
+      { name: 'BRT', offset: -3, label: 'Brasília Time (BRT) UTC-3:00' },
+      { name: 'ART', offset: -3, label: 'Argentina Time (ART) UTC-3:00' },
+      { name: 'EST', offset: -5, label: 'Eastern Standard (EST) UTC-5:00' },
+      { name: 'EDT', offset: -4, label: 'Eastern Daylight (EDT) UTC-4:00' },
+      { name: 'CST', offset: -6, label: 'Central Standard (CST) UTC-6:00' },
+      { name: 'CDT', offset: -5, label: 'Central Daylight (CDT) UTC-5:00' },
+      { name: 'MST', offset: -7, label: 'Mountain Standard (MST) UTC-7:00' },
+      { name: 'MDT', offset: -6, label: 'Mountain Daylight (MDT) UTC-6:00' },
+      { name: 'PST', offset: -8, label: 'Pacific Standard (PST) UTC-8:00' },
+      { name: 'PDT', offset: -7, label: 'Pacific Daylight (PDT) UTC-7:00' },
+      { name: 'AKST', offset: -9, label: 'Alaska Standard (AKST) UTC-9:00' },
+      { name: 'AKDT', offset: -8, label: 'Alaska Daylight (AKDT) UTC-8:00' },
+      { name: 'HST', offset: -10, label: 'Hawaii Standard (HST) UTC-10:00' }
     ];
 
-    function populateTimezoneSelect(){
+    function populateTimezoneSelect(list){
       const sel = document.getElementById('tz_select');
-      sel.innerHTML = TZ_OPTIONS.map(tz => `<option value="${tz.name}" data-offset="${tz.offset}">${tz.label}</option>`).join('');
-      // default IST if present
-      const def = TZ_OPTIONS.findIndex(z => z.name === 'IST');
-      sel.selectedIndex = def >= 0 ? def : 0;
-      applyTimezoneFromSelect();
-      sel.addEventListener('change', applyTimezoneFromSelect);
+      const items = list || TZ_OPTIONS;
+      sel.innerHTML = items.map(tz => `<option value="${tz.name}" data-offset="${tz.offset}">${tz.label}</option>`).join('');
+      if (!list) {
+        const def = TZ_OPTIONS.findIndex(z => z.name === 'IST');
+        sel.selectedIndex = def >= 0 ? def : 0;
+        applyTimezoneFromSelect();
+      }
     }
 
     function applyTimezoneFromSelect(){
@@ -220,6 +287,24 @@
       document.getElementById('tz_name').value = name;
       document.getElementById('tz_offset').value = String(offset);
       render();
+    }
+
+    function filterTimezones(){
+      const q = (document.getElementById('tz_search').value || '').toLowerCase();
+      if (!q) { populateTimezoneSelect(); applyTimezoneFromSelect(); return; }
+      const filtered = TZ_OPTIONS.filter(tz =>
+        tz.name.toLowerCase().includes(q) ||
+        tz.label.toLowerCase().includes(q) ||
+        String(tz.offset).includes(q)
+      );
+      populateTimezoneSelect(filtered);
+      // keep first match selected if any
+      if (filtered.length) { document.getElementById('tz_select').selectedIndex = 0; applyTimezoneFromSelect(); }
+    }
+
+    function setupTimezoneSearch(){
+      const s = document.getElementById('tz_search');
+      s.addEventListener('input', filterTimezones);
     }
     function newWindow(name){ return { name: name || '', start: 'sunrise', end: 'sunset', duty_cycle: 0 }; }
 
@@ -259,7 +344,8 @@
       container.innerHTML = '';
       pins.forEach((p, idx) => {
         const card = document.createElement('div');
-        card.style.border = '1px solid #eee';
+        card.className = 'pin-card';
+        card.style.border = '1px solid #e5e7eb';
         card.style.borderRadius = '8px';
         card.style.padding = '12px';
         card.style.marginBottom = '12px';
@@ -282,6 +368,7 @@
         const winWrap = card.querySelector('.windows');
         p.windows.forEach((w, widx) => {
           const block = document.createElement('div');
+          block.className = 'window-block';
           block.style.border = '1px dashed #ddd';
           block.style.borderRadius = '6px';
           block.style.padding = '8px';
@@ -486,6 +573,8 @@
       await loadSamplePins();
       if (pins.length === 0) { pins.push(newPin()); }
       populateTimezoneSelect();
+      setupTimezoneSearch();
+      setupCollapsibles();
       renderPinsUI();
       render();
     })();
