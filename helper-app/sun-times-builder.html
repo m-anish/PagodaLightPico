@@ -1,23 +1,3 @@
-    // Canonicalize time zone to a supported IANA name used by Intl
-    function canonicalizeTimeZone(tz){
-      if (!tz) return tz;
-      const aliasMap = {
-        'Asia/Calcutta': 'Asia/Kolkata',
-        'Asia/Bombay': 'Asia/Kolkata',
-        'Europe/Kiev': 'Europe/Kyiv',
-        'Asia/Rangoon': 'Asia/Yangon'
-      };
-      let zones = [];
-      if (typeof Intl !== 'undefined' && Intl.supportedValuesOf) {
-        try { zones = Intl.supportedValuesOf('timeZone'); } catch {}
-      }
-      const isSupported = (z) => zones && zones.length ? zones.includes(z) : true;
-      if (isSupported(tz)) return tz;
-      const mapped = aliasMap[tz];
-      if (mapped && isSupported(mapped)) return mapped;
-      return tz; // fallback
-    }
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -94,7 +74,7 @@
         <fieldset class="tz" style="margin:0;">
           <legend><span class="legend-row"><button type="button" class="collapse-toggle" aria-label="toggle">▼</button><span class="emoji">🌍</span>Timezone</span></legend>
           <div class="row">
-            <label>IANA Timezone
+            <label>Timezone
               <input id="tz" type="text" placeholder="Asia/Kolkata" list="tzList" />
               <datalist id="tzList"></datalist>
             </label>
@@ -150,6 +130,25 @@
     const days = {};
     let SAMPLE_VERSION = null;
     const placeMap = new Map();
+    // Canonicalize time zone to a supported IANA name used by Intl
+    function canonicalizeTimeZone(tz){
+      if (!tz) return tz;
+      const aliasMap = {
+        'Asia/Calcutta': 'Asia/Kolkata',
+        'Asia/Bombay': 'Asia/Kolkata',
+        'Europe/Kiev': 'Europe/Kyiv',
+        'Asia/Rangoon': 'Asia/Yangon'
+      };
+      let zones = [];
+      if (typeof Intl !== 'undefined' && Intl.supportedValuesOf) {
+        try { zones = Intl.supportedValuesOf('timeZone'); } catch {}
+      }
+      const isSupported = (z) => zones && zones.length ? zones.includes(z) : true;
+      if (isSupported(tz)) return tz;
+      const mapped = aliasMap[tz];
+      if (mapped && isSupported(mapped)) return mapped;
+      return tz; // fallback
+    }
 
     function validateKey(key){ return /^\d{2}-\d{2}$/.test(key); }
     function validateTime(t){ return /^\d{2}:\d{2}$/.test(t); }
