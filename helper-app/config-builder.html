@@ -193,8 +193,10 @@
       </fieldset>
     </form>
 
+    <div id="global_validation" class="tip"></div>
+
     <div class="actions">
-      <button type="button" onclick="downloadJSON()">Download config.json</button>
+      <button id="download_btn" type="button" onclick="downloadJSON()">Download config.json</button>
       <button id="upload_btn" type="button">Upload and prefill</button>
       <input id="upload_config" type="file" accept="application/json,.json" style="position:absolute; width:1px; height:1px; padding:0; margin:-1px; border:0; clip:rect(0,0,0,0); overflow:hidden;" />
       <a class="button" href="./index.html">Back to Home</a>
@@ -502,6 +504,40 @@
       return { ok: true, msg: 'Windows cover 24h continuously' };
     }
 
+    // Aggregate window validation across all pins and reflect near the Download button
+    function updateGlobalValidation(){
+      const errs = [];
+      pins.forEach((p) => {
+        const vd = computePinValidation(p);
+        if (!vd.ok) errs.push(`GPIO ${p.gpio_pin}: ${vd.msg}`);
+      });
+
+      const out = document.getElementById('global_validation');
+      const btn = document.getElementById('download_btn');
+
+      if (out){
+        if (errs.length){
+          out.innerHTML = errs.map(e=>`❌ ${e}`).join('<br>');
+          out.style.color = '#b91c1c';
+        } else {
+          out.textContent = '';
+          out.style.color = '';
+        }
+      }
+
+      if (btn){
+        if (errs.length){
+          btn.setAttribute('disabled','');
+          btn.style.opacity = '0.5';
+          btn.style.cursor = 'not-allowed';
+        } else {
+          btn.removeAttribute('disabled');
+          btn.style.opacity = '';
+          btn.style.cursor = '';
+        }
+      }
+    }
+
     function windowsFromObject(time_windows){
       if (!time_windows || typeof time_windows !== 'object') return [ newWindow() ];
       const arr = [];
@@ -620,6 +656,7 @@
     function render(){
       const cfg = buildConfig();
       document.getElementById('preview').textContent = JSON.stringify(cfg, null, 2);
+      updateGlobalValidation();
     }
 
     function downloadJSON(){
