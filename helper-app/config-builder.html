@@ -220,6 +220,26 @@
       return { gpio_pin: gpio, name: `Pin ${gpio}`, enabled: false, windows: [ newWindow() ] };
     }
 
+  // Load RTC SDA/SCL from sample config to prefill hardware selects
+  async function loadSampleHardware(){
+    try {
+      const resp = await fetch('./config.json.sample', { cache: 'no-store' });
+      if (!resp.ok) return;
+      const sample = await resp.json();
+      const hw = sample && sample.hardware || {};
+      const sda = hw.rtc_i2c_sda_pin ?? hw.rtc_sda;
+      const scl = hw.rtc_i2c_scl_pin ?? hw.rtc_scl;
+      if (typeof sda !== 'undefined') {
+        const sel = document.getElementById('rtc_sda');
+        if (sel) sel.value = String(sda);
+      }
+      if (typeof scl !== 'undefined') {
+        const sel = document.getElementById('rtc_scl');
+        if (sel) sel.value = String(scl);
+      }
+    } catch {}
+  }
+
     // Password reveal toggle
     function togglePassword(){
       const input = document.getElementById('password');
