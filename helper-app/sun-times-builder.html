@@ -56,6 +56,7 @@
           <div>
             <label>&nbsp;</label>
             <button type="button" id="applyPlace">Use selected place</button>
+            <button type="button" id="useMyLocation">Use my location</button>
           </div>
         </div>
         <div class="row">
@@ -250,6 +251,36 @@
       }, 250);
     });
 
+    // Use browser geolocation to fill lat/lon and then auto-fill timezone
+    async function useBrowserLocation(){
+      const btn = document.getElementById('useMyLocation');
+      if (!('geolocation' in navigator)) { alert('Geolocation is not supported in this browser.'); return; }
+      const restore = () => { if (btn){ btn.disabled = false; btn.textContent = 'Use my location'; } };
+      if (btn){ btn.disabled = true; btn.textContent = 'Locating…'; }
+      try {
+        const pos = await new Promise((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, {
+            enableHighAccuracy: true,
+            timeout: 10000,
+            maximumAge: 60000
+          });
+        });
+        const lat = pos.coords.latitude;
+        const lon = pos.coords.longitude;
+        document.getElementById('lat').value = lat.toFixed(4);
+        document.getElementById('lon').value = lon.toFixed(4);
+        if (!document.getElementById('location').value) {
+          document.getElementById('location').value = 'My location';
+        }
+        await autoFillTimezone();
+        render();
+      } catch (e) {
+        alert('Could not get your location. Please allow permission or try again.');
+      } finally {
+        restore();
+      }
+    }
+
     async function autoFillTimezone(){
       const lat = parseFloat(document.getElementById('lat').value);
       const lon = parseFloat(document.getElementById('lon').value);
@@ -273,6 +304,10 @@
       }
       render();
     });
+
+    // Wire geolocation button
+    const geoBtn = document.getElementById('useMyLocation');
+    if (geoBtn) geoBtn.addEventListener('click', useBrowserLocation);
 
     // If user edits coordinates manually, try to auto-fill timezone as well
     ['lat','lon'].forEach(id => document.getElementById(id).addEventListener('change', autoFillTimezone));
