@@ -102,10 +102,10 @@
         <legend><span class="legend-row"><button type="button" class="collapse-toggle" aria-label="toggle">▼</button><span class="emoji">🧰</span>Hardware</span></legend>
         <div class="row">
           <label>RTC SDA pin
-            <input id="rtc_sda" type="number" value="20" />
+            <select id="rtc_sda"></select>
           </label>
           <label>RTC SCL pin
-            <input id="rtc_scl" type="number" value="21" />
+            <select id="rtc_scl"></select>
           </label>
         </div>
         <label>PWM frequency (Hz)
@@ -331,6 +331,19 @@
     function removePin(idx){ pins.splice(idx,1); renderPinsUI(); render(); }
     function addWindowToPin(idx){ if (pins[idx].windows.length < MAX_WINDOWS){ pins[idx].windows.push(newWindow()); renderPinsUI(); render(); } }
     function removeWindowFromPin(pidx, widx){ if (pins[pidx].windows.length > MIN_WINDOWS){ pins[pidx].windows.splice(widx,1); renderPinsUI(); render(); } }
+
+    // Populate RTC SDA/SCL selects with valid GPIOs (0–22) and set defaults
+    const GOOD_GPIO = Array.from({length:23}, (_,i)=>i);
+    function populateHardwareGpioSelects(){
+      const fill = (sel, defVal) => {
+        if (!sel) return;
+        if (!sel.options.length){ sel.innerHTML = GOOD_GPIO.map(i=>`<option value="${i}">${i}</option>`).join(''); }
+        const v = String(parseInt(defVal));
+        if (v !== 'NaN'){ sel.value = v; if (sel.value !== v) sel.selectedIndex = 0; }
+      };
+      fill(document.getElementById('rtc_sda'), (document.getElementById('rtc_sda').value || 20));
+      fill(document.getElementById('rtc_scl'), (document.getElementById('rtc_scl').value || 21));
+    }
 
     function gpioSelect(current){
       const opts = Array.from({length:23}, (_,i)=>`<option value="${i}" ${i===current? 'selected':''}>${i}</option>`).join('');
@@ -715,10 +728,12 @@
         }
 
         if (cfg.hardware){
-          if (cfg.hardware.rtc_sda !== undefined) document.getElementById('rtc_sda').value = cfg.hardware.rtc_sda;
-          if (cfg.hardware.rtc_i2c_sda_pin !== undefined) document.getElementById('rtc_sda').value = cfg.hardware.rtc_i2c_sda_pin;
-          if (cfg.hardware.rtc_scl !== undefined) document.getElementById('rtc_scl').value = cfg.hardware.rtc_scl;
-          if (cfg.hardware.rtc_i2c_scl_pin !== undefined) document.getElementById('rtc_scl').value = cfg.hardware.rtc_i2c_scl_pin;
+          // Ensure dropdowns are populated, then set values from config
+          populateHardwareGpioSelects();
+          if (cfg.hardware.rtc_sda !== undefined) document.getElementById('rtc_sda').value = String(cfg.hardware.rtc_sda);
+          if (cfg.hardware.rtc_i2c_sda_pin !== undefined) document.getElementById('rtc_sda').value = String(cfg.hardware.rtc_i2c_sda_pin);
+          if (cfg.hardware.rtc_scl !== undefined) document.getElementById('rtc_scl').value = String(cfg.hardware.rtc_scl);
+          if (cfg.hardware.rtc_i2c_scl_pin !== undefined) document.getElementById('rtc_scl').value = String(cfg.hardware.rtc_i2c_scl_pin);
           if (cfg.hardware.pwm_freq !== undefined) document.getElementById('pwm_freq').value = cfg.hardware.pwm_freq;
           if (cfg.hardware.pwm_frequency !== undefined) document.getElementById('pwm_freq').value = cfg.hardware.pwm_frequency;
         }
@@ -806,6 +821,7 @@
       if (pins.length === 0) { pins.push(newPin()); }
       populateTimezoneSelect();
       setupTimezoneSearch();
+      populateHardwareGpioSelects();
       setupCollapsibles();
       setupUpload();
       renderPinsUI();
