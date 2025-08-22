@@ -706,6 +706,13 @@
       return `${parts[0]}.${parts[1]}`;
     }
 
+    // Compatibility shim: some older generated versions call schemaValidate(cfg)
+    // Provide a safe no-op to avoid ReferenceError if present in cached builds.
+    // Later, this can be wired to a real JSON Schema validator in the browser.
+    if (typeof window.schemaValidate !== 'function') {
+      window.schemaValidate = function(cfg){ return { valid: true, errors: [] }; };
+    }
+
     async function fetchSampleVersion(){
       try {
         const resp = await fetch('./config.json.sample', { cache: 'no-store' });
@@ -875,5 +882,48 @@
       render();
     })();
   </script>
-</body>
-</html>
+  <script type="module">
+    // In-browser JSON Schema validation using Ajv v8 (2020) + formats
+    import Ajv2020 from 'https://cdn.jsdelivr.net/npm/ajv@8/dist/2020.js';
+    import addFormats from 'https://cdn.jsdelivr.net/npm/ajv-formats@2/dist/ajv-formats.js';
+
+    const SCHEMA_CANDIDATES = [
+      '../../shared/json/config.schema.json',
+      './config.schema.json'
+    ];
+
+    async function loadSchema() {
+      for (const url of SCHEMA_CANDIDATES) {
+        try {
+          const resp = await fetch(url, { cache: 'no-store' });
+          if (!resp.ok) continue;
+          return await resp.json();
+        } catch (_) { /* try next */ }
+      }
+      throw new Error('Schema fetch failed');
+    }
+
+    (async () => {
+      try {
+        const schema = await loadSchema();
+        const ajv = new Ajv2020({
+          allErrors: true,
+          strict: false,
+          allowUnionTypes: true
+        });
+        addFormats(ajv);
+        const validate = ajv.compile(schema);
+
+        // Expose global function expected by the builder
+        window.schemaValidate = function(cfg){
+          const valid = validate(cfg);
+          return { valid, errors: valid ? [] : (validate.errors || []) };
+        };
+      } catch (e) {
+        // Keep the fallback no-op if schema cannot be loaded
+        console.warn('Schema validation unavailable:', e);
+      }
+    })();
+  </script>
+  </body>
+  </html>
