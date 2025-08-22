@@ -27,20 +27,34 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Install ajv-cli
-        run: npm i -g ajv-cli@5
+      - name: Install Ajv (v8)
+        run: npm i ajv@8
 
       - name: Validate sample configs against schema (draft 2020-12)
         run: |
-          set -e
-          for f in firmware/micropython/config/samples/*.json.sample; do
-            echo "Validating $f"
-            ajv validate \
-              --spec=draft2020 \
-              --strict=false \
-              --allow-union-types \
-              --all-errors \
-              --verbose \
-              -s shared/json/config.schema.json \
-              -d "@$f"
-          done
+          node -e '
+          const fs = require("fs");
+          const path = require("path");
+          const Ajv2020 = require("ajv").default || require("ajv");
+          const repoRoot = process.cwd();
+          const schemaPath = path.join(repoRoot, "shared/json/config.schema.json");
+          const samplesDir = path.join(repoRoot, "firmware/micropython/config/samples");
+          const schema = JSON.parse(fs.readFileSync(schemaPath, "utf8"));
+          const ajv = new Ajv2020({ strict: false, allErrors: true, allowUnionTypes: true });
+          const validate = ajv.compile(schema);
+          const files = fs.readdirSync(samplesDir).filter(n => n === "config.json.sample");
+          if (files.length === 0) { console.log("No sample files found."); process.exit(0); }
+          let failed = false;
+          for (const name of files) {
+            const p = path.join(samplesDir, name);
+            process.stdout.write(`Validating ${path.relative(repoRoot, p)}\n`);
+            const data = JSON.parse(fs.readFileSync(p, "utf8"));
+            const ok = validate(data);
+            if (!ok) {
+              failed = true;
+              console.error("Schema validation failed for:", path.relative(repoRoot, p));
+              console.error(validate.errors);
+            }
+          }
+          if (failed) process.exit(2);
+          '
