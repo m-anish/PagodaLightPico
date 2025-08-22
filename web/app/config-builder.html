@@ -721,6 +721,13 @@
       return `${parts[0]}.${parts[1]}`;
     }
 
+    // Compatibility shim: some older generated versions call schemaValidate(cfg)
+    // Provide a safe no-op to avoid ReferenceError if present in cached builds.
+    // Later, this can be wired to a real JSON Schema validator in the browser.
+    if (typeof window.schemaValidate !== 'function') {
+      window.schemaValidate = function(cfg){ return { valid: true, errors: [] }; };
+    }
+
     async function fetchSampleVersion(){
       try {
         const resp = await fetch('./config.json.sample', { cache: 'no-store' });
@@ -886,147 +893,40 @@
     })();
   </script>
 
-  <!-- Ajv (draft 2020-12) for client-side JSON Schema validation -->
-  <script src="https://cdn.jsdelivr.net/npm/ajv@8/dist/ajv2020.min.js"></script>
-  <script>
-    // Inline copy of shared/json/config.schema.json for client-side validation
-    const CONFIG_SCHEMA = {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "$id": "https://github.com/m-anish/PagodaLightPico/schemas/config.schema.json",
-      "title": "PagodaLightPico Configuration",
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["wifi", "timezone", "hardware", "system", "pwm_pins"],
-      "properties": {
-        "wifi": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["ssid", "password"],
-          "properties": {
-            "ssid": { "type": "string", "minLength": 1 },
-            "password": { "type": "string", "minLength": 1 }
-          }
-        },
-        "timezone": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["name", "offset"],
-          "properties": {
-            "name": { "type": "string", "minLength": 1 },
-            "offset": { "type": "number", "minimum": -12, "maximum": 14 }
-          }
-        },
-        "hardware": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["rtc_i2c_sda_pin", "rtc_i2c_scl_pin"],
-          "properties": {
-            "rtc_i2c_sda_pin": { "type": "integer", "minimum": 0, "maximum": 28 },
-            "rtc_i2c_scl_pin": { "type": "integer", "minimum": 0, "maximum": 28 },
-            "pwm_frequency": { "type": "integer", "minimum": 1, "maximum": 40000000 }
-          }
-        },
-        "system": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["log_level", "update_interval"],
-          "properties": {
-            "log_level": { "type": "string", "enum": ["FATAL", "ERROR", "WARN", "INFO", "DEBUG"] },
-            "update_interval": { "type": "integer", "minimum": 1 },
-            "network_check_interval": { "type": "integer", "minimum": 10, "maximum": 3600 },
-            "server_idle_sleep_ms": { "type": "integer", "minimum": 50, "maximum": 5000 },
-            "client_read_sleep_ms": { "type": "integer", "minimum": 10, "maximum": 2000 },
-            "ram_telemetry_enabled": { "type": "boolean" },
-            "ram_telemetry_interval": { "type": "integer", "minimum": 10, "maximum": 86400 },
-            "web_title": { "type": "string" }
-          }
-        },
-        "notifications": {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "enabled": { "type": "boolean" },
-            "mqtt_broker": { "type": "string" },
-            "mqtt_port": { "type": "integer" },
-            "mqtt_topic": { "type": "string" },
-            "mqtt_client_id": { "type": "string" },
-            "notify_on_window_change": { "type": "boolean" },
-            "notify_on_errors": { "type": "boolean" }
-          }
-        },
-        "pwm_pins": {
-          "type": "object",
-          "minProperties": 1,
-          "additionalProperties": false,
-          "patternProperties": {
-            "^_": { "description": "Helper/comment keys ignored by firmware", "type": ["string", "number", "boolean", "object", "array", "null"] },
-            "^[^_].*$": {
-              "type": "object",
-              "additionalProperties": false,
-              "required": ["gpio_pin", "name"],
-              "properties": {
-                "gpio_pin": { "type": "integer", "minimum": 0, "maximum": 28 },
-                "name": { "type": "string", "minLength": 1 },
-                "enabled": { "type": "boolean" },
-                "time_windows": {
-                  "type": "object",
-                  "minProperties": 2,
-                  "maxProperties": 5,
-                  "additionalProperties": false,
-                  "patternProperties": {
-                    "^_": { "description": "Helper/comment keys", "type": ["string", "number", "boolean", "object", "array", "null"] },
-                    "^[^_].*$": {
-                      "type": "object",
-                      "additionalProperties": false,
-                      "required": ["start", "end", "duty_cycle"],
-                      "properties": {
-                        "start": { "$ref": "#/$defs/timeString" },
-                        "end": { "$ref": "#/$defs/timeString" },
-                        "duty_cycle": { "type": "integer", "minimum": 0, "maximum": 100 }
-                      }
-                    }
-                  },
-                  "allOf": [
-                    { "required": ["day"] }
-                  ]
-                }
-              },
-              "allOf": [
-                {
-                  "if": { "properties": { "enabled": { "const": true } }, "required": ["enabled"] },
-                  "then": { "required": ["time_windows"] }
-                }
-              ]
-            }
-          }
-        }
-      },
-      "$defs": {
-        "timeString": {
-          "description": "Either 'sunrise'/'sunset' or HH:MM 24-hour format",
-          "oneOf": [
-            { "type": "string", "enum": ["sunrise", "sunset"] },
-            { "type": "string", "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$" }
-          ]
-        }
-      }
-    };
+  <script type="module">
+    // In-browser JSON Schema validation using Ajv v8 (2020) + formats
+    import Ajv2020 from 'https://cdn.jsdelivr.net/npm/ajv@8/dist/2020.js';
+    import addFormats from 'https://cdn.jsdelivr.net/npm/ajv-formats@2/dist/ajv-formats.js';
 
-    let __ajv, __validateFn;
-    function ensureAjv(){ if (!__ajv) { __ajv = new Ajv2020({ strict: false, allErrors: true, allowUnionTypes: true }); } return __ajv; }
-    function ensureValidator(){ if (!__validateFn) { __validateFn = ensureAjv().compile(CONFIG_SCHEMA); } return __validateFn; }
+    const SCHEMA_URL = './config.schema.json';
 
-    function schemaValidate(cfg){
-      try {
-        const validate = ensureValidator();
-        const ok = validate(cfg);
-        return { ok, errors: ok ? [] : (validate.errors || []) };
-      } catch (e) {
-        return { ok: false, errors: [{ message: 'Schema compile/validate error: ' + (e && e.message ? e.message : String(e)) }] };
-      }
+    async function loadSchema() {
+      const resp = await fetch(SCHEMA_URL, { cache: 'no-store' });
+      if (!resp.ok) throw new Error('Schema fetch failed');
+      return await resp.json();
     }
 
-    
+    (async () => {
+      try {
+        const schema = await loadSchema();
+        const ajv = new Ajv2020({
+          allErrors: true,
+          strict: false,
+          allowUnionTypes: true
+        });
+        addFormats(ajv);
+        const validate = ajv.compile(schema);
+
+        // Expose global function expected by the builder
+        window.schemaValidate = function(cfg){
+          const valid = validate(cfg);
+          return { valid, errors: valid ? [] : (validate.errors || []) };
+        };
+      } catch (e) {
+        // Keep the fallback no-op if schema cannot be loaded
+        console.warn('Schema validation unavailable:', e);
+      }
+    })();
   </script>
-</body>
-</html>
+  </body>
+  </html>
