@@ -6,6 +6,8 @@
   "additionalProperties": false,
   "required": ["wifi", "timezone", "hardware", "system", "pwm_pins"],
   "properties": {
+    "version": { "type": "string" },
+    "hostname": { "type": "string" },
     "wifi": {
       "type": "object",
       "additionalProperties": false,
