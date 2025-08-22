@@ -681,20 +681,35 @@
     }
 
     function downloadJSON(){
-      const cfg = buildConfig();
-      const blob = new Blob([JSON.stringify(cfg, null, 2)], {type:'application/json'});
-      const now = new Date();
-      const pad = (n) => String(n).padStart(2, '0');
-      const dateStr = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
-      const timeStr = `${pad(now.getHours())}-${pad(now.getMinutes())}-${pad(now.getSeconds())}`;
-      const ver = String(cfg.version || '0.0.0').replace(/[^0-9A-Za-z_.-]/g, '-');
-      const filename = `config_${dateStr}_${timeStr}_${ver}.json`;
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = filename;
-      a.click();
-      URL.revokeObjectURL(a.href);
-    }
+  // Re-check validation before allowing download
+  const errs = [];
+  // Per-pin window validations
+  pins.forEach((p) => { const vd = computePinValidation(p); if (!vd.ok) errs.push(`GPIO ${p.gpio_pin}: ${vd.msg}`); });
+  // Cross-pin GPIO clashes
+  errs.push(...computeGPIOValidation());
+  // Schema validation
+  const cfg = buildConfig();
+  const sv = schemaValidate(cfg);
+  if (!sv.ok) errs.push('Schema invalid');
+  if (errs.length) {
+    const out = document.getElementById('global_validation');
+    if (out && out.textContent.trim() === '') { out.textContent = errs.join(' | '); out.className = 'validation err'; }
+    return; // Block download on errors
+  }
+  const blob = new Blob([JSON.stringify(cfg, null, 2)], {type:'application/json'});
+  const now = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  const dateStr = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
+  const timeStr = `${pad(now.getHours())}-${pad(now.getMinutes())}-${pad(now.getSeconds())}`;
+  const ver = String(cfg.version || '0.0.0').replace(/[^0-9A-Za-z_.-]/g, '-');
+  const filename = `config_${dateStr}_${timeStr}_${ver}.json`;
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
 
     // --- Upload + Prefill helpers ---
     let sampleMajorMinor = null;
@@ -724,35 +739,30 @@
 
     // Aggregate validation and reflect near the Download button
     function updateGlobalValidation(){
-      const errs = [];
-      // Per-pin window validations
-      pins.forEach((p) => { const vd = computePinValidation(p); if (!vd.ok) errs.push(`GPIO ${p.gpio_pin}: ${vd.msg}`); });
-      // Cross-pin GPIO clashes
-      errs.push(...computeGPIOValidation());
+  const msgs = [];
+  // GPIO conflicts and continuity
+  const gpioErrs = computeGPIOValidation();
+  if (gpioErrs && gpioErrs.length) msgs.push('GPIO: ' + gpioErrs.join('; '));
+  // Schema validation
+  const cfg = buildConfig();
+  const sv = schemaValidate(cfg);
+  if (!sv.ok) {
+    const ajv = ensureAjv();
+    const errText = ajv.errorsText(sv.errors, { separator: '; ' });
+    msgs.push('Schema: ' + errText);
+  }
+  const el = document.getElementById('global_validation');
+  const btn = document.getElementById('download_btn');
+  if (el) {
+    el.textContent = msgs.length ? msgs.join(' | ') : 'Looks good ✓';
+    el.className = msgs.length ? 'validation err' : 'validation ok';
+  }
+  if (btn) {
+    if (msgs.length) { btn.setAttribute('disabled',''); btn.style.opacity = '0.5'; btn.style.cursor = 'not-allowed'; }
+    else { btn.removeAttribute('disabled'); btn.style.opacity = ''; btn.style.cursor = ''; }
+  }
+}
 
-      const out = document.getElementById('global_validation');
-      const btn = document.getElementById('download_btn');
-      if (out){
-        if (errs.length){
-          out.innerHTML = errs.map(e=>`❌ ${e}`).join('<br>');
-          out.style.color = '#b91c1c';
-        } else {
-          out.textContent = '';
-          out.style.color = '';
-        }
-      }
-      if (btn){
-        if (errs.length){
-          btn.setAttribute('disabled','');
-          btn.style.opacity = '0.5';
-          btn.style.cursor = 'not-allowed';
-        } else {
-          btn.removeAttribute('disabled');
-          btn.style.opacity = '';
-          btn.style.cursor = '';
-        }
-      }
-    }
 
     function setMsg(html, isError){
       const el = document.getElementById('upload_msg');
@@ -882,6 +892,7 @@
       render();
     })();
   </script>
+
   <script type="module">
     // In-browser JSON Schema validation using Ajv v8 (2020) + formats
     import Ajv2020 from 'https://cdn.jsdelivr.net/npm/ajv@8/dist/2020.js';
