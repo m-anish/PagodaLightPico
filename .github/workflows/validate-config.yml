@@ -35,7 +35,7 @@ jobs:
           node -e '
           const fs = require("fs");
           const path = require("path");
-          const Ajv2020 = require("ajv").default || require("ajv");
+          const Ajv2020 = require("ajv/dist/2020").default; // includes 2020-12 meta-schema
           const repoRoot = process.cwd();
           const schemaPath = path.join(repoRoot, "shared/json/config.schema.json");
           const samplesDir = path.join(repoRoot, "firmware/micropython/config/samples");
