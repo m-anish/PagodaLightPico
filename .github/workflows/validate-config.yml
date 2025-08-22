@@ -35,5 +35,8 @@ jobs:
           set -e
           ajv validate \
             --spec=draft2020 \
+            --strict=false \
+            --allowUnionTypes \
+            --all-errors \
             -s shared/json/config.schema.json \
-            -d 'firmware/micropython/config/samples/*.json.sample'
+            -d firmware/micropython/config/samples/*.json.sample
