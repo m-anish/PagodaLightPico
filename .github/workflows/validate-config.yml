@@ -1,0 +1,39 @@
+name: Validate config samples
+
+on:
+  pull_request:
+    paths:
+      - 'shared/json/config.schema.json'
+      - 'firmware/micropython/config/samples/**'
+      - '.github/workflows/validate-config.yml'
+  push:
+    branches:
+      - main
+      - master
+    paths:
+      - 'shared/json/config.schema.json'
+      - 'firmware/micropython/config/samples/**'
+      - '.github/workflows/validate-config.yml'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install ajv-cli
+        run: npm i -g ajv-cli@5
+
+      - name: Validate sample configs against schema (draft 2020-12)
+        run: |
+          set -e
+          ajv validate \
+            --spec=draft2020 \
+            -s shared/json/config.schema.json \
+            -d 'firmware/micropython/config/samples/*.json.sample'
