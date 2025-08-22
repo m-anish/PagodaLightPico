@@ -690,7 +690,10 @@
   // Schema validation
   const cfg = buildConfig();
   const sv = schemaValidate(cfg);
-  if (!sv.ok) errs.push('Schema invalid');
+  if (!sv.valid) {
+    const errText = (window.ajvErrorsText ? window.ajvErrorsText(sv.errors) : '');
+    errs.push('Schema invalid' + (errText ? `: ${errText}` : ''));
+  }
   if (errs.length) {
     const out = document.getElementById('global_validation');
     if (out && out.textContent.trim() === '') { out.textContent = errs.join(' | '); out.className = 'validation err'; }
@@ -746,10 +749,9 @@
   // Schema validation
   const cfg = buildConfig();
   const sv = schemaValidate(cfg);
-  if (!sv.ok) {
-    const ajv = ensureAjv();
-    const errText = ajv.errorsText(sv.errors, { separator: '; ' });
-    msgs.push('Schema: ' + errText);
+  if (!sv.valid) {
+    const errText = (window.ajvErrorsText ? window.ajvErrorsText(sv.errors) : (sv.errors||[]).map(e => `${e.instancePath||'/'} ${e.message||''}`.trim()).join('; '));
+    msgs.push('Schema: ' + (errText || 'invalid'));
   }
   const el = document.getElementById('global_validation');
   const btn = document.getElementById('download_btn');
@@ -896,7 +898,7 @@
   <script type="module">
     // In-browser JSON Schema validation using Ajv v8 (2020) + formats
     import Ajv2020 from 'https://cdn.jsdelivr.net/npm/ajv@8/dist/2020.js';
-    import addFormats from 'https://cdn.jsdelivr.net/npm/ajv-formats@2/dist/ajv-formats.js';
+    import addFormats from 'https://cdn.jsdelivr.net/npm/ajv-formats@2/dist/index.js';
 
     const SCHEMA_URL = './config.schema.json';
 
@@ -916,6 +918,12 @@
         });
         addFormats(ajv);
         const validate = ajv.compile(schema);
+
+        // Helper to stringify Ajv errors for non-module code
+        window.ajvErrorsText = function(errors){
+          try { return ajv.errorsText(errors, { separator: '; ' }); }
+          catch { return (errors||[]).map(e => `${e.instancePath||'/'} ${e.message||''}`.trim()).join('; '); }
+        };
 
         // Expose global function expected by the builder
         window.schemaValidate = function(cfg){
