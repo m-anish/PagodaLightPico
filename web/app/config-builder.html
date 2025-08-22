@@ -898,20 +898,12 @@
     import Ajv2020 from 'https://cdn.jsdelivr.net/npm/ajv@8/dist/2020.js';
     import addFormats from 'https://cdn.jsdelivr.net/npm/ajv-formats@2/dist/ajv-formats.js';
 
-    const SCHEMA_CANDIDATES = [
-      '../../shared/json/config.schema.json',
-      './config.schema.json'
-    ];
+    const SCHEMA_URL = './config.schema.json';
 
     async function loadSchema() {
-      for (const url of SCHEMA_CANDIDATES) {
-        try {
-          const resp = await fetch(url, { cache: 'no-store' });
-          if (!resp.ok) continue;
-          return await resp.json();
-        } catch (_) { /* try next */ }
-      }
-      throw new Error('Schema fetch failed');
+      const resp = await fetch(SCHEMA_URL, { cache: 'no-store' });
+      if (!resp.ok) throw new Error('Schema fetch failed');
+      return await resp.json();
     }
 
     (async () => {
