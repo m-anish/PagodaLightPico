@@ -6,7 +6,7 @@ on:
       - main
       - master
     paths:
-      - 'helper-app/**'
+      - 'web/**'
       - '.github/workflows/gh-pages.yml'
   workflow_dispatch:
 
@@ -30,10 +30,11 @@ jobs:
         run: |
           set -e
           mkdir -p site
-          cp -R helper-app/* site/
+          cp -R web/app/* site/
           # Copy sample JSON files to be accessible at site root
-          if [ -f config.json.sample ]; then cp -v config.json.sample site/; fi
-          if [ -f sun_times.json.sample ]; then cp -v sun_times.json.sample site/; fi
+          if ls firmware/micropython/config/samples/*.json.sample >/dev/null 2>&1; then
+            cp -v firmware/micropython/config/samples/*.json.sample site/
+          fi
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
