@@ -30,6 +30,8 @@ A MicroPython-based LED lighting controller for the Dhamma Laddha Vipassana medi
 
 ## Configuration
 
+Tip: Use the helper-app hosted on github-pages to generate validated `config.json` and `sun_times.json` files.
+
 ### JSON Configuration (config.json)
 The system now uses JSON-based configuration for easy runtime updates:
 
@@ -123,16 +125,6 @@ The new Microdot-powered web interface provides:
 - **Evening/Night Windows**: Configure custom lighting schedules
 - **Overnight Windows**: Support for schedules crossing midnight
 - **Brightness Control**: 0-100% PWM duty cycle for each window
-
-## Contributing
-
-Contributions, issues, and feature requests are welcome!  
-Feel free to fork the repository and submit pull requests.
-
-## License
-
-This project is licensed under the **GNU General Public License v3.0 (GPLv3)**.  
-See the [LICENSE](LICENSE) file for details.
 
 ## Notifications (MQTT)
 The device can publish JSON events (window changes, errors, system events) to an MQTT broker.
@@ -291,18 +283,14 @@ Use an MQTT app (e.g., MQTT Dash on Android), connect to `broker.hivemq.com:1883
 The helper app in `helper-app/` is deployed to GitHub Pages via the workflow at `.github/workflows/gh-pages.yml`.
 
 - The site deploys automatically on pushes to the default branch (`main`/`master`).
-- For feature branches, open a Pull Request. You can automate merging with the "automerge" label.
+- For feature branches, open and merge a Pull Request. This will trigger automated github pages deployment.
 
-### Auto-merge PRs with the "automerge" label
+## Contributing
 
-We use `.github/workflows/auto-merge.yml` to merge PRs labeled `automerge` after all checks pass.
+Contributions, issues, and feature requests are welcome!  
+Feel free to fork the repository and submit pull requests.
 
-Steps:
-1. Create a PR targeting `main`.
-2. Add the label `automerge` to the PR.
-3. Wait for required checks to pass. The workflow will squash-merge the PR automatically.
-4. Merge to `main` triggers the Pages deploy workflow which publishes the latest `helper-app/` and includes `config.json.sample` and `sun_times.json.sample` at the site root.
+## License
 
-Recommended repo settings:
-- Settings → Branches → Protect `main` with required status checks (e.g., "Deploy helper app to GitHub Pages").
-- Settings → Pages → Build and deployment → Source = "GitHub Actions".
+This project is licensed under the **GNU General Public License v3.0 (GPLv3)**.  
+See the [LICENSE](LICENSE) file for details.
