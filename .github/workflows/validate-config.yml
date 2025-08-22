@@ -33,10 +33,13 @@ jobs:
       - name: Validate sample configs against schema (draft 2020-12)
         run: |
           set -e
-          ajv validate \
-            --spec=draft2020 \
-            --strict=false \
-            --allowUnionTypes \
-            --all-errors \
-            -s shared/json/config.schema.json \
-            -d firmware/micropython/config/samples/*.json.sample
+          for f in firmware/micropython/config/samples/*.json.sample; do
+            echo "Validating $f"
+            ajv validate \
+              --spec=draft2020 \
+              --strict=false \
+              --allow-union-types \
+              --all-errors \
+              -s shared/json/config.schema.json \
+              -d "$f"
+          done
