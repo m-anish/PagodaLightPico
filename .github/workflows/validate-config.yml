@@ -40,6 +40,7 @@ jobs:
               --strict=false \
               --allow-union-types \
               --all-errors \
+              --verbose \
               -s shared/json/config.schema.json \
-              -d "$f"
+              -d "@$f"
           done
