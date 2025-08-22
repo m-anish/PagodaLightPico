@@ -23,14 +23,16 @@ A MicroPython-based LED lighting controller for the Dhamma Laddha Vipassana medi
 ## Installation
 
 1. Clone this repository to your local machine.
-2. **Copy `config.json.sample` to `config.json`** and update it with your WiFi credentials, timezone offset/name, I2C pins, and other settings.
-3. **Copy `sun_times.json.sample` to `sun_times.json`** and adjust for your location (latitude/longitude) and local sunrise/sunset times.
+2. **Copy sample files to working files** from `firmware/micropython/config/samples/`:
+   - `cp firmware/micropython/config/samples/config.json.sample config.json`
+   - `cp firmware/micropython/config/samples/sun_times.json.sample sun_times.json`
+   Then update them with your WiFi credentials, timezone, I2C pins, and other settings.
 4. Copy all files to your Raspberry Pi Pico W.
 5. Boot the Pico W; the system will connect to WiFi, sync time, and start LED control.
 
 ## Configuration
 
-Tip: Use the helper-app hosted on github-pages to generate validated `config.json` and `sun_times.json` files.
+Tip: Use the helper app (deployed via GitHub Pages) to generate validated `config.json` and `sun_times.json` files.
 
 ### JSON Configuration (config.json)
 The system now uses JSON-based configuration for easy runtime updates:
@@ -269,18 +271,18 @@ Use an MQTT app (e.g., MQTT Dash on Android), connect to `broker.hivemq.com:1883
 - **mDNS**: If discovery fails, use IP or ensure multicast is allowed on your network.
 
 ## Developer Quickstart
-- Copy sample config: `cp config.json.sample config.json`
-- Copy sample sun times: `cp sun_times.json.sample sun_times.json`
-- Deploy files to Pico W (choose one tool):
-  - rshell: `rshell -p /dev/ttyACM0 cp -r . /pyboard/`
-  - ampy: `ampy -p /dev/ttyACM0 put lib/ && ampy -p /dev/ttyACM0 put main.py && ampy -p /dev/ttyACM0 put config.json && ampy -p /dev/ttyACM0 put sun_times.json`
+- Copy sample config: `cp firmware/micropython/config/samples/config.json.sample config.json`
+- Copy sample sun times: `cp firmware/micropython/config/samples/sun_times.json.sample sun_times.json`
+- Deploy firmware files to Pico W (choose one tool):
+  - rshell: `rshell -p /dev/ttyACM0 cp -r firmware/micropython/src/* /pyboard/` then `rshell -p /dev/ttyACM0 cp config.json /pyboard/ && rshell -p /dev/ttyACM0 cp sun_times.json /pyboard/`
+  - ampy: `ampy -p /dev/ttyACM0 put firmware/micropython/src/lib/ && ampy -p /dev/ttyACM0 put firmware/micropython/src/main.py && ampy -p /dev/ttyACM0 put config.json && ampy -p /dev/ttyACM0 put sun_times.json`
 - REPL/debug: `rshell -p /dev/ttyACM0 repl` or `screen /dev/ttyACM0 115200`
 - After edits: Ctrl+D in REPL for soft reset
 - Check memory in REPL: `import gc; gc.collect(); print(gc.mem_free())`
 
 ## Automated GitHub Pages deployment and Auto-merge
 
-The helper app in `helper-app/` is deployed to GitHub Pages via the workflow at `.github/workflows/gh-pages.yml`.
+The helper app in `web/app/` is deployed to GitHub Pages via the workflow at `.github/workflows/gh-pages.yml`.
 
 - The site deploys automatically on pushes to the default branch (`main`/`master`).
 - For feature branches, open and merge a Pull Request. This will trigger automated github pages deployment.
