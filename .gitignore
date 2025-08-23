@@ -32,3 +32,23 @@ sun_times.json
 *.tmp
 *.temp
 
+# ------------------------------------
+# KiCad generated/intermediate files
+# (scoped to hardware/kicad/ only)
+# Keeps .kicad_pcb and .kicad_sch tracked
+# ------------------------------------
+# Autosave and backup files
+hardware/kicad/**/*-backups/
+hardware/kicad/**/*.kicad_sch-bak
+hardware/kicad/**/*.kicad_pcb-bak
+hardware/kicad/**/*.bak
+hardware/kicad/**/*.bck
+
+# Project local settings (user-specific)
+hardware/kicad/**/*.kicad_prl
+hardware/kicad/**/fp-info-cache
+
+# Legacy cache/rescue and netlists
+hardware/kicad/**/*-cache.lib
+hardware/kicad/**/*-rescue.lib
+hardware/kicad/**/*.net
