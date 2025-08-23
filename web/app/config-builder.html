@@ -897,11 +897,9 @@
 
   <script type="module">
     // In-browser JSON Schema validation using Ajv v8 (2020) + formats
-    // Use namespace imports to handle CDN ESM variations (default vs named)
-    import * as Ajv2020Mod from 'https://cdn.jsdelivr.net/npm/ajv@8/dist/2020.js';
-    import * as AjvFormatsMod from 'https://cdn.jsdelivr.net/npm/ajv-formats@2/dist/index.js';
-    const Ajv2020 = Ajv2020Mod.default || Ajv2020Mod;
-    const addFormats = AjvFormatsMod.default || AjvFormatsMod;
+    // Force ESM via jsDelivr's +esm transformer to avoid CJS `exports` errors
+    import Ajv2020 from 'https://cdn.jsdelivr.net/npm/ajv@8/dist/2020.js/+esm';
+    import addFormats from 'https://cdn.jsdelivr.net/npm/ajv-formats@2/dist/index.js/+esm';
 
     const SCHEMA_URL = './config.schema.json';
 
