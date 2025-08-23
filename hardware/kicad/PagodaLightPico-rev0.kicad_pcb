@@ -1,9 +1,5 @@
-(kicad_pcb (version 20211014) (generator pcbnew)
-
-  (general
-    (thickness 1.6)
-  )
-
+ (kicad_pcb (version 20211014) (generator pcbnew)
+  (general (thickness 1.6))
   (paper "A4")
   (layers
     (0 "F.Cu" signal)
@@ -27,7 +23,6 @@
     (48 "B.Fab" user)
     (49 "F.Fab" user)
   )
-
   (setup
     (stackup
       (layer "F.Cu" (type signal))
@@ -36,53 +31,12 @@
     )
     (pcbplotparams
       (layerselection 0x00010fc_ffffffff)
+      (outputformat 1)
       (usegerberextensions true)
       (usegerberattributes true)
-      (usegerberadvancedattributes true)
       (creategerberjobfile true)
-      (subtractmaskfromsilk false)
-      (outputformat 1)
-      (mirror false)
-      (drillshape 1)
-      (scaleselection 1)
-      (outputdirectory "gerbers")
+      (outputdirectory "gerbers/")
     )
-  )
-
-  ;; Board outline: 100mm x 80mm rectangle with 3mm corner radius
-  (gr_rect (start 0 0) (end 100 80) (layer "Edge.Cuts") (width 0.15) (fill none) (radius 3))
-
-  ;; Mounting holes (M3, ~3.2mm pad) placed 6mm from each corner
-  (module "MountingHole:MountingHole_3.2mm_M3" (layer "F.Cu") (tedit 5B9249C0) (tstamp 1)
-    (at 6 6)
-    (descr "Mounting Hole 3.2mm, M3")
-    (fp_text reference "H1" (at 0 -4) (layer "F.SilkS") hide)
-    (fp_text value "MountingHole" (at 0 4) (layer "F.Fab") hide)
-    (pad 1 thru_hole circle (at 0 0) (size 6 6) (drill 3.2) (layers *.Cu *.Mask))
-  )
-
-  (module "MountingHole:MountingHole_3.2mm_M3" (layer "F.Cu") (tedit 5B9249C0) (tstamp 2)
-    (at 94 6)
-    (descr "Mounting Hole 3.2mm, M3")
-    (fp_text reference "H2" (at 0 -4) (layer "F.SilkS") hide)
-    (fp_text value "MountingHole" (at 0 4) (layer "F.Fab") hide)
-    (pad 1 thru_hole circle (at 0 0) (size 6 6) (drill 3.2) (layers *.Cu *.Mask))
-  )
-
-  (module "MountingHole:MountingHole_3.2mm_M3" (layer "F.Cu") (tedit 5B9249C0) (tstamp 3)
-    (at 94 74)
-    (descr "Mounting Hole 3.2mm, M3")
-    (fp_text reference "H3" (at 0 -4) (layer "F.SilkS") hide)
-    (fp_text value "MountingHole" (at 0 4) (layer "F.Fab") hide)
-    (pad 1 thru_hole circle (at 0 0) (size 6 6) (drill 3.2) (layers *.Cu *.Mask))
-  )
-
-  (module "MountingHole:MountingHole_3.2mm_M3" (layer "F.Cu") (tedit 5B9249C0) (tstamp 4)
-    (at 6 74)
-    (descr "Mounting Hole 3.2mm, M3")
-    (fp_text reference "H4" (at 0 -4) (layer "F.SilkS") hide)
-    (fp_text value "MountingHole" (at 0 4) (layer "F.Fab") hide)
-    (pad 1 thru_hole circle (at 0 0) (size 6 6) (drill 3.2) (layers *.Cu *.Mask))
   )
 )
 
